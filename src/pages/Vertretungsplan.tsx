@@ -5,8 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Calendar, Plus, Edit, Trash2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ArrowLeft, Calendar, Plus, Edit, Trash2, Clock } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SubstitutionEntry {
   id: string;
@@ -20,28 +23,47 @@ interface SubstitutionEntry {
   note?: string;
 }
 
+interface ScheduleEntry {
+  period?: number;
+  Stunde?: number;
+  monday?: string;
+  tuesday?: string;
+  wednesday?: string;
+  thursday?: string;
+  friday?: string;
+}
+
+interface ParsedScheduleEntry {
+  subject: string;
+  teacher: string;
+  room: string;
+}
+
 const Vertretungsplan = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const [substitutions, setSubstitutions] = useState<SubstitutionEntry[]>([]);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newSubstitution, setNewSubstitution] = useState({
-    date: '',
-    class: '',
-    period: 1,
-    subject: '',
-    teacher: '',
+  const [schedules, setSchedules] = useState<{ [key: string]: ScheduleEntry[] }>({});
+  const [showSubstitutionDialog, setShowSubstitutionDialog] = useState(false);
+  const [selectedScheduleEntry, setSelectedScheduleEntry] = useState<{
+    class: string;
+    day: string;
+    period: number;
+    entry: ParsedScheduleEntry;
+  } | null>(null);
+  const [substitutionData, setSubstitutionData] = useState({
     substituteTeacher: '',
-    room: '',
     note: ''
   });
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedClass, setSelectedClass] = useState('10b');
 
   useEffect(() => {
     if (!user) {
       navigate('/auth');
       return;
     }
-    if (profile && profile.permission_lvl < 5) {
+    if (profile && profile.permission_lvl < 6) {
       toast({
         variant: "destructive",
         title: "Zugriff verweigert",
@@ -50,62 +72,118 @@ const Vertretungsplan = () => {
       navigate('/');
       return;
     }
-    // Sample data
+    
+    fetchSchedules();
+    // Sample substitution data
     setSubstitutions([
       {
         id: '1',
         date: new Date().toISOString().split('T')[0],
-        class: '10b_A',
+        class: '10b',
         period: 3,
-        subject: 'Mathematik',
-        teacher: 'Herr Schmidt',
-        substituteTeacher: 'Frau Müller',
-        room: 'R201',
+        subject: 'MA',
+        teacher: 'Kön',
+        substituteTeacher: 'Müller',
+        room: '203',
         note: 'Arbeitsblätter mitbringen'
-      },
-      {
-        id: '2',
-        date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-        class: '10c_A',
-        period: 5,
-        subject: 'Deutsch',
-        teacher: 'Frau Weber',
-        substituteTeacher: 'Herr König',
-        room: 'R105'
       }
     ]);
   }, [user, profile, navigate]);
 
-  const handleCreateSubstitution = () => {
-    if (!newSubstitution.date || !newSubstitution.class || !newSubstitution.subject) {
-      toast({
-        variant: "destructive",
-        title: "Fehler",
-        description: "Bitte füllen Sie alle Pflichtfelder aus."
+  const fetchSchedules = async () => {
+    try {
+      const { data: schedule10b } = await supabase.from('Stundenplan_10b_A').select('*');
+      const { data: schedule10c } = await supabase.from('Stundenplan_10c_A').select('*');
+      
+      // Transform data to match ScheduleEntry interface
+      const transform = (data: any[]) => data.map(item => ({
+        period: item.Stunde,
+        monday: item.monday,
+        tuesday: item.tuesday,
+        wednesday: item.wednesday,
+        thursday: item.thursday,
+        friday: item.friday
+      }));
+      
+      setSchedules({
+        '10b': transform(schedule10b || []),
+        '10c': transform(schedule10c || [])
       });
-      return;
+    } catch (error) {
+      console.error('Error fetching schedules:', error);
     }
+  };
+
+  const parseScheduleEntry = (entry: string): ParsedScheduleEntry[] => {
+    if (!entry || entry.trim() === '') return [];
+    
+    // Split by | for multiple subjects in one period
+    const subjects = entry.split('|').map(s => s.trim());
+    
+    return subjects.map(subject => {
+      const parts = subject.split(' ');
+      if (parts.length >= 3) {
+        return {
+          subject: parts[0],
+          teacher: parts[1],
+          room: parts[2]
+        };
+      }
+      return {
+        subject: subject,
+        teacher: '',
+        room: ''
+      };
+    });
+  };
+
+  const getDayColumn = (day: string) => {
+    const schedule = schedules[selectedClass] || [];
+    return schedule.map(entry => ({
+      period: entry.period,
+      content: entry[day as keyof ScheduleEntry] as string
+    }));
+  };
+
+  const hasSubstitution = (classname: string, day: string, period: number) => {
+    return substitutions.some(sub => 
+      sub.class === classname && 
+      sub.date === selectedDate && 
+      sub.period === period
+    );
+  };
+
+  const getSubstitution = (classname: string, day: string, period: number) => {
+    return substitutions.find(sub => 
+      sub.class === classname && 
+      sub.date === selectedDate && 
+      sub.period === period
+    );
+  };
+
+  const handleCellClick = (classname: string, day: string, period: number, entry: ParsedScheduleEntry) => {
+    setSelectedScheduleEntry({ class: classname, day, period, entry });
+    setSubstitutionData({ substituteTeacher: '', note: '' });
+    setShowSubstitutionDialog(true);
+  };
+
+  const handleCreateSubstitution = () => {
+    if (!selectedScheduleEntry) return;
 
     const substitution: SubstitutionEntry = {
       id: Date.now().toString(),
-      ...newSubstitution
+      date: selectedDate,
+      class: selectedScheduleEntry.class,
+      period: selectedScheduleEntry.period,
+      subject: selectedScheduleEntry.entry.subject,
+      teacher: selectedScheduleEntry.entry.teacher,
+      substituteTeacher: substitutionData.substituteTeacher,
+      room: selectedScheduleEntry.entry.room,
+      note: substitutionData.note
     };
 
-    setSubstitutions([...substitutions, substitution].sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    ));
-    
-    setNewSubstitution({
-      date: '',
-      class: '',
-      period: 1,
-      subject: '',
-      teacher: '',
-      substituteTeacher: '',
-      room: '',
-      note: ''
-    });
-    setShowCreateForm(false);
+    setSubstitutions([...substitutions, substitution]);
+    setShowSubstitutionDialog(false);
     
     toast({
       title: "Vertretung erstellt",
@@ -130,7 +208,7 @@ const Vertretungsplan = () => {
     });
   };
 
-  const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >= 5;
+  const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >= 6;
 
   return (
     <div className="min-h-screen bg-background">
@@ -151,12 +229,30 @@ const Vertretungsplan = () => {
                 </div>
               </div>
             </div>
-            {canEditSubstitutions && (
-              <Button onClick={() => setShowCreateForm(!showCreateForm)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Neue Vertretung
-              </Button>
-            )}
+            <div className="flex items-center gap-4">
+              <div>
+                <Label htmlFor="date">Datum</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-40"
+                />
+              </div>
+              <div>
+                <Label htmlFor="class">Klasse</Label>
+                <Select value={selectedClass} onValueChange={setSelectedClass}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10b">10b</SelectItem>
+                    <SelectItem value="10c">10c</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -164,137 +260,104 @@ const Vertretungsplan = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-6">
-          {/* Create Form */}
-          {showCreateForm && canEditSubstitutions && (
+          {/* Schedule Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Stundenplan {selectedClass} - {formatDate(selectedDate)}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-border">
+                  <thead>
+                    <tr>
+                      <th className="border border-border p-2 bg-muted">Stunde</th>
+                      <th className="border border-border p-2 bg-muted">Montag</th>
+                      <th className="border border-border p-2 bg-muted">Dienstag</th>
+                      <th className="border border-border p-2 bg-muted">Mittwoch</th>
+                      <th className="border border-border p-2 bg-muted">Donnerstag</th>
+                      <th className="border border-border p-2 bg-muted">Freitag</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(schedules[selectedClass] || []).map((entry) => (
+                      <tr key={entry.period}>
+                        <td className="border border-border p-2 font-medium bg-muted">{entry.period}</td>
+                        {['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].map((day) => {
+                          const dayEntry = entry[day as keyof ScheduleEntry] as string;
+                          const parsedEntries = parseScheduleEntry(dayEntry);
+                          const isSubstituted = hasSubstitution(selectedClass, day, entry.period);
+                          const substitution = getSubstitution(selectedClass, day, entry.period);
+
+                          return (
+                            <td key={day} className="border border-border p-1">
+                              <div className="space-y-1">
+                                {parsedEntries.map((parsed, idx) => (
+                                  <div
+                                    key={idx}
+                                    className={`p-2 rounded cursor-pointer transition-colors min-h-[60px] flex flex-col justify-center ${
+                                      isSubstituted 
+                                        ? 'bg-destructive/20 text-destructive border border-destructive/50' 
+                                        : 'hover:bg-muted/50'
+                                    }`}
+                                    onClick={() => canEditSubstitutions && handleCellClick(selectedClass, day, entry.period, parsed)}
+                                  >
+                                    <div className="text-sm font-medium">
+                                      {isSubstituted ? substitution?.subject : parsed.subject}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {isSubstituted ? substitution?.substituteTeacher : parsed.teacher}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {isSubstituted ? substitution?.room : parsed.room}
+                                    </div>
+                                    {isSubstituted && substitution?.note && (
+                                      <div className="text-xs text-destructive mt-1">
+                                        {substitution.note}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {canEditSubstitutions && (
+                <p className="text-sm text-muted-foreground mt-4">
+                  Klicken Sie auf eine Stunde, um eine Vertretung zu erstellen.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Active Substitutions List */}
+          {substitutions.filter(sub => sub.date === selectedDate && sub.class === selectedClass).length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Neue Vertretung erstellen</CardTitle>
+                <CardTitle>Vertretungen für {formatDate(selectedDate)}</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="date">Datum *</Label>
-                    <Input
-                      id="date"
-                      type="date"
-                      value={newSubstitution.date}
-                      onChange={(e) => setNewSubstitution({...newSubstitution, date: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="class">Klasse *</Label>
-                    <Input
-                      id="class"
-                      value={newSubstitution.class}
-                      onChange={(e) => setNewSubstitution({...newSubstitution, class: e.target.value})}
-                      placeholder="z.B. 10b_A"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="period">Stunde</Label>
-                    <Input
-                      id="period"
-                      type="number"
-                      min="1"
-                      max="10"
-                      value={newSubstitution.period}
-                      onChange={(e) => setNewSubstitution({...newSubstitution, period: parseInt(e.target.value)})}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="subject">Fach *</Label>
-                    <Input
-                      id="subject"
-                      value={newSubstitution.subject}
-                      onChange={(e) => setNewSubstitution({...newSubstitution, subject: e.target.value})}
-                      placeholder="z.B. Mathematik"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="teacher">Ursprünglicher Lehrer</Label>
-                    <Input
-                      id="teacher"
-                      value={newSubstitution.teacher}
-                      onChange={(e) => setNewSubstitution({...newSubstitution, teacher: e.target.value})}
-                      placeholder="z.B. Herr Schmidt"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="substituteTeacher">Vertretungslehrer</Label>
-                    <Input
-                      id="substituteTeacher"
-                      value={newSubstitution.substituteTeacher}
-                      onChange={(e) => setNewSubstitution({...newSubstitution, substituteTeacher: e.target.value})}
-                      placeholder="z.B. Frau Müller"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="room">Raum</Label>
-                    <Input
-                      id="room"
-                      value={newSubstitution.room}
-                      onChange={(e) => setNewSubstitution({...newSubstitution, room: e.target.value})}
-                      placeholder="z.B. R201"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <Label htmlFor="note">Notiz</Label>
-                    <Input
-                      id="note"
-                      value={newSubstitution.note}
-                      onChange={(e) => setNewSubstitution({...newSubstitution, note: e.target.value})}
-                      placeholder="Zusätzliche Informationen"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-2 mt-4">
-                  <Button onClick={handleCreateSubstitution}>Vertretung hinzufügen</Button>
-                  <Button variant="outline" onClick={() => setShowCreateForm(false)}>
-                    Abbrechen
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Substitutions List */}
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold">Aktuelle Vertretungen</h2>
-            
-            {substitutions.map((substitution) => (
-              <Card key={substitution.id}>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 flex-1">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Datum</p>
-                        <p className="font-medium">{formatDate(substitution.date)}</p>
+                <div className="space-y-2">
+                  {substitutions
+                    .filter(sub => sub.date === selectedDate && sub.class === selectedClass)
+                    .map((substitution) => (
+                    <div key={substitution.id} className="flex items-center justify-between p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                      <div className="flex items-center gap-4">
+                        <span className="font-medium">{substitution.period}. Std</span>
+                        <span>{substitution.subject}</span>
+                        <span className="text-muted-foreground">
+                          {substitution.teacher} → {substitution.substituteTeacher || 'Entfall'}
+                        </span>
+                        <span className="text-muted-foreground">{substitution.room}</span>
                       </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Klasse & Stunde</p>
-                        <p className="font-medium">{substitution.class} - {substitution.period}. Std</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Fach</p>
-                        <p className="font-medium">{substitution.subject}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Vertretung</p>
-                        <p className="font-medium">
-                          {substitution.teacher && `${substitution.teacher} → `}
-                          {substitution.substituteTeacher || 'Entfall'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Raum</p>
-                        <p className="font-medium">{substitution.room || '-'}</p>
-                      </div>
-                    </div>
-                    {canEditSubstitutions && (
-                      <div className="flex gap-2 ml-4">
-                        <Button variant="ghost" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                      {canEditSubstitutions && (
                         <Button 
                           variant="ghost" 
                           size="sm" 
@@ -303,30 +366,66 @@ const Vertretungsplan = () => {
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                      </div>
-                    )}
-                  </div>
-                  {substitution.note && (
-                    <div className="mt-4 p-3 bg-muted rounded-md">
-                      <p className="text-sm text-muted-foreground">Notiz:</p>
-                      <p className="text-sm">{substitution.note}</p>
+                      )}
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-
-            {substitutions.length === 0 && (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">Keine Vertretungen vorhanden.</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </main>
+
+      {/* Substitution Dialog */}
+      <Dialog open={showSubstitutionDialog} onOpenChange={setShowSubstitutionDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Vertretung erstellen</DialogTitle>
+          </DialogHeader>
+          {selectedScheduleEntry && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="text-sm text-muted-foreground">Ursprünglicher Unterricht:</div>
+                <div className="p-3 bg-muted rounded-md">
+                  <div className="font-medium">{selectedScheduleEntry.entry.subject}</div>
+                  <div className="text-sm">{selectedScheduleEntry.entry.teacher}</div>
+                  <div className="text-sm">{selectedScheduleEntry.entry.room}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {selectedScheduleEntry.period}. Stunde - {selectedScheduleEntry.class}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="substituteTeacher">Vertretungslehrer</Label>
+                <Input
+                  id="substituteTeacher"
+                  value={substitutionData.substituteTeacher}
+                  onChange={(e) => setSubstitutionData({...substitutionData, substituteTeacher: e.target.value})}
+                  placeholder="Leer lassen für Entfall"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="note">Notiz (optional)</Label>
+                <Input
+                  id="note"
+                  value={substitutionData.note}
+                  onChange={(e) => setSubstitutionData({...substitutionData, note: e.target.value})}
+                  placeholder="Zusätzliche Informationen"
+                />
+              </div>
+              
+              <div className="flex gap-2">
+                <Button onClick={handleCreateSubstitution}>Vertretung erstellen</Button>
+                <Button variant="outline" onClick={() => setShowSubstitutionDialog(false)}>
+                  Abbrechen
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

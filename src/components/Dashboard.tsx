@@ -34,13 +34,13 @@ const Dashboard = () => {
 
   const getPermissionBadgeVariant = (level: number) => {
     if (level >= 8) return "default"; // Schulleitung
-    if (level >= 5) return "secondary"; // Lehrer
+    if (level >= 6) return "secondary"; // Lehrer
     return "outline"; // Schüler
   };
 
   const getPermissionColor = (level: number) => {
     if (level >= 8) return "text-primary";
-    if (level >= 5) return "text-secondary-foreground";
+    if (level >= 6) return "text-secondary-foreground";
     return "text-muted-foreground";
   };
 
@@ -101,7 +101,7 @@ const Dashboard = () => {
                 <p className="font-medium text-foreground">{profile?.name || user?.email}</p>
                 <div className="flex items-center gap-2">
                   <Badge variant={getPermissionBadgeVariant(profile?.permission_lvl || 1)}>
-                    {profile?.permission_lvl >= 8 ? "Schulleitung" : profile?.permission_lvl >= 5 ? "Lehrkraft" : "Schüler"}
+                    {profile?.permission_lvl >= 8 ? "Schulleitung" : profile?.permission_lvl >= 6 ? "Lehrkraft" : "Schüler"}
                   </Badge>
                   <span className={`text-sm ${getPermissionColor(profile?.permission_lvl || 1)}`}>
                     Level {profile?.permission_lvl || 1}
@@ -135,7 +135,7 @@ const Dashboard = () => {
                   ? "Als Schulleitung haben Sie Zugriff auf alle Systemfunktionen."
                   : profile?.permission_lvl && profile.permission_lvl >= 8
                   ? "Als Administrator haben Sie Zugriff auf alle Systemfunktionen."
-                  : profile?.permission_lvl && profile.permission_lvl >= 5
+                  : profile?.permission_lvl && profile.permission_lvl >= 6
                   ? "Als Lehrkraft können Sie Stundenpläne und Ankündigungen verwalten."
                   : "Als Schüler können Sie Ihren Stundenplan einsehen und den Hausaufgaben-Assistenten nutzen."
                 }
@@ -152,7 +152,7 @@ const Dashboard = () => {
           )}
 
           {/* Teacher Features */}
-          {profile?.permission_lvl && profile.permission_lvl >= 5 && (
+          {profile?.permission_lvl && profile.permission_lvl >= 6 && (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-foreground">
                 {profile.permission_lvl >= 8 ? "Lehrkraft-Funktionen" : "Ihre Funktionen"}
@@ -164,7 +164,7 @@ const Dashboard = () => {
           {/* Student Features */}
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-foreground">
-              {profile?.permission_lvl && profile.permission_lvl >= 5 ? "Schüler-Funktionen" : "Ihre Funktionen"}
+              {profile?.permission_lvl && profile.permission_lvl >= 6 ? "Schüler-Funktionen" : "Ihre Funktionen"}
             </h2>
             {renderFeatureCards(studentFeatures)}
           </div>

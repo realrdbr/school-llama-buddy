@@ -25,7 +25,7 @@ const Klassenverwaltung = () => {
       navigate('/auth');
       return;
     }
-    if (profile && profile.permission_lvl < 5) {
+    if (profile && profile.permission_lvl < 6) {
       toast({
         variant: "destructive",
         title: "Zugriff verweigert",
@@ -38,31 +38,31 @@ const Klassenverwaltung = () => {
     // Sample data
     setClasses([
       {
-        name: '10b_A',
+        name: '10b',
         students: 24,
         classTeacher: 'Frau Kunadt',
         room: 'R201',
         subjects: ['Mathematik', 'Deutsch', 'Englisch', 'Geschichte', 'Biologie', 'Physik']
       },
       {
-        name: '10c_A',
+        name: '10c',
         students: 22,
         classTeacher: 'Herr König',
         room: 'R205',
         subjects: ['Mathematik', 'Deutsch', 'Englisch', 'Geographie', 'Chemie', 'Sport']
       },
       {
-        name: '9a',
-        students: 26,
-        classTeacher: 'Herr Schmidt',
-        room: 'R103',
-        subjects: ['Mathematik', 'Deutsch', 'Englisch', 'Geschichte', 'Biologie']
+        name: 'Neue Klasse',
+        students: 0,
+        classTeacher: 'Noch nicht zugewiesen',
+        room: 'Noch nicht zugewiesen',
+        subjects: ['Platzhalter']
       }
     ]);
   }, [user, profile, navigate]);
 
   const navigateToSchedule = (className: string) => {
-    if (className === '10b_A' || className === '10c_A') {
+    if (className === '10b' || className === '10c') {
       navigate('/stundenplan');
     } else {
       toast({
@@ -164,7 +164,7 @@ const Klassenverwaltung = () => {
                         <BookOpen className="h-5 w-5" />
                         Klasse {classInfo.name}
                       </CardTitle>
-                      {(classInfo.name === '10b_A' || classInfo.name === '10c_A') && (
+                      {(classInfo.name === '10b' || classInfo.name === '10c') && (
                         <Badge variant="secondary">Stundenplan verfügbar</Badge>
                       )}
                     </div>

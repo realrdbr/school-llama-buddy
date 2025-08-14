@@ -62,6 +62,29 @@ const Stundenplan = () => {
     }
   };
 
+  const parseScheduleEntry = (entry: string) => {
+    if (!entry || entry.trim() === '') return [];
+    
+    // Split by | for multiple subjects in one period
+    const subjects = entry.split('|').map(s => s.trim());
+    
+    return subjects.map(subject => {
+      const parts = subject.split(' ');
+      if (parts.length >= 3) {
+        return {
+          subject: parts[0],
+          teacher: parts[1],
+          room: parts[2]
+        };
+      }
+      return {
+        subject: subject,
+        teacher: '',
+        room: ''
+      };
+    });
+  };
+
   const renderScheduleTable = (schedule: ScheduleEntry[], className: string) => {
     const days = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'];
     const dayKeys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
@@ -85,11 +108,28 @@ const Stundenplan = () => {
                 <td className="border border-border p-3 font-medium">
                   {entry.Stunde}. Stunde
                 </td>
-                {dayKeys.map((day) => (
-                  <td key={day} className="border border-border p-3">
-                    {entry[day] || '-'}
-                  </td>
-                ))}
+                {dayKeys.map((day) => {
+                  const dayEntry = entry[day];
+                  const parsedEntries = parseScheduleEntry(dayEntry);
+
+                  return (
+                    <td key={day} className="border border-border p-2">
+                      <div className="space-y-1">
+                        {parsedEntries.length > 0 ? (
+                          parsedEntries.map((parsed, idx) => (
+                            <div key={idx} className="p-2 bg-muted/30 rounded text-sm">
+                              <div className="font-medium">{parsed.subject}</div>
+                              <div className="text-muted-foreground">{parsed.teacher}</div>
+                              <div className="text-muted-foreground">{parsed.room}</div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center text-muted-foreground">-</div>
+                        )}
+                      </div>
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
@@ -130,34 +170,34 @@ const Stundenplan = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-8">
-          {/* Class 10b_A */}
+          {/* Class 10b */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5" />
-                Klasse 10b_A
+                Klasse 10b
               </CardTitle>
             </CardHeader>
             <CardContent>
               {schedule10bA.length > 0 ? (
-                renderScheduleTable(schedule10bA, "10b_A")
+                renderScheduleTable(schedule10bA, "10b")
               ) : (
                 <p className="text-muted-foreground">Kein Stundenplan verfügbar.</p>
               )}
             </CardContent>
           </Card>
 
-          {/* Class 10c_A */}
+          {/* Class 10c */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5" />
-                Klasse 10c_A
+                Klasse 10c
               </CardTitle>
             </CardHeader>
             <CardContent>
               {schedule10cA.length > 0 ? (
-                renderScheduleTable(schedule10cA, "10c_A")
+                renderScheduleTable(schedule10cA, "10c")
               ) : (
                 <p className="text-muted-foreground">Kein Stundenplan verfügbar.</p>
               )}
