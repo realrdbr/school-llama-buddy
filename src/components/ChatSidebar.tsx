@@ -30,10 +30,14 @@ const ChatSidebar = ({ currentConversationId, onConversationSelect, onNewChat }:
     if (!profile?.id) return;
 
     try {
+      // Get the real user_id from auth session
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || profile.id.toString();
+      
       const { data, error } = await supabase
         .from('chat_conversations')
         .select('id, title, created_at, updated_at')
-        .eq('user_id', profile.id.toString())
+        .eq('user_id', userId)
         .order('updated_at', { ascending: false });
 
       if (error) throw error;

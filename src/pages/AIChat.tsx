@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, Loader2, Bot, ArrowLeft } from 'lucide-react';
+import { Send, Loader2, Bot, ArrowLeft, Upload, Paperclip, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import ChatSidebar from '@/components/ChatSidebar';
 
@@ -22,6 +22,7 @@ const AIChat = () => {
   const [conversation, setConversation] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -74,10 +75,14 @@ const AIChat = () => {
     if (!profile?.id) return null;
 
     try {
+      // First, check if user has auth session and get the real user_id
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || profile.id.toString();
+      
       const { data, error } = await supabase
         .from('chat_conversations')
         .insert({
-          user_id: profile.id.toString(),
+          user_id: userId,
           title: firstMessage.slice(0, 50) + (firstMessage.length > 50 ? '...' : '')
         })
         .select()
@@ -91,20 +96,63 @@ const AIChat = () => {
     }
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf', 'text/plain'];
+    
+    const validFiles = files.filter(file => {
+      if (!allowedTypes.includes(file.type)) {
+        toast({
+          title: "Fehler",
+          description: `Dateityp ${file.type} nicht unterstützt. Erlaubt: PNG, JPG, PDF, TXT`,
+          variant: "destructive"
+        });
+        return false;
+      }
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        toast({
+          title: "Fehler", 
+          description: `Datei ${file.name} ist zu groß (max. 10MB)`,
+          variant: "destructive"
+        });
+        return false;
+      }
+      return true;
+    });
+
+    setUploadedFiles(prev => [...prev, ...validFiles]);
+  };
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() && uploadedFiles.length === 0 || isLoading) return;
 
-    const userMessage = { role: 'user' as const, content: input };
+    let messageContent = input;
+    
+    // Add file information to message if files are uploaded
+    if (uploadedFiles.length > 0) {
+      const fileDescriptions = uploadedFiles.map(file => 
+        `📎 ${file.name} (${file.type}, ${(file.size / 1024).toFixed(1)} KB)`
+      ).join('\n');
+      messageContent = `${input}\n\n--- Angehängte Dateien ---\n${fileDescriptions}`;
+    }
+    
+    const userMessage = { role: 'user' as const, content: messageContent };
     setConversation(prev => [...prev, userMessage]);
     setIsLoading(true);
     const currentInput = input;
+    const currentFiles = uploadedFiles;
     setInput('');
+    setUploadedFiles([]);
 
     // Create conversation if it doesn't exist
     let conversationId = currentConversationId;
     if (!conversationId) {
-      conversationId = await createNewConversation(currentInput);
+      conversationId = await createNewConversation(currentInput || 'Datei-Upload');
       if (conversationId) {
         setCurrentConversationId(conversationId);
       }
@@ -116,6 +164,29 @@ const AIChat = () => {
     }
 
     try {
+      // Process uploaded files for context
+      let fileContext = '';
+      if (currentFiles.length > 0) {
+        fileContext = '\n\nBEIGEFÜGTE DATEIEN:\n';
+        for (const file of currentFiles) {
+          fileContext += `- ${file.name} (${file.type})\n`;
+          
+          // Read file content for context (simplified)
+          if (file.type.startsWith('text/')) {
+            try {
+              const text = await file.text();
+              fileContext += `  Inhalt: ${text.substring(0, 500)}${text.length > 500 ? '...' : ''}\n`;
+            } catch (error) {
+              fileContext += `  (Text konnte nicht gelesen werden)\n`;
+            }
+          } else if (file.type.startsWith('image/')) {
+            fileContext += `  (Bild-Datei - Analyse nicht implementiert)\n`;
+          } else if (file.type === 'application/pdf') {
+            fileContext += `  (PDF-Datei - Analyse nicht implementiert)\n`;
+          }
+        }
+      }
+
       const response = await fetch('http://localhost:11434/api/chat', {
         method: 'POST',
         headers: {
@@ -150,10 +221,10 @@ WICHTIGE REGELN:
 3. Beispiel: "AKTION:CREATE_ANNOUNCEMENT|title:Wichtiger Hinweis|content:Morgen ist schulfrei|priority:high"
 4. Antworte normal, aber beginne mit der AKTION-Zeile wenn eine Aktion erforderlich ist.
 
-Antworte auf Deutsch und führe die angeforderten Aktionen aus.`
+Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
             },
             ...conversation,
-            { role: 'user', content: currentInput }
+            { role: 'user', content: currentInput + fileContext }
           ],
           stream: false
         }),
@@ -255,6 +326,7 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.`
     setCurrentConversationId(null);
     setConversation([]);
     setInput('');
+    setUploadedFiles([]);
   };
 
   // Handle initial message from location state
@@ -346,21 +418,70 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.`
             {/* Input */}
             <Card>
               <CardContent className="pt-6">
-                <form onSubmit={handleSubmit} className="flex gap-2">
-                  <Input
-                    placeholder="Stellen Sie hier Ihre Frage oder bitten Sie um eine Aktion..."
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    disabled={isLoading}
-                    className="flex-1"
-                  />
-                  <Button type="submit" disabled={!input.trim() || isLoading}>
-                    {isLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                  </Button>
+                {/* File Upload Area */}
+                {uploadedFiles.length > 0 && (
+                  <div className="mb-4 p-3 bg-muted rounded-lg">
+                    <p className="text-sm font-medium mb-2">Angehängte Dateien:</p>
+                    <div className="space-y-2">
+                      {uploadedFiles.map((file, index) => (
+                        <div key={index} className="flex items-center justify-between bg-background p-2 rounded">
+                          <div className="flex items-center gap-2">
+                            <Paperclip className="h-4 w-4" />
+                            <span className="text-sm">{file.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({(file.size / 1024).toFixed(1)} KB)
+                            </span>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeFile(index)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <form onSubmit={handleSubmit} className="space-y-3">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Stellen Sie hier Ihre Frage oder bitten Sie um eine Aktion..."
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      disabled={isLoading}
+                      className="flex-1"
+                    />
+                    <input
+                      type="file"
+                      id="file-upload"
+                      multiple
+                      accept=".png,.jpg,.jpeg,.pdf,.txt"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => document.getElementById('file-upload')?.click()}
+                      disabled={isLoading}
+                    >
+                      <Upload className="h-4 w-4" />
+                    </Button>
+                    <Button type="submit" disabled={(!input.trim() && uploadedFiles.length === 0) || isLoading}>
+                      {isLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Unterstützte Dateien: PNG, JPG, PDF, TXT (max. 10MB)
+                  </p>
                 </form>
               </CardContent>
             </Card>
