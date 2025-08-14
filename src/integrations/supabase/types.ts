@@ -14,7 +14,119 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      permissions: {
+        Row: {
+          created_at: string
+          id: number
+          name: string
+          permission_lvl: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          name: string
+          permission_lvl?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          name?: string
+          permission_lvl?: number | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          permission_id: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id?: string
+          permission_id?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          permission_id?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_permission_id_fkey"
+            columns: ["permission_id"]
+            isOneToOne: false
+            referencedRelation: "permissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      Stundenplan_10b_A: {
+        Row: {
+          friday: string | null
+          monday: string | null
+          Stunde: number
+          thursday: string | null
+          tuesday: string | null
+          wednesday: string | null
+        }
+        Insert: {
+          friday?: string | null
+          monday?: string | null
+          Stunde?: number
+          thursday?: string | null
+          tuesday?: string | null
+          wednesday?: string | null
+        }
+        Update: {
+          friday?: string | null
+          monday?: string | null
+          Stunde?: number
+          thursday?: string | null
+          tuesday?: string | null
+          wednesday?: string | null
+        }
+        Relationships: []
+      }
+      Stundenplan_10c_A: {
+        Row: {
+          friday: string | null
+          monday: string | null
+          Stunde: number
+          thursday: string | null
+          tuesday: string | null
+          wednesday: string | null
+        }
+        Insert: {
+          friday?: string | null
+          monday?: string | null
+          Stunde?: number
+          thursday?: string | null
+          tuesday?: string | null
+          wednesday?: string | null
+        }
+        Update: {
+          friday?: string | null
+          monday?: string | null
+          Stunde?: number
+          thursday?: string | null
+          tuesday?: string | null
+          wednesday?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
