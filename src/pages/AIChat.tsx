@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,6 +22,15 @@ const AIChat = () => {
   const [conversation, setConversation] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [conversation]);
 
   // Load conversation when selected
   const loadConversation = async (conversationId: string) => {
@@ -274,14 +283,15 @@ Antworte auf Deutsch und erkläre nur die verfügbaren Funktionen der App.`
                         <p className="whitespace-pre-wrap">{message.content}</p>
                       </div>
                     ))}
-                    {isLoading && (
-                      <div className="flex items-center gap-2 p-4 bg-muted mr-8 rounded-lg">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>KI denkt nach...</span>
-                      </div>
-                    )}
-                  </div>
-                )}
+                     {isLoading && (
+                       <div className="flex items-center gap-2 p-4 bg-muted mr-8 rounded-lg">
+                         <Loader2 className="h-4 w-4 animate-spin" />
+                         <span>KI denkt nach...</span>
+                       </div>
+                     )}
+                     <div ref={messagesEndRef} />
+                   </div>
+                 )}
               </CardContent>
             </Card>
 
