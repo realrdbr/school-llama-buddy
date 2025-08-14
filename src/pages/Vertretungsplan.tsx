@@ -50,6 +50,7 @@ const Vertretungsplan = () => {
     day: string;
     period: number;
     entry: ParsedScheduleEntry;
+    targetDate?: string;
   } | null>(null);
   const [substitutionData, setSubstitutionData] = useState({
     substituteTeacher: '',
@@ -81,10 +82,27 @@ const Vertretungsplan = () => {
 
   const fetchSubstitutions = async () => {
     try {
+      // Get the week range for the selected date
+      const selectedDateObj = new Date(selectedDate + 'T00:00:00');
+      const dayOfWeek = selectedDateObj.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      
+      // Calculate start of week (Monday)
+      const startOfWeek = new Date(selectedDateObj);
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // If Sunday, go back 6 days
+      startOfWeek.setDate(startOfWeek.getDate() - daysToMonday);
+      
+      // Calculate end of week (Friday)
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(endOfWeek.getDate() + 4); // Monday + 4 = Friday
+      
+      const startDateString = startOfWeek.toISOString().split('T')[0];
+      const endDateString = endOfWeek.toISOString().split('T')[0];
+
       const { data, error } = await supabase
         .from('vertretungsplan')
         .select('*')
-        .eq('date', selectedDate);
+        .gte('date', startDateString)
+        .lte('date', endDateString);
 
       if (error) throw error;
 
@@ -173,22 +191,58 @@ const Vertretungsplan = () => {
   };
 
   const hasSubstitution = (classname: string, day: string, period: number) => {
+    // Get the actual date for this weekday in the selected week
+    const selectedDateObj = new Date(selectedDate + 'T00:00:00');
+    const dayOfWeek = selectedDateObj.getDay();
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const startOfWeek = new Date(selectedDateObj);
+    startOfWeek.setDate(startOfWeek.getDate() - daysToMonday);
+    
+    const dayMapping = { 'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 'friday': 4 };
+    const targetDay = new Date(startOfWeek);
+    targetDay.setDate(targetDay.getDate() + dayMapping[day as keyof typeof dayMapping]);
+    const targetDateString = targetDay.toISOString().split('T')[0];
+    
     return substitutions.some(sub => 
       sub.class === classname && 
-      sub.date === selectedDate && 
+      sub.date === targetDateString && 
       sub.period === period
     );
   };
 
   const getSubstitution = (classname: string, day: string, period: number) => {
+    // Get the actual date for this weekday in the selected week
+    const selectedDateObj = new Date(selectedDate + 'T00:00:00');
+    const dayOfWeek = selectedDateObj.getDay();
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const startOfWeek = new Date(selectedDateObj);
+    startOfWeek.setDate(startOfWeek.getDate() - daysToMonday);
+    
+    const dayMapping = { 'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 'friday': 4 };
+    const targetDay = new Date(startOfWeek);
+    targetDay.setDate(targetDay.getDate() + dayMapping[day as keyof typeof dayMapping]);
+    const targetDateString = targetDay.toISOString().split('T')[0];
+    
     return substitutions.find(sub => 
       sub.class === classname && 
-      sub.date === selectedDate && 
+      sub.date === targetDateString && 
       sub.period === period
     );
   };
 
   const handleCellClick = (classname: string, day: string, period: number, entry: ParsedScheduleEntry) => {
+    // Calculate the actual date for this specific weekday
+    const selectedDateObj = new Date(selectedDate + 'T00:00:00');
+    const dayOfWeek = selectedDateObj.getDay();
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const startOfWeek = new Date(selectedDateObj);
+    startOfWeek.setDate(startOfWeek.getDate() - daysToMonday);
+    
+    const dayMapping = { 'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 'friday': 4 };
+    const targetDay = new Date(startOfWeek);
+    targetDay.setDate(targetDay.getDate() + dayMapping[day as keyof typeof dayMapping]);
+    const targetDateString = targetDay.toISOString().split('T')[0];
+    
     // Only allow editing if there's no existing substitution for this specific date/class/period
     if (hasSubstitution(classname, day, period)) {
       toast({
@@ -198,7 +252,7 @@ const Vertretungsplan = () => {
       return;
     }
     
-    setSelectedScheduleEntry({ class: classname, day, period, entry });
+    setSelectedScheduleEntry({ class: classname, day, period, entry, targetDate: targetDateString });
     setSubstitutionData({ 
       substituteTeacher: '', 
       substituteSubject: entry.subject,
@@ -211,34 +265,12 @@ const Vertretungsplan = () => {
   const handleCreateSubstitution = async () => {
     if (!selectedScheduleEntry) return;
 
-    // Get the selected date and day of week
-    const selectedDateObj = new Date(selectedDate + 'T00:00:00');
-    const dayOfWeek = selectedDateObj.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    // Use the target date calculated in handleCellClick
+    const targetDate = selectedScheduleEntry.targetDate || selectedDate;
     
-    // Convert day names to day numbers
-    const dayMapping = {
-      'monday': 1,
-      'tuesday': 2, 
-      'wednesday': 3,
-      'thursday': 4,
-      'friday': 5
-    };
-    
-    const selectedDayNumber = dayMapping[selectedScheduleEntry.day as keyof typeof dayMapping];
-    
-    // Only create substitution if the selected date matches the day of the week
-    if (dayOfWeek !== selectedDayNumber) {
-      toast({
-        variant: "destructive",
-        title: "Datum passt nicht zum Wochentag",
-        description: `Das ausgewählte Datum ist kein ${getDayName(selectedScheduleEntry.day)}.`
-      });
-      return;
-    }
-
     const substitution: SubstitutionEntry = {
       id: Date.now().toString(),
-      date: selectedDate,
+      date: targetDate,
       class: selectedScheduleEntry.class,
       period: selectedScheduleEntry.period,
       subject: substitutionData.substituteSubject,
@@ -251,7 +283,7 @@ const Vertretungsplan = () => {
     // Save to database first
     try {
       const { error } = await supabase.from('vertretungsplan').insert({
-        date: selectedDate,
+        date: targetDate,
         class_name: selectedScheduleEntry.class,
         period: selectedScheduleEntry.period,
         original_subject: selectedScheduleEntry.entry.subject,
@@ -269,8 +301,9 @@ const Vertretungsplan = () => {
       }
 
       // Create automatic announcement for ALL users
+      const targetDateFormatted = formatDate(targetDate);
       const { error: announcementError } = await supabase.from('announcements').insert({
-        title: `Vertretungsplan geändert - ${formatDate(selectedDate)}`,
+        title: `Vertretungsplan geändert - ${targetDateFormatted}`,
         content: `Klasse ${selectedScheduleEntry.class}, ${getDayName(selectedScheduleEntry.day)} ${selectedScheduleEntry.period}. Stunde: ${substitutionData.substituteSubject} wird von ${substitutionData.substituteTeacher || 'ENTFALL'} vertreten (Raum: ${substitutionData.substituteRoom})`,
         author: profile?.name || 'Lehrkraft',
         priority: 'high'
@@ -332,7 +365,7 @@ const Vertretungsplan = () => {
     });
   };
 
-  const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >= 5;
+  const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >= 10;
 
   return (
     <div className="min-h-screen bg-background">
@@ -421,30 +454,23 @@ const Vertretungsplan = () => {
                             <td key={day} className="border border-border p-1">
                               <div className="space-y-1">
                                 {parsedEntries.map((parsed, idx) => {
-                                  // Get the actual date for this specific weekday
+                                  // Get the actual date for this weekday in the selected week
                                   const selectedDateObj = new Date(selectedDate + 'T00:00:00');
-                                  const dayOfWeek = selectedDateObj.getDay(); // 0 = Sunday, 1 = Monday, etc.
+                                  const dayOfWeek = selectedDateObj.getDay();
+                                  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                                  const startOfWeek = new Date(selectedDateObj);
+                                  startOfWeek.setDate(startOfWeek.getDate() - daysToMonday);
                                   
-                                  // Convert day names to day numbers for comparison
-                                  const dayMapping = {
-                                    'monday': 1,
-                                    'tuesday': 2, 
-                                    'wednesday': 3,
-                                    'thursday': 4,
-                                    'friday': 5
-                                  };
-                                  
-                                  const currentDayNumber = dayMapping[day as keyof typeof dayMapping];
-                                  
-                                  // Only show substitution if the selected date matches this weekday
-                                  const isCorrectDay = dayOfWeek === currentDayNumber;
+                                  const dayMapping = { 'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 'friday': 4 };
+                                  const targetDay = new Date(startOfWeek);
+                                  targetDay.setDate(targetDay.getDate() + dayMapping[day as keyof typeof dayMapping]);
                                   
                                   // Check if there's a substitution for this specific date/class/period
-                                  const specificSubstitution = isCorrectDay ? substitutions.find(sub => 
+                                  const specificSubstitution = substitutions.find(sub => 
                                     sub.class === selectedClass && 
-                                    sub.date === selectedDate && 
+                                    sub.date === targetDay.toISOString().split('T')[0] && 
                                     sub.period === entry.period
-                                  ) : null;
+                                  );
                                   
                                   return (
                                     <div
@@ -452,11 +478,11 @@ const Vertretungsplan = () => {
                                       className={`p-2 rounded cursor-pointer transition-colors min-h-[60px] flex flex-col justify-center ${
                                         specificSubstitution
                                           ? 'bg-destructive/20 text-destructive border border-destructive/50' 
-                                          : isCorrectDay
+                                          : canEditSubstitutions
                                           ? 'hover:bg-muted/50'
-                                          : 'hover:bg-muted/30 opacity-60'
+                                          : 'hover:bg-muted/30'
                                       }`}
-                                      onClick={() => canEditSubstitutions && isCorrectDay && handleCellClick(selectedClass, day, entry.period, parsed)}
+                                      onClick={() => canEditSubstitutions && handleCellClick(selectedClass, day, entry.period, parsed)}
                                     >
                                       <div className="text-sm font-medium">
                                         {specificSubstitution ? (specificSubstitution.subject || parsed.subject) : parsed.subject}
@@ -470,11 +496,6 @@ const Vertretungsplan = () => {
                                       {specificSubstitution?.note && (
                                         <div className="text-xs text-destructive mt-1">
                                           {specificSubstitution.note}
-                                        </div>
-                                      )}
-                                      {!isCorrectDay && (
-                                        <div className="text-xs text-muted-foreground mt-1 opacity-50">
-                                          (Anderer Wochentag)
                                         </div>
                                       )}
                                     </div>
@@ -497,18 +518,26 @@ const Vertretungsplan = () => {
             </CardContent>
           </Card>
 
-          {/* Active Substitutions List */}
-          {substitutions.filter(sub => sub.date === selectedDate && sub.class === selectedClass).length > 0 && (
+          {/* Active Substitutions List for the whole week */}
+          {substitutions.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Vertretungen für {formatDate(selectedDate)}</CardTitle>
+                <CardTitle>Alle Vertretungen dieser Woche</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
                   {substitutions
-                    .filter(sub => sub.date === selectedDate && sub.class === selectedClass)
-                    .sort((a, b) => a.period - b.period)
-                    .map((substitution) => (
+                    .sort((a, b) => {
+                      // Sort by date first, then by period
+                      const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime();
+                      return dateCompare !== 0 ? dateCompare : a.period - b.period;
+                    })
+                    .map((substitution) => {
+                      const subDate = new Date(substitution.date);
+                      const dayName = subDate.toLocaleDateString('de-DE', { weekday: 'long' });
+                      const isToday = substitution.date === new Date().toISOString().split('T')[0];
+                      
+                      return (
                     <div key={substitution.id} className="flex items-center justify-between p-3 bg-destructive/10 border border-destructive/20 rounded-md">
                       <div className="flex items-center gap-4">
                         <span className="font-medium">{substitution.period}. Std</span>
