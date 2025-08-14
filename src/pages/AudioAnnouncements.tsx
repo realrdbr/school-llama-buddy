@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Upload, Mic, Play, Pause, Trash2, Calendar } from 'lucide-react';
+import { ArrowLeft, Upload, Mic, Play, Pause, Trash2, Calendar, Download, Volume2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -38,6 +38,8 @@ const AudioAnnouncements = () => {
     schedule_date: ''
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (!profile || profile.permission_lvl < 10) {
@@ -193,6 +195,134 @@ const AudioAnnouncements = () => {
       toast({
         title: "Fehler",
         description: "Status konnte nicht geändert werden",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const playAudio = async (announcement: any) => {
+    try {
+      // Stop currently playing audio if any
+      if (audioElement) {
+        audioElement.pause();
+        audioElement.currentTime = 0;
+      }
+
+      let audioUrl = '';
+
+      if (announcement.is_tts) {
+        // For TTS, generate audio using local TTS function
+        const { data, error } = await supabase.functions.invoke('audio-tts', {
+          body: {
+            text: announcement.tts_text,
+            voice_id: announcement.voice_id || 'alloy'
+          }
+        });
+
+        if (error) throw error;
+
+        // Create audio URL from generated TTS (if implemented)
+        toast({
+          title: "TTS-Wiedergabe",
+          description: "TTS-Wiedergabe noch nicht implementiert",
+          variant: "destructive"
+        });
+        return;
+      } else {
+        // For uploaded audio files, get the file from storage
+        const { data, error } = await supabase.storage
+          .from('audio-announcements')
+          .download(announcement.audio_file_path);
+
+        if (error) throw error;
+
+        // Create object URL for the blob
+        audioUrl = URL.createObjectURL(data);
+      }
+
+      // Create and play audio element
+      const audio = new Audio(audioUrl);
+      setAudioElement(audio);
+      setCurrentlyPlaying(announcement.id);
+
+      audio.onended = () => {
+        setCurrentlyPlaying(null);
+        setAudioElement(null);
+        URL.revokeObjectURL(audioUrl); // Clean up object URL
+      };
+
+      audio.onerror = () => {
+        toast({
+          title: "Wiedergabe-Fehler",
+          description: "Audio konnte nicht abgespielt werden",
+          variant: "destructive"
+        });
+        setCurrentlyPlaying(null);
+        setAudioElement(null);
+      };
+
+      await audio.play();
+
+      toast({
+        title: "Wiedergabe gestartet",
+        description: `"${announcement.title}" wird abgespielt`
+      });
+
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description: "Audio konnte nicht abgespielt werden",
+        variant: "destructive"
+      });
+      setCurrentlyPlaying(null);
+    }
+  };
+
+  const stopAudio = () => {
+    if (audioElement) {
+      audioElement.pause();
+      audioElement.currentTime = 0;
+      setAudioElement(null);
+      setCurrentlyPlaying(null);
+    }
+  };
+
+  const downloadAudio = async (announcement: any) => {
+    try {
+      if (!announcement.audio_file_path) {
+        toast({
+          title: "Fehler",
+          description: "Keine Audio-Datei zum Download verfügbar",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const { data, error } = await supabase.storage
+        .from('audio-announcements')
+        .download(announcement.audio_file_path);
+
+      if (error) throw error;
+
+      // Create download link
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = announcement.title + '.mp3';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Download gestartet",
+        description: "Audio-Datei wird heruntergeladen"
+      });
+
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description: "Download fehlgeschlagen",
         variant: "destructive"
       });
     }
@@ -418,12 +548,47 @@ const AudioAnnouncements = () => {
                       
                       <div className="flex items-center justify-between pt-2">
                         <div className="flex items-center gap-2">
+                          {currentlyPlaying === announcement.id ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={stopAudio}
+                              className="gap-2"
+                            >
+                              <Pause className="h-4 w-4" />
+                              Stoppen
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => playAudio(announcement)}
+                              className="gap-2"
+                            >
+                              <Play className="h-4 w-4" />
+                              Abspielen
+                            </Button>
+                          )}
+                          
+                          {!announcement.is_tts && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => downloadAudio(announcement)}
+                              className="gap-2"
+                            >
+                              <Download className="h-4 w-4" />
+                              Download
+                            </Button>
+                          )}
+                          
                           <Button
                             size="sm"
                             variant={announcement.is_active ? "secondary" : "default"}
                             onClick={() => toggleActive(announcement.id, announcement.is_active)}
+                            className="gap-2"
                           >
-                            {announcement.is_active ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                            <Volume2 className="h-4 w-4" />
                             {announcement.is_active ? "Deaktivieren" : "Aktivieren"}
                           </Button>
                         </div>
@@ -432,6 +597,7 @@ const AudioAnnouncements = () => {
                           size="sm"
                           variant="destructive"
                           onClick={() => deleteAnnouncement(announcement.id)}
+                          className="gap-2"
                         >
                           <Trash2 className="h-4 w-4" />
                           Löschen
