@@ -52,7 +52,7 @@ serve(async (req) => {
         break
 
       case 'update_vertretungsplan':
-        if (userProfile.permission_lvl >= 4) {
+        if (userProfile.permission_lvl >= 10) {
           const { data, error } = await supabase
             .from('vertretungsplan')
             .insert({
@@ -66,7 +66,7 @@ serve(async (req) => {
               substitute_subject: parameters.substituteSubject,
               substitute_room: parameters.substituteRoom,
               note: parameters.note,
-              created_by: userProfile.user_id
+              created_by: null  // Set to null since we're using username-based auth
             })
           
           if (!error) {
@@ -76,7 +76,7 @@ serve(async (req) => {
             result = { error: error.message }
           }
         } else {
-          result = { error: 'Keine Berechtigung zum Bearbeiten des Vertretungsplans' }
+          result = { error: 'Keine Berechtigung zum Bearbeiten des Vertretungsplans - Level 10 erforderlich' }
         }
         break
 
@@ -91,7 +91,7 @@ serve(async (req) => {
               priority: parameters.priority || 'normal',
               target_class: parameters.targetClass,
               target_permission_level: parameters.targetPermissionLevel,
-              created_by: userProfile.user_id
+              created_by: null  // Set to null since we're using username-based auth
             })
           
           if (!error) {

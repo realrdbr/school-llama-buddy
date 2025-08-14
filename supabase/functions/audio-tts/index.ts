@@ -25,18 +25,15 @@ serve(async (req) => {
       throw new Error('Nicht authentifiziert - user_id fehlt')
     }
 
-    // Check permissions using our custom permission system
+    // Check permissions using username instead of UUID
     const { data: profile } = await supabase
-      .from('profiles')
-      .select(`
-        *,
-        permissions!inner(permission_lvl)
-      `)
-      .eq('user_id', user_id)
+      .from('permissions')
+      .select('permission_lvl')
+      .eq('username', user_id)  // user_id is actually the username in our custom auth
       .single()
 
-    if (!profile || profile.permissions.permission_lvl < 10) {
-      throw new Error('Keine Berechtigung für Durchsagen')
+    if (!profile || profile.permission_lvl < 10) {
+      throw new Error('Keine Berechtigung für Audio-Ankündigungen - Level 10 erforderlich')
     }
 
     // Create TTS announcement record
@@ -49,7 +46,7 @@ serve(async (req) => {
         tts_text: text,
         voice_id,
         schedule_date: schedule_date ? new Date(schedule_date).toISOString() : null,
-        created_by: user_id,
+        created_by: null,  // Set to null since we're using username-based auth
         is_active: true
       })
       .select()
