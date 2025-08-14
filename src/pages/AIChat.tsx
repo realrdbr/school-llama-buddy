@@ -134,23 +134,23 @@ BERECHTIGUNGSLEVEL-SYSTEM:
 - Level 9: KOORDINATION/STELLVERTRETUNG (können Vertretungen erstellen/bearbeiten, Klassen verwalten)
 - Level 10: SCHULLEITUNG/ADMIN (können Benutzer verwalten, alle Systemeinstellungen ändern)
 
-WICHTIGE REGELN:
-1. ERFINDE NIEMALS Daten! Du hast keinen Zugriff auf die echte Datenbank.
-2. Gib NIEMALS vor, spezifische Vertretungen, Termine oder Personen zu kennen.
-3. Bei Fragen zu aktuellen Daten sage: "Für aktuelle Informationen schauen Sie bitte direkt in den entsprechenden Bereich der Anwendung."
-4. Du kannst nur über die Funktionen der App sprechen, nicht über spezifische Inhalte.
-
-VERFÜGBARE FUNKTIONEN für Level ${profile?.permission_lvl}:
+VERFÜGBARE AKTIONEN für Level ${profile?.permission_lvl}:
 ${profile?.permission_lvl && profile.permission_lvl >= 10 ? 
-  '- Benutzer erstellen und verwalten\n- Alle Systemeinstellungen\n- Vertretungen verwalten\n- Ankündigungen verwalten' :
+  '- CREATE_USER: Benutzer erstellen (Parameter: email, password, username, fullName, permissionLevel)\n- UPDATE_VERTRETUNGSPLAN: Vertretung erstellen (Parameter: date, className, period, originalTeacher, originalSubject, originalRoom, substituteTeacher, substituteSubject, substituteRoom, note)\n- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)' :
   profile?.permission_lvl && profile.permission_lvl >= 9 ?
-  '- Vertretungen erstellen und bearbeiten\n- Ankündigungen verwalten\n- Klassenverwaltung' :
+  '- UPDATE_VERTRETUNGSPLAN: Vertretung erstellen (Parameter: date, className, period, originalTeacher, originalSubject, originalRoom, substituteTeacher, substituteSubject, substituteRoom, note)\n- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)' :
   profile?.permission_lvl && profile.permission_lvl >= 4 ?
-  '- Ankündigungen erstellen und bearbeiten\n- Vertretungen einsehen\n- Stundenplan einsehen' :
-  '- Stundenplan einsehen\n- Vertretungen anzeigen\n- Ankündigungen lesen'
+  '- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)' :
+  'Keine Aktionen verfügbar'
 }
 
-Antworte auf Deutsch und erkläre nur die verfügbaren Funktionen der App.`
+WICHTIGE REGELN:
+1. Du kannst ECHTE AKTIONEN ausführen! Wenn ein Benutzer eine Aktion anfordert, führe sie aus.
+2. Wenn du eine Aktion ausführen sollst, antworte mit: "AKTION:[ACTION_NAME]|PARAMETER1:wert1|PARAMETER2:wert2|..."
+3. Beispiel: "AKTION:CREATE_ANNOUNCEMENT|title:Wichtiger Hinweis|content:Morgen ist schulfrei|priority:high"
+4. Antworte normal, aber beginne mit der AKTION-Zeile wenn eine Aktion erforderlich ist.
+
+Antworte auf Deutsch und führe die angeforderten Aktionen aus.`
             },
             ...conversation,
             { role: 'user', content: currentInput }
@@ -164,10 +164,58 @@ Antworte auf Deutsch und erkläre nur die verfügbaren Funktionen der App.`
       }
 
       const data = await response.json();
+      let assistantContent = data.message.content;
+      
+      // Check if AI wants to perform an action
+      if (assistantContent.includes('AKTION:')) {
+        const actionMatch = assistantContent.match(/AKTION:([^|]+)(\|[^|]+:[^|]+)*/);
+        if (actionMatch) {
+          const actionName = actionMatch[1].trim();
+          const paramString = actionMatch[2] || '';
+          
+          // Parse parameters
+          const parameters: any = {};
+          if (paramString) {
+            const paramPairs = paramString.split('|').filter(p => p.includes(':'));
+            paramPairs.forEach(pair => {
+              const [key, value] = pair.split(':');
+              if (key && value) {
+                parameters[key.trim()] = value.trim();
+              }
+            });
+          }
+          
+          try {
+            // Call ai-actions edge function
+            const { data: actionResult, error: actionError } = await supabase.functions.invoke('ai-actions', {
+              body: {
+                action: actionName.toLowerCase(),
+                parameters,
+                userProfile: {
+                  user_id: profile?.id,
+                  name: profile?.name,
+                  permission_lvl: profile?.permission_lvl
+                }
+              }
+            });
+            
+            if (actionError) {
+              assistantContent += `\n\nFehler bei der Ausführung: ${actionError.message}`;
+            } else if (actionResult?.success) {
+              assistantContent += `\n\n✅ ${actionResult.result.message || 'Aktion erfolgreich ausgeführt!'}`;
+            } else {
+              assistantContent += `\n\n❌ ${actionResult?.result?.error || 'Aktion fehlgeschlagen'}`;
+            }
+          } catch (error) {
+            console.error('Action execution error:', error);
+            assistantContent += `\n\nFehler bei der Ausführung: ${error}`;
+          }
+        }
+      }
       
       const assistantResponse = {
         role: 'assistant' as const,
-        content: data.message.content
+        content: assistantContent
       };
       
       setConversation(prev => [...prev, assistantResponse]);
