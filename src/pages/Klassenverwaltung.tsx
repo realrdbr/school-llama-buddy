@@ -4,7 +4,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, BookOpen, Users, Calendar, Settings } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ArrowLeft, BookOpen, Users, Calendar, Settings, Plus, Edit } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface ClassInfo {
@@ -19,6 +22,10 @@ const Klassenverwaltung = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const [classes, setClasses] = useState<ClassInfo[]>([]);
+  const [showCreateClass, setShowCreateClass] = useState(false);
+  const [showEditClass, setShowEditClass] = useState(false);
+  const [selectedClass, setSelectedClass] = useState<ClassInfo | null>(null);
+  const [newClass, setNewClass] = useState({ name: '', classTeacher: '', students: 0 });
 
   useEffect(() => {
     if (!user) {
@@ -56,14 +63,14 @@ const Klassenverwaltung = () => {
         students: 0,
         classTeacher: 'Noch nicht zugewiesen',
         room: 'Noch nicht zugewiesen',
-        subjects: ['Platzhalter']
+        subjects: []
       }
     ]);
   }, [user, profile, navigate]);
 
   const navigateToSchedule = (className: string) => {
     if (className === '10b' || className === '10c') {
-      navigate('/stundenplan');
+      navigate(`/stundenplan?scrollTo=${className}`);
     } else {
       toast({
         title: "Stundenplan nicht verfügbar",
@@ -73,6 +80,56 @@ const Klassenverwaltung = () => {
   };
 
   const canEditClasses = profile?.permission_lvl && profile.permission_lvl >= 8;
+
+  const handleCreateClass = () => {
+    if (!newClass.name || !newClass.classTeacher) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Bitte füllen Sie alle Felder aus."
+      });
+      return;
+    }
+
+    const classToAdd: ClassInfo = {
+      name: newClass.name,
+      students: newClass.students,
+      classTeacher: newClass.classTeacher,
+      room: '',
+      subjects: []
+    };
+
+    setClasses([...classes, classToAdd]);
+    setNewClass({ name: '', classTeacher: '', students: 0 });
+    setShowCreateClass(false);
+    
+    toast({
+      title: "Klasse erstellt",
+      description: `Die Klasse ${newClass.name} wurde erfolgreich erstellt.`
+    });
+  };
+
+  const handleEditClass = () => {
+    if (!selectedClass || !selectedClass.classTeacher || selectedClass.students < 0) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Bitte füllen Sie alle Felder korrekt aus."
+      });
+      return;
+    }
+
+    setClasses(classes.map(cls => 
+      cls.name === selectedClass.name ? selectedClass : cls
+    ));
+    setShowEditClass(false);
+    setSelectedClass(null);
+    
+    toast({
+      title: "Klasse bearbeitet",
+      description: `Die Klasse ${selectedClass.name} wurde erfolgreich aktualisiert.`
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -94,10 +151,55 @@ const Klassenverwaltung = () => {
               </div>
             </div>
             {canEditClasses && (
-              <Button>
-                <Settings className="h-4 w-4 mr-2" />
-                Klassen bearbeiten
-              </Button>
+              <Dialog open={showCreateClass} onOpenChange={setShowCreateClass}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Neue Klasse
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Neue Klasse erstellen</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="className">Klassenname</Label>
+                      <Input
+                        id="className"
+                        value={newClass.name}
+                        onChange={(e) => setNewClass({...newClass, name: e.target.value})}
+                        placeholder="z.B. 11a"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="classTeacher">Klassenlehrer</Label>
+                      <Input
+                        id="classTeacher"
+                        value={newClass.classTeacher}
+                        onChange={(e) => setNewClass({...newClass, classTeacher: e.target.value})}
+                        placeholder="z.B. Herr Schmidt"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="studentCount">Anzahl Schüler</Label>
+                      <Input
+                        id="studentCount"
+                        type="number"
+                        value={newClass.students}
+                        onChange={(e) => setNewClass({...newClass, students: parseInt(e.target.value) || 0})}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={handleCreateClass}>Erstellen</Button>
+                      <Button variant="outline" onClick={() => setShowCreateClass(false)}>
+                        Abbrechen
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
             )}
           </div>
         </div>
@@ -205,8 +307,15 @@ const Klassenverwaltung = () => {
                         Stundenplan
                       </Button>
                       {canEditClasses && (
-                        <Button variant="outline" size="sm">
-                          <Settings className="h-4 w-4" />
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setSelectedClass(classInfo);
+                            setShowEditClass(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
                         </Button>
                       )}
                     </div>
@@ -262,6 +371,44 @@ const Klassenverwaltung = () => {
           </Card>
         </div>
       </main>
+
+      {/* Edit Class Dialog */}
+      <Dialog open={showEditClass} onOpenChange={setShowEditClass}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Klasse bearbeiten</DialogTitle>
+          </DialogHeader>
+          {selectedClass && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="editClassTeacher">Klassenlehrer</Label>
+                <Input
+                  id="editClassTeacher"
+                  value={selectedClass.classTeacher}
+                  onChange={(e) => setSelectedClass({...selectedClass, classTeacher: e.target.value})}
+                  placeholder="z.B. Herr Schmidt"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editStudentCount">Anzahl Schüler</Label>
+                <Input
+                  id="editStudentCount"
+                  type="number"
+                  value={selectedClass.students}
+                  onChange={(e) => setSelectedClass({...selectedClass, students: parseInt(e.target.value) || 0})}
+                  placeholder="0"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleEditClass}>Speichern</Button>
+                <Button variant="outline" onClick={() => setShowEditClass(false)}>
+                  Abbrechen
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

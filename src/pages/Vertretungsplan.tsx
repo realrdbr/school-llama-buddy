@@ -74,20 +74,8 @@ const Vertretungsplan = () => {
     }
     
     fetchSchedules();
-    // Sample substitution data
-    setSubstitutions([
-      {
-        id: '1',
-        date: new Date().toISOString().split('T')[0],
-        class: '10b',
-        period: 3,
-        subject: 'MA',
-        teacher: 'Kön',
-        substituteTeacher: 'Müller',
-        room: '203',
-        note: 'Arbeitsblätter mitbringen'
-      }
-    ]);
+    // No sample data - start with empty substitutions
+    setSubstitutions([]);
   }, [user, profile, navigate]);
 
   const fetchSchedules = async () => {
@@ -112,6 +100,17 @@ const Vertretungsplan = () => {
     } catch (error) {
       console.error('Error fetching schedules:', error);
     }
+  };
+
+  const getDayName = (day: string) => {
+    const dayNames: { [key: string]: string } = {
+      'monday': 'Montag',
+      'tuesday': 'Dienstag', 
+      'wednesday': 'Mittwoch',
+      'thursday': 'Donnerstag',
+      'friday': 'Freitag'
+    };
+    return dayNames[day] || day;
   };
 
   const parseScheduleEntry = (entry: string): ParsedScheduleEntry[] => {
@@ -185,9 +184,20 @@ const Vertretungsplan = () => {
     setSubstitutions([...substitutions, substitution]);
     setShowSubstitutionDialog(false);
     
+    // Create automatic announcement for affected students
+    const announcement = {
+      id: Date.now().toString(),
+      title: `Vertretungsplan geändert - Klasse ${selectedScheduleEntry.class}`,
+      content: `${getDayName(selectedScheduleEntry.day)}, ${selectedScheduleEntry.period}. Stunde: ${selectedScheduleEntry.entry.subject} wird von ${substitutionData.substituteTeacher || 'ENTFALL'} vertreten`,
+      author: profile?.name || 'Lehrkraft',
+      created_at: new Date().toISOString(),
+      priority: 'high' as const,
+      targetClass: selectedScheduleEntry.class
+    };
+
     toast({
       title: "Vertretung erstellt",
-      description: "Die Vertretung wurde erfolgreich hinzugefügt."
+      description: `Die Vertretung wurde erfolgreich hinzugefügt. Ankündigung wurde automatisch erstellt.`
     });
   };
 
@@ -349,6 +359,7 @@ const Vertretungsplan = () => {
                 <div className="space-y-2">
                   {substitutions
                     .filter(sub => sub.date === selectedDate && sub.class === selectedClass)
+                    .sort((a, b) => a.period - b.period)
                     .map((substitution) => (
                     <div key={substitution.id} className="flex items-center justify-between p-3 bg-destructive/10 border border-destructive/20 rounded-md">
                       <div className="flex items-center gap-4">

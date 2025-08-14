@@ -46,39 +46,8 @@ const Settings = () => {
     );
   }
 
-  // Sample Arduino devices
-  const arduinoDevices = [
-    {
-      id: 1,
-      name: "Haupteingang",
-      type: "Arduino Uno",
-      ipAddress: "192.168.1.101",
-      status: "Online",
-      lastPing: "2024-01-14 11:30:15",
-      uptime: "72h 15m",
-      function: "Keycard Scanner"
-    },
-    {
-      id: 2,
-      name: "Lehrerzimmer",
-      type: "Arduino Nano",
-      ipAddress: "192.168.1.102", 
-      status: "Online",
-      lastPing: "2024-01-14 11:30:12",
-      uptime: "15h 42m",
-      function: "Access Control"
-    },
-    {
-      id: 3,
-      name: "Vertretungsplan Display",
-      type: "Arduino Mega",
-      ipAddress: "192.168.1.103",
-      status: "Offline",
-      lastPing: "2024-01-14 08:15:30",
-      uptime: "0h 0m",
-      function: "Display Controller"
-    }
-  ];
+  // No sample devices - empty state
+  const arduinoDevices: any[] = [];
 
   const getStatusIcon = (status: string) => {
     return status === "Online" ? (
@@ -128,9 +97,9 @@ const Settings = () => {
                 <CheckCircle className="h-4 w-4 text-green-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">2/3</div>
+                <div className="text-2xl font-bold">0/0</div>
                 <p className="text-xs text-muted-foreground">
-                  66% Verfügbarkeit
+                  Keine Geräte
                 </p>
               </CardContent>
             </Card>
@@ -141,9 +110,9 @@ const Settings = () => {
                 <AlertTriangle className="h-4 w-4 text-yellow-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">1</div>
+                <div className="text-2xl font-bold">0</div>
                 <p className="text-xs text-muted-foreground">
-                  Gerät offline
+                  Keine Warnungen
                 </p>
               </CardContent>
             </Card>
@@ -228,71 +197,78 @@ const Settings = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {arduinoDevices.map((device) => (
-                  <Card key={device.id}>
-                    <CardContent className="pt-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="p-3 bg-primary/10 rounded-lg">
-                            <CircuitBoard className="h-6 w-6 text-primary" />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold">{device.name}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {device.type} • {device.ipAddress}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {device.function}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <div className="flex items-center gap-2 mb-1">
-                              {getStatusIcon(device.status)}
-                              <Badge variant={getStatusBadge(device.status)}>
-                                {device.status}
-                              </Badge>
+              {arduinoDevices.length === 0 ? (
+                <div className="text-center py-8">
+                  <CircuitBoard className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">Keine Arduino-Geräte konfiguriert.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {arduinoDevices.map((device) => (
+                    <Card key={device.id}>
+                      <CardContent className="pt-6">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="p-3 bg-primary/10 rounded-lg">
+                              <CircuitBoard className="h-6 w-6 text-primary" />
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                              Letzter Ping: {device.lastPing}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Uptime: {device.uptime}
-                            </p>
+                            <div>
+                              <h3 className="font-semibold">{device.name}</h3>
+                              <p className="text-sm text-muted-foreground">
+                                {device.type} • {device.ipAddress}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {device.function}
+                              </p>
+                            </div>
                           </div>
                           
-                          <div className="flex gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleDeviceAction(device.id, "Ping")}
-                            >
-                              Ping
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleDeviceAction(device.id, "Neustart")}
-                            >
-                              Neustart
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleDeviceAction(device.id, "Konfiguration")}
-                            >
-                              Config
-                            </Button>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <div className="flex items-center gap-2 mb-1">
+                                {getStatusIcon(device.status)}
+                                <Badge variant={getStatusBadge(device.status)}>
+                                  {device.status}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Letzter Ping: {device.lastPing}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Uptime: {device.uptime}
+                              </p>
+                            </div>
+                            
+                            <div className="flex gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleDeviceAction(device.id, "Ping")}
+                              >
+                                Ping
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleDeviceAction(device.id, "Neustart")}
+                              >
+                                Neustart
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleDeviceAction(device.id, "Konfiguration")}
+                              >
+                                Config
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

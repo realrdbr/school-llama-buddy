@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +19,7 @@ interface ScheduleEntry {
 const Stundenplan = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
+  const [searchParams] = useSearchParams();
   const [schedule10bA, setSchedule10bA] = useState<ScheduleEntry[]>([]);
   const [schedule10cA, setSchedule10cA] = useState<ScheduleEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +30,18 @@ const Stundenplan = () => {
       return;
     }
     fetchSchedules();
-  }, [user, navigate]);
+
+    // Handle scroll to specific class
+    const scrollToClass = searchParams.get('scrollTo');
+    if (scrollToClass) {
+      setTimeout(() => {
+        const element = document.getElementById(`schedule-${scrollToClass}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+    }
+  }, [user, navigate, searchParams]);
 
   const fetchSchedules = async () => {
     try {
@@ -115,17 +127,27 @@ const Stundenplan = () => {
                   return (
                     <td key={day} className="border border-border p-2">
                       <div className="space-y-1">
-                        {parsedEntries.length > 0 ? (
-                          parsedEntries.map((parsed, idx) => (
-                            <div key={idx} className="p-2 bg-muted/30 rounded text-sm">
-                              <div className="font-medium">{parsed.subject}</div>
-                              <div className="text-muted-foreground">{parsed.teacher}</div>
-                              <div className="text-muted-foreground">{parsed.room}</div>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-center text-muted-foreground">-</div>
-                        )}
+                         {parsedEntries.length > 0 ? (
+                           parsedEntries.length > 1 ? (
+                             <div className="grid grid-cols-2 gap-1">
+                               {parsedEntries.map((parsed, idx) => (
+                                 <div key={idx} className="p-2 bg-muted/30 rounded text-xs border">
+                                   <div className="font-medium">{parsed.subject}</div>
+                                   <div className="text-muted-foreground">{parsed.teacher}</div>
+                                   <div className="text-muted-foreground">{parsed.room}</div>
+                                 </div>
+                               ))}
+                             </div>
+                           ) : (
+                             <div className="p-2 bg-muted/30 rounded text-sm">
+                               <div className="font-medium">{parsedEntries[0].subject}</div>
+                               <div className="text-muted-foreground">{parsedEntries[0].teacher}</div>
+                               <div className="text-muted-foreground">{parsedEntries[0].room}</div>
+                             </div>
+                           )
+                         ) : (
+                           <div className="text-center text-muted-foreground">-</div>
+                         )}
                       </div>
                     </td>
                   );
@@ -171,7 +193,7 @@ const Stundenplan = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-8">
           {/* Class 10b */}
-          <Card>
+          <Card id="schedule-10b">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5" />
@@ -188,7 +210,7 @@ const Stundenplan = () => {
           </Card>
 
           {/* Class 10c */}
-          <Card>
+          <Card id="schedule-10c">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5" />

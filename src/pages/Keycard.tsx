@@ -1,100 +1,143 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { 
-  ArrowLeft, 
-  KeyRound, 
-  Plus, 
-  Search, 
-  Shield, 
-  Clock,
-  User,
-  Building
-} from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ArrowLeft, KeyRound, Plus, Edit, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+
+interface KeycardData {
+  id: string;
+  cardNumber: string;
+  owner: string;
+  accessLevel: string;
+  isActive: boolean;
+  lastUsed?: string;
+}
 
 const Keycard = () => {
   const navigate = useNavigate();
-  const { profile } = useAuth();
-  const [searchTerm, setSearchTerm] = useState('');
+  const { user, profile } = useAuth();
+  const [keycards, setKeycards] = useState<KeycardData[]>([]);
+  const [showCreateKeycard, setShowCreateKeycard] = useState(false);
+  const [showEditKeycard, setShowEditKeycard] = useState(false);
+  const [selectedKeycard, setSelectedKeycard] = useState<KeycardData | null>(null);
+  const [newKeycard, setNewKeycard] = useState({ cardNumber: '', owner: '', accessLevel: 'Schüler' });
 
-  // Check permissions
-  if (!profile || profile.permission_lvl < 8) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card>
-          <CardHeader>
-            <CardTitle>Zugriff verweigert</CardTitle>
-            <CardDescription>
-              Sie haben keine Berechtigung für das Keycard-System.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => navigate('/')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Zurück zum Dashboard
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Sample keycard data
-  const keycards = [
-    {
-      id: 1,
-      cardNumber: "CARD001",
-      holder: "Max Mustermann",
-      role: "Lehrer",
-      accessLevel: "Hoch",
-      rooms: ["101", "102", "203", "Lehrerzimmer"],
-      lastUsed: "2024-01-14 09:30",
-      status: "Aktiv"
-    },
-    {
-      id: 2,
-      cardNumber: "CARD002", 
-      holder: "Anna Schmidt",
-      role: "Schüler",
-      accessLevel: "Niedrig",
-      rooms: ["Klassenzimmer"],
-      lastUsed: "2024-01-14 08:15",
-      status: "Aktiv"
-    },
-    {
-      id: 3,
-      cardNumber: "CARD003",
-      holder: "Dr. Weber",
-      role: "Schulleitung",
-      accessLevel: "Vollzugriff",
-      rooms: ["Alle Räume"],
-      lastUsed: "2024-01-14 10:45",
-      status: "Aktiv"
+  useEffect(() => {
+    if (!user) {
+      navigate('/auth');
+      return;
     }
-  ];
-
-  const filteredKeycards = keycards.filter(card =>
-    card.holder.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    card.cardNumber.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const getAccessLevelColor = (level: string) => {
-    switch (level) {
-      case "Vollzugriff": return "default";
-      case "Hoch": return "secondary";
-      case "Niedrig": return "outline";
-      default: return "outline";
+    if (profile && profile.permission_lvl < 1) {
+      toast({
+        variant: "destructive",
+        title: "Zugriff verweigert",
+        description: "Sie haben keine Berechtigung für diese Seite."
+      });
+      navigate('/');
+      return;
     }
+    
+    // Sample data for demonstration
+    setKeycards([
+      {
+        id: '1',
+        cardNumber: '1234567890',
+        owner: 'Max Mustermann',
+        accessLevel: 'Schüler',
+        isActive: true,
+        lastUsed: '2024-01-15T10:30:00Z'
+      },
+      {
+        id: '2',
+        cardNumber: '0987654321',
+        owner: 'Maria Schmidt',
+        accessLevel: 'Lehrer',
+        isActive: true,
+        lastUsed: '2024-01-15T14:20:00Z'
+      }
+    ]);
+  }, [user, profile, navigate]);
+
+  const canManageKeycards = profile?.permission_lvl && profile.permission_lvl >= 8;
+
+  const handleCreateKeycard = () => {
+    if (!newKeycard.cardNumber || !newKeycard.owner) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Bitte füllen Sie alle Felder aus."
+      });
+      return;
+    }
+
+    const keycard: KeycardData = {
+      id: Date.now().toString(),
+      cardNumber: newKeycard.cardNumber,
+      owner: newKeycard.owner,
+      accessLevel: newKeycard.accessLevel,
+      isActive: true
+    };
+
+    setKeycards([...keycards, keycard]);
+    setNewKeycard({ cardNumber: '', owner: '', accessLevel: 'Schüler' });
+    setShowCreateKeycard(false);
+    
+    toast({
+      title: "Keycard erstellt",
+      description: `Keycard für ${newKeycard.owner} wurde erfolgreich registriert.`
+    });
   };
 
-  const getStatusColor = (status: string) => {
-    return status === "Aktiv" ? "default" : "destructive";
+  const handleEditKeycard = () => {
+    if (!selectedKeycard || !selectedKeycard.cardNumber || !selectedKeycard.owner) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Bitte füllen Sie alle Felder aus."
+      });
+      return;
+    }
+
+    setKeycards(keycards.map(card => 
+      card.id === selectedKeycard.id ? selectedKeycard : card
+    ));
+    setShowEditKeycard(false);
+    setSelectedKeycard(null);
+    
+    toast({
+      title: "Keycard bearbeitet",
+      description: `Keycard wurde erfolgreich aktualisiert.`
+    });
+  };
+
+  const handleDeleteKeycard = (id: string) => {
+    setKeycards(keycards.filter(card => card.id !== id));
+    toast({
+      title: "Keycard gelöscht",
+      description: "Die Keycard wurde erfolgreich entfernt."
+    });
+  };
+
+  const toggleKeycard = (id: string) => {
+    setKeycards(keycards.map(card => 
+      card.id === id ? { ...card, isActive: !card.isActive } : card
+    ));
+    
+    const card = keycards.find(c => c.id === id);
+    toast({
+      title: card?.isActive ? "Keycard deaktiviert" : "Keycard aktiviert",
+      description: `Die Keycard wurde ${card?.isActive ? 'deaktiviert' : 'aktiviert'}.`
+    });
+  };
+
+  const getStatusBadge = (isActive: boolean) => {
+    return isActive ? "default" : "secondary";
   };
 
   return (
@@ -106,17 +149,72 @@ const Keycard = () => {
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Zurück
+                Zurück zum Dashboard
               </Button>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Keycard-System</h1>
-                <p className="text-muted-foreground">Zugangskontrolle verwalten</p>
+              <div className="flex items-center gap-3">
+                <KeyRound className="h-6 w-6 text-primary" />
+                <div>
+                  <h1 className="text-2xl font-bold text-foreground">Keycard-System</h1>
+                  <p className="text-muted-foreground">
+                    {canManageKeycards ? "Zugangskarten verwalten" : "Keycard-Übersicht"}
+                  </p>
+                </div>
               </div>
             </div>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Neue Keycard
-            </Button>
+            {canManageKeycards && (
+              <Dialog open={showCreateKeycard} onOpenChange={setShowCreateKeycard}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Keycard registrieren
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Neue Keycard registrieren</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="cardNumber">Keycard-Nummer</Label>
+                      <Input
+                        id="cardNumber"
+                        value={newKeycard.cardNumber}
+                        onChange={(e) => setNewKeycard({...newKeycard, cardNumber: e.target.value})}
+                        placeholder="z.B. 1234567890"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="owner">Besitzer</Label>
+                      <Input
+                        id="owner"
+                        value={newKeycard.owner}
+                        onChange={(e) => setNewKeycard({...newKeycard, owner: e.target.value})}
+                        placeholder="z.B. Max Mustermann"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="accessLevel">Zugriffsebene</Label>
+                      <select
+                        id="accessLevel"
+                        value={newKeycard.accessLevel}
+                        onChange={(e) => setNewKeycard({...newKeycard, accessLevel: e.target.value})}
+                        className="w-full p-2 border border-border rounded-md"
+                      >
+                        <option value="Schüler">Schüler</option>
+                        <option value="Lehrer">Lehrer</option>
+                        <option value="Verwaltung">Verwaltung</option>
+                      </select>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={handleCreateKeycard}>Registrieren</Button>
+                      <Button variant="outline" onClick={() => setShowCreateKeycard(false)}>
+                        Abbrechen
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
         </div>
       </header>
@@ -124,133 +222,134 @@ const Keycard = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-6">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Aktive Karten</CardTitle>
-                <KeyRound className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">3</div>
-                <p className="text-xs text-muted-foreground">
-                  +0 seit letzter Woche
-                </p>
-              </CardContent>
-            </Card>
+          {/* Keycards List */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {keycards.map((keycard) => (
+              <Card key={keycard.id} className="hover:shadow-md transition-shadow">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <KeyRound className="h-5 w-5" />
+                      {keycard.owner}
+                    </CardTitle>
+                    <Badge variant={getStatusBadge(keycard.isActive)}>
+                      {keycard.isActive ? 'Aktiv' : 'Inaktiv'}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Kartennummer</p>
+                    <p className="font-mono">{keycard.cardNumber}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-muted-foreground">Zugriffsebene</p>
+                    <p className="font-medium">{keycard.accessLevel}</p>
+                  </div>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Zugriffe heute</CardTitle>
-                <Shield className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">127</div>
-                <p className="text-xs text-muted-foreground">
-                  +12% seit gestern
-                </p>
-              </CardContent>
-            </Card>
+                  {keycard.lastUsed && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Zuletzt verwendet</p>
+                      <p className="text-sm">{new Date(keycard.lastUsed).toLocaleString('de-DE')}</p>
+                    </div>
+                  )}
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Gesperrte Räume</CardTitle>
-                <Building className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">2</div>
-                <p className="text-xs text-muted-foreground">
-                  Wartungsarbeiten
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Letzter Zugriff</CardTitle>
-                <Clock className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">10:45</div>
-                <p className="text-xs text-muted-foreground">
-                  Dr. Weber - Büro
-                </p>
-              </CardContent>
-            </Card>
+                  <div className="flex gap-2">
+                    {canManageKeycards && (
+                      <>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setSelectedKeycard(keycard);
+                            setShowEditKeycard(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => toggleKeycard(keycard.id)}
+                        >
+                          {keycard.isActive ? 'Deaktivieren' : 'Aktivieren'}
+                        </Button>
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={() => handleDeleteKeycard(keycard.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
-          {/* Search and Filter */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Keycard-Verwaltung</CardTitle>
-              <CardDescription>
-                Verwalten Sie Zugangskarten und Berechtigungen
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-4 mb-6">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Nach Karteninhaber oder Kartennummer suchen..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-
-              {/* Keycard List */}
-              <div className="space-y-4">
-                {filteredKeycards.map((card) => (
-                  <Card key={card.id}>
-                    <CardContent className="pt-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="p-3 bg-primary/10 rounded-lg">
-                            <KeyRound className="h-6 w-6 text-primary" />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold">{card.holder}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {card.cardNumber} • {card.role}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge variant={getAccessLevelColor(card.accessLevel)}>
-                                {card.accessLevel}
-                              </Badge>
-                              <Badge variant={getStatusColor(card.status)}>
-                                {card.status}
-                              </Badge>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              Letzter Zugriff: {card.lastUsed}
-                            </p>
-                          </div>
-                          
-                          <div className="text-sm text-muted-foreground">
-                            <p className="font-medium">Zugriff auf:</p>
-                            <p>{card.rooms.join(", ")}</p>
-                          </div>
-                          
-                          <Button variant="outline" size="sm">
-                            Bearbeiten
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          {keycards.length === 0 && (
+            <Card>
+              <CardContent className="text-center py-8">
+                <KeyRound className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">Keine Keycards verfügbar.</p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </main>
+
+      {/* Edit Keycard Dialog */}
+      <Dialog open={showEditKeycard} onOpenChange={setShowEditKeycard}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Keycard bearbeiten</DialogTitle>
+          </DialogHeader>
+          {selectedKeycard && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="editCardNumber">Keycard-Nummer</Label>
+                <Input
+                  id="editCardNumber"
+                  value={selectedKeycard.cardNumber}
+                  onChange={(e) => setSelectedKeycard({...selectedKeycard, cardNumber: e.target.value})}
+                  placeholder="z.B. 1234567890"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editOwner">Besitzer</Label>
+                <Input
+                  id="editOwner"
+                  value={selectedKeycard.owner}
+                  onChange={(e) => setSelectedKeycard({...selectedKeycard, owner: e.target.value})}
+                  placeholder="z.B. Max Mustermann"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editAccessLevel">Zugriffsebene</Label>
+                <select
+                  id="editAccessLevel"
+                  value={selectedKeycard.accessLevel}
+                  onChange={(e) => setSelectedKeycard({...selectedKeycard, accessLevel: e.target.value})}
+                  className="w-full p-2 border border-border rounded-md"
+                >
+                  <option value="Schüler">Schüler</option>
+                  <option value="Lehrer">Lehrer</option>
+                  <option value="Verwaltung">Verwaltung</option>
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleEditKeycard}>Speichern</Button>
+                <Button variant="outline" onClick={() => setShowEditKeycard(false)}>
+                  Abbrechen
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

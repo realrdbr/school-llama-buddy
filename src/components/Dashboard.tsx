@@ -139,7 +139,7 @@ const Dashboard = () => {
                   : profile?.permission_lvl && profile.permission_lvl >= 5
                   ? "Als Lehrkraft können Sie Stundenpläne und Ankündigungen verwalten."
                   : profile?.permission_lvl && profile.permission_lvl > 1
-                  ? "Als Schüler können Sie Ihren Stundenplan einsehen und den Hausaufgaben-Assistenten nutzen."
+                  ? `Als Schüler der Klasse 10b (Klassenlehrer: Frau Kunadt) können Sie Ihren Stundenplan einsehen und den Hausaufgaben-Assistenten nutzen.`
                   : "Als Besucher haben Sie eingeschränkten Zugriff auf öffentliche Inhalte."
                 }
               </CardDescription>
