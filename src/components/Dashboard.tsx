@@ -33,15 +33,17 @@ const Dashboard = () => {
   };
 
   const getPermissionBadgeVariant = (level: number) => {
-    if (level >= 8) return "default"; // Schulleitung
-    if (level >= 5) return "secondary"; // Lehrer
-    return "outline"; // Besucher/Schüler
+    if (level >= 10) return "default"; // Schulleitung
+    if (level >= 8) return "secondary"; // Verwaltung/Administrator  
+    if (level >= 5) return "outline"; // Lehrer
+    return "destructive"; // Besucher/Schüler
   };
 
   const getPermissionColor = (level: number) => {
-    if (level >= 8) return "text-primary";
-    if (level >= 5) return "text-secondary-foreground";
-    return "text-muted-foreground";
+    if (level >= 10) return "text-primary";
+    if (level >= 8) return "text-secondary-foreground";
+    if (level >= 5) return "text-muted-foreground";
+    return "text-destructive";
   };
 
   const adminFeatures = [
@@ -102,7 +104,7 @@ const Dashboard = () => {
                 <p className="font-medium text-foreground">{profile?.name || user?.email}</p>
                 <div className="flex items-center gap-2">
                   <Badge variant={getPermissionBadgeVariant(profile?.permission_lvl || 1)}>
-                    {profile?.permission_lvl >= 8 ? "Schulleitung" : profile?.permission_lvl >= 5 ? "Lehrkraft" : profile?.permission_lvl > 1 ? "Schüler" : "Besucher"}
+                    {profile?.permission_lvl >= 10 ? "Schulleitung" : profile?.permission_lvl >= 8 ? "Verwaltung" : profile?.permission_lvl >= 5 ? "Lehrkraft" : profile?.permission_lvl > 1 ? "Schüler" : "Besucher"}
                   </Badge>
                   <span className={`text-sm ${getPermissionColor(profile?.permission_lvl || 1)}`}>
                     Level {profile?.permission_lvl || 1}
@@ -135,7 +137,7 @@ const Dashboard = () => {
                 {profile?.permission_lvl && profile.permission_lvl >= 10 
                   ? "Als Schulleitung haben Sie Zugriff auf alle Systemfunktionen."
                   : profile?.permission_lvl && profile.permission_lvl >= 8
-                  ? "Als Administrator haben Sie Zugriff auf alle Systemfunktionen."
+                  ? "Als Verwaltung/Administrator haben Sie Zugriff auf erweiterte Systemfunktionen."
                   : profile?.permission_lvl && profile.permission_lvl >= 5
                   ? "Als Lehrkraft können Sie Stundenpläne und Ankündigungen verwalten."
                   : profile?.permission_lvl && profile.permission_lvl > 1
@@ -149,7 +151,9 @@ const Dashboard = () => {
           {/* Admin Features */}
           {profile?.permission_lvl && profile.permission_lvl >= 8 && (
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-foreground">Verwaltung</h2>
+              <h2 className="text-xl font-semibold text-foreground">
+                {profile.permission_lvl >= 10 ? "Schulleitung" : "Verwaltung"}
+              </h2>
               {renderFeatureCards(adminFeatures)}
             </div>
           )}

@@ -14,10 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      announcements: {
+        Row: {
+          author: string
+          content: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          priority: string | null
+          target_class: string | null
+          target_permission_level: number | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          author: string
+          content: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          priority?: string | null
+          target_class?: string | null
+          target_permission_level?: number | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          author?: string
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          priority?: string | null
+          target_class?: string | null
+          target_permission_level?: number | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       permissions: {
         Row: {
           created_at: string
           id: number
+          keycard_active: boolean | null
+          keycard_number: string | null
           must_change_password: boolean | null
           name: string
           password: string
@@ -27,6 +68,8 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: number
+          keycard_active?: boolean | null
+          keycard_number?: string | null
           must_change_password?: boolean | null
           name: string
           password?: string
@@ -36,6 +79,8 @@ export type Database = {
         Update: {
           created_at?: string
           id?: number
+          keycard_active?: boolean | null
+          keycard_number?: string | null
           must_change_password?: boolean | null
           name?: string
           password?: string
@@ -145,6 +190,57 @@ export type Database = {
           thursday?: string | null
           tuesday?: string | null
           wednesday?: string | null
+        }
+        Relationships: []
+      }
+      vertretungsplan: {
+        Row: {
+          class_name: string
+          created_at: string | null
+          created_by: string | null
+          date: string
+          id: string
+          note: string | null
+          original_room: string
+          original_subject: string
+          original_teacher: string
+          period: number
+          substitute_room: string | null
+          substitute_subject: string | null
+          substitute_teacher: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          class_name: string
+          created_at?: string | null
+          created_by?: string | null
+          date: string
+          id?: string
+          note?: string | null
+          original_room: string
+          original_subject: string
+          original_teacher: string
+          period: number
+          substitute_room?: string | null
+          substitute_subject?: string | null
+          substitute_teacher?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          class_name?: string
+          created_at?: string | null
+          created_by?: string | null
+          date?: string
+          id?: string
+          note?: string | null
+          original_room?: string
+          original_subject?: string
+          original_teacher?: string
+          period?: number
+          substitute_room?: string | null
+          substitute_subject?: string | null
+          substitute_teacher?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }

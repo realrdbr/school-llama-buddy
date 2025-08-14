@@ -53,6 +53,8 @@ const Vertretungsplan = () => {
   } | null>(null);
   const [substitutionData, setSubstitutionData] = useState({
     substituteTeacher: '',
+    substituteSubject: '',
+    substituteRoom: '',
     note: ''
   });
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -162,11 +164,16 @@ const Vertretungsplan = () => {
 
   const handleCellClick = (classname: string, day: string, period: number, entry: ParsedScheduleEntry) => {
     setSelectedScheduleEntry({ class: classname, day, period, entry });
-    setSubstitutionData({ substituteTeacher: '', note: '' });
+    setSubstitutionData({ 
+      substituteTeacher: '', 
+      substituteSubject: entry.subject,
+      substituteRoom: entry.room,
+      note: '' 
+    });
     setShowSubstitutionDialog(true);
   };
 
-  const handleCreateSubstitution = () => {
+  const handleCreateSubstitution = async () => {
     if (!selectedScheduleEntry) return;
 
     const substitution: SubstitutionEntry = {
@@ -174,30 +181,50 @@ const Vertretungsplan = () => {
       date: selectedDate,
       class: selectedScheduleEntry.class,
       period: selectedScheduleEntry.period,
-      subject: selectedScheduleEntry.entry.subject,
+      subject: substitutionData.substituteSubject,
       teacher: selectedScheduleEntry.entry.teacher,
       substituteTeacher: substitutionData.substituteTeacher,
-      room: selectedScheduleEntry.entry.room,
+      room: substitutionData.substituteRoom,
       note: substitutionData.note
     };
 
     setSubstitutions([...substitutions, substitution]);
-    setShowSubstitutionDialog(false);
     
-    // Create automatic announcement for affected students
-    const announcement = {
-      id: Date.now().toString(),
-      title: `Vertretungsplan geändert - Klasse ${selectedScheduleEntry.class}`,
-      content: `${getDayName(selectedScheduleEntry.day)}, ${selectedScheduleEntry.period}. Stunde: ${selectedScheduleEntry.entry.subject} wird von ${substitutionData.substituteTeacher || 'ENTFALL'} vertreten`,
-      author: profile?.name || 'Lehrkraft',
-      created_at: new Date().toISOString(),
-      priority: 'high' as const,
-      targetClass: selectedScheduleEntry.class
-    };
+    // Save to database
+    try {
+      const { error } = await supabase.from('vertretungsplan').insert({
+        date: selectedDate,
+        class_name: selectedScheduleEntry.class,
+        period: selectedScheduleEntry.period,
+        original_subject: selectedScheduleEntry.entry.subject,
+        original_teacher: selectedScheduleEntry.entry.teacher,
+        original_room: selectedScheduleEntry.entry.room,
+        substitute_teacher: substitutionData.substituteTeacher,
+        substitute_subject: substitutionData.substituteSubject,
+        substitute_room: substitutionData.substituteRoom,
+        note: substitutionData.note
+      });
 
+      if (error) throw error;
+
+      // Create automatic announcement
+      const { error: announcementError } = await supabase.from('announcements').insert({
+        title: `Vertretungsplan geändert - Klasse ${selectedScheduleEntry.class}`,
+        content: `${getDayName(selectedScheduleEntry.day)}, ${selectedScheduleEntry.period}. Stunde: ${substitutionData.substituteSubject} wird von ${substitutionData.substituteTeacher || 'ENTFALL'} vertreten`,
+        author: profile?.name || 'Lehrkraft',
+        priority: 'high',
+        target_class: selectedScheduleEntry.class
+      });
+
+      if (announcementError) console.error('Error creating announcement:', announcementError);
+    } catch (error) {
+      console.error('Error saving substitution:', error);
+    }
+
+    setShowSubstitutionDialog(false);
     toast({
       title: "Vertretung erstellt",
-      description: `Die Vertretung wurde erfolgreich hinzugefügt. Ankündigung wurde automatisch erstellt.`
+      description: `Die Vertretung wurde erfolgreich hinzugefügt und in der Datenbank gespeichert.`
     });
   };
 
@@ -294,7 +321,7 @@ const Vertretungsplan = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {(schedules[selectedClass] || []).map((entry) => (
+                    {(schedules[selectedClass] || []).sort((a, b) => a.period - b.period).map((entry) => (
                       <tr key={entry.period}>
                         <td className="border border-border p-2 font-medium bg-muted">{entry.period}</td>
                         {['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].map((day) => {
@@ -316,15 +343,15 @@ const Vertretungsplan = () => {
                                     }`}
                                     onClick={() => canEditSubstitutions && handleCellClick(selectedClass, day, entry.period, parsed)}
                                   >
-                                    <div className="text-sm font-medium">
-                                      {isSubstituted ? substitution?.subject : parsed.subject}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                      {isSubstituted ? substitution?.substituteTeacher : parsed.teacher}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                      {isSubstituted ? substitution?.room : parsed.room}
-                                    </div>
+                    <div className="text-sm font-medium">
+                      {isSubstituted ? (substitution?.subject || parsed.subject) : parsed.subject}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {isSubstituted ? (substitution?.substituteTeacher || 'ENTFALL') : parsed.teacher}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {isSubstituted ? (substitution?.room || parsed.room) : parsed.room}
+                    </div>
                                     {isSubstituted && substitution?.note && (
                                       <div className="text-xs text-destructive mt-1">
                                         {substitution.note}
@@ -416,6 +443,26 @@ const Vertretungsplan = () => {
                   value={substitutionData.substituteTeacher}
                   onChange={(e) => setSubstitutionData({...substitutionData, substituteTeacher: e.target.value})}
                   placeholder="Leer lassen für Entfall"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="substituteSubject">Fach</Label>
+                <Input
+                  id="substituteSubject"
+                  value={substitutionData.substituteSubject}
+                  onChange={(e) => setSubstitutionData({...substitutionData, substituteSubject: e.target.value})}
+                  placeholder="Fach"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="substituteRoom">Raum</Label>
+                <Input
+                  id="substituteRoom"
+                  value={substitutionData.substituteRoom}
+                  onChange={(e) => setSubstitutionData({...substitutionData, substituteRoom: e.target.value})}
+                  placeholder="Raum"
                 />
               </div>
               

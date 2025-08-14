@@ -37,9 +37,9 @@ const Stundenplan = () => {
       setTimeout(() => {
         const element = document.getElementById(`schedule-${scrollToClass}`);
         if (element) {
-          element.scrollIntoView({ behavior: 'smooth' });
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-      }, 100);
+      }, 500);
     }
   }, [user, navigate, searchParams]);
 

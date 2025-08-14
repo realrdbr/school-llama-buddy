@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ArrowLeft, KeyRound, Plus, Edit, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface KeycardData {
   id: string;
@@ -17,6 +18,7 @@ interface KeycardData {
   accessLevel: string;
   isActive: boolean;
   lastUsed?: string;
+  permissionLevel: number;
 }
 
 const Keycard = () => {
@@ -33,7 +35,7 @@ const Keycard = () => {
       navigate('/auth');
       return;
     }
-    if (profile && profile.permission_lvl < 1) {
+    if (profile && profile.permission_lvl < 8) {
       toast({
         variant: "destructive",
         title: "Zugriff verweigert",
@@ -43,30 +45,44 @@ const Keycard = () => {
       return;
     }
     
-    // Sample data for demonstration
-    setKeycards([
-      {
-        id: '1',
-        cardNumber: '1234567890',
-        owner: 'Max Mustermann',
-        accessLevel: 'Schüler',
-        isActive: true,
-        lastUsed: '2024-01-15T10:30:00Z'
-      },
-      {
-        id: '2',
-        cardNumber: '0987654321',
-        owner: 'Maria Schmidt',
-        accessLevel: 'Lehrer',
-        isActive: true,
-        lastUsed: '2024-01-15T14:20:00Z'
-      }
-    ]);
+    fetchKeycards();
   }, [user, profile, navigate]);
+
+  const fetchKeycards = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('permissions')
+        .select('*')
+        .not('keycard_number', 'is', null);
+
+      if (error) throw error;
+
+      const keycardData = data.map(perm => ({
+        id: perm.id.toString(),
+        cardNumber: perm.keycard_number || '',
+        owner: perm.name,
+        accessLevel: getAccessLevelText(perm.permission_lvl),
+        isActive: perm.keycard_active !== false,
+        permissionLevel: perm.permission_lvl
+      }));
+
+      setKeycards(keycardData);
+    } catch (error) {
+      console.error('Error fetching keycards:', error);
+    }
+  };
+
+  const getAccessLevelText = (level: number) => {
+    if (level >= 10) return 'Schulleitung - Vollzugriff';
+    if (level >= 8) return 'Verwaltung - Erweitert';
+    if (level >= 5) return 'Lehrer - Standard';
+    if (level > 1) return 'Schüler - Eingeschränkt';
+    return 'Besucher - Gänge';
+  };
 
   const canManageKeycards = profile?.permission_lvl && profile.permission_lvl >= 8;
 
-  const handleCreateKeycard = () => {
+  const handleCreateKeycard = async () => {
     if (!newKeycard.cardNumber || !newKeycard.owner) {
       toast({
         variant: "destructive",
@@ -76,25 +92,41 @@ const Keycard = () => {
       return;
     }
 
-    const keycard: KeycardData = {
-      id: Date.now().toString(),
-      cardNumber: newKeycard.cardNumber,
-      owner: newKeycard.owner,
-      accessLevel: newKeycard.accessLevel,
-      isActive: true
-    };
+    try {
+      const permissionLevel = newKeycard.accessLevel === 'Schulleitung' ? 10 : 
+                            newKeycard.accessLevel === 'Verwaltung' ? 8 :
+                            newKeycard.accessLevel === 'Lehrer' ? 5 : 2;
 
-    setKeycards([...keycards, keycard]);
-    setNewKeycard({ cardNumber: '', owner: '', accessLevel: 'Schüler' });
-    setShowCreateKeycard(false);
-    
-    toast({
-      title: "Keycard erstellt",
-      description: `Keycard für ${newKeycard.owner} wurde erfolgreich registriert.`
-    });
+      const { error } = await supabase
+        .from('permissions')
+        .insert({
+          name: newKeycard.owner,
+          permission_lvl: permissionLevel,
+          keycard_number: newKeycard.cardNumber,
+          keycard_active: true
+        });
+
+      if (error) throw error;
+
+      await fetchKeycards();
+      setNewKeycard({ cardNumber: '', owner: '', accessLevel: 'Schüler' });
+      setShowCreateKeycard(false);
+      
+      toast({
+        title: "Keycard erstellt",
+        description: `Keycard für ${newKeycard.owner} wurde erfolgreich registriert.`
+      });
+    } catch (error) {
+      console.error('Error creating keycard:', error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Keycard konnte nicht erstellt werden."
+      });
+    }
   };
 
-  const handleEditKeycard = () => {
+  const handleEditKeycard = async () => {
     if (!selectedKeycard || !selectedKeycard.cardNumber || !selectedKeycard.owner) {
       toast({
         variant: "destructive",
@@ -104,16 +136,34 @@ const Keycard = () => {
       return;
     }
 
-    setKeycards(keycards.map(card => 
-      card.id === selectedKeycard.id ? selectedKeycard : card
-    ));
-    setShowEditKeycard(false);
-    setSelectedKeycard(null);
-    
-    toast({
-      title: "Keycard bearbeitet",
-      description: `Keycard wurde erfolgreich aktualisiert.`
-    });
+    try {
+      const { error } = await supabase
+        .from('permissions')
+        .update({
+          keycard_number: selectedKeycard.cardNumber,
+          name: selectedKeycard.owner,
+          keycard_active: selectedKeycard.isActive
+        })
+        .eq('id', parseInt(selectedKeycard.id));
+
+      if (error) throw error;
+
+      await fetchKeycards();
+      setShowEditKeycard(false);
+      setSelectedKeycard(null);
+      
+      toast({
+        title: "Keycard bearbeitet",
+        description: `Keycard wurde erfolgreich aktualisiert.`
+      });
+    } catch (error) {
+      console.error('Error updating keycard:', error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Keycard konnte nicht aktualisiert werden."
+      });
+    }
   };
 
   const handleDeleteKeycard = (id: string) => {
