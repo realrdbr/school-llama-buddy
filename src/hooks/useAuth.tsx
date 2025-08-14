@@ -3,14 +3,12 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Profile {
-  id: string;
-  user_id: string;
-  email: string;
-  full_name: string | null;
-  permission_id: number | null;
-  permission_level?: number;
-  permission_name?: string;
-  must_change_password?: boolean;
+  id: number;
+  username: string;
+  name: string;
+  permission_lvl: number;
+  password: string;
+  created_at: string;
 }
 
 interface AuthContextType {
@@ -32,63 +30,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Remove the problematic useEffect that conflicts with HMR
   useEffect(() => {
-    // Simple initialization without Supabase auth listeners
     setLoading(false);
   }, []);
-
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(`
-          *,
-          permissions (
-            permission_lvl,
-            name
-          )
-        `)
-        .eq('user_id', userId)
-        .single();
-
-      if (error) {
-        console.error('Error fetching profile:', error);
-        return;
-      }
-
-      setProfile({
-        ...data,
-        permission_level: data.permissions?.permission_lvl,
-        permission_name: data.permissions?.name,
-        must_change_password: data.must_change_password
-      });
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    }
-  };
 
   const signInWithUsername = async (username: string, password: string) => {
     try {
       setLoading(true);
       
-      const { data, error } = await supabase.rpc('verify_user_login', {
-        username_input: username,
-        password_input: password
-      });
+      // Direct query to permissions table  
+      const response = await fetch(
+        `https://afnfyivevmqihuqijusi.supabase.co/rest/v1/permissions?username=eq.${username}&password=eq.${password}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmbmZ5aXZldm1xaWh1cWlqdXNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNzQ4MzAsImV4cCI6MjA3MDc1MDgzMH0.iZNTzN55MZK8p0hrZzsaAxbSALp5tVrloUQUiosmbRU',
+            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmbmZ5aXZldm1xaWh1cWlqdXNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNzQ4MzAsImV4cCI6MjA3MDc1MDgzMH0.iZNTzN55MZK8p0hrZzsaAxbSALp5tVrloUQUiosmbRU'
+          }
+        }
+      );
 
-      if (error || !data || data.length === 0) {
+      const users = await response.json();
+
+      if (!response.ok || !users || users.length === 0) {
         setLoading(false);
         return { error: { message: 'Ungültiger Benutzername oder Passwort' } };
       }
 
-      const userData = data[0];
-      
+      const userData = users[0];
+
       // Create a dummy user for internal auth
       const dummyUser: User = {
-        id: userData.user_id,
+        id: userData.username,
         app_metadata: {},
-        user_metadata: { username, full_name: userData.full_name },
+        user_metadata: { username, full_name: userData.name },
         aud: 'authenticated',
         created_at: new Date().toISOString(),
         email: `${username}@internal.school`
@@ -97,20 +73,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Set user and profile state
       setUser(dummyUser);
       setProfile({
-        id: userData.profile_id,
-        user_id: userData.user_id,
-        email: `${username}@internal.school`,
-        full_name: userData.full_name,
-        permission_id: null,
-        permission_level: userData.permission_level,
-        permission_name: '',
-        must_change_password: userData.must_change_password
+        id: userData.id,
+        username: userData.username,
+        name: userData.name,
+        permission_lvl: userData.permission_lvl,
+        password: userData.password,
+        created_at: userData.created_at
       });
       
       setLoading(false);
       return { 
         error: null, 
-        mustChangePassword: userData.must_change_password 
+        mustChangePassword: false 
       };
     } catch (error) {
       setLoading(false);
@@ -119,24 +93,34 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const changePassword = async (oldPassword: string, newPassword: string) => {
-    if (!user) return { error: { message: 'Nicht angemeldet' } };
+    if (!user || !profile) return { error: { message: 'Nicht angemeldet' } };
 
     try {
-      const { data, error } = await supabase.rpc('change_user_password', {
-        user_id_input: user.id,
-        old_password: oldPassword,
-        new_password: newPassword
-      });
-
-      if (error) return { error };
-      
-      const result = data as any;
-      if (result?.error) return { error: { message: result.error } };
-
-      // Update profile to remove must_change_password flag
-      if (profile) {
-        setProfile({ ...profile, must_change_password: false });
+      // Verify old password
+      if (profile.password !== oldPassword) {
+        return { error: { message: 'Falsches aktuelles Passwort' } };
       }
+
+      // Manual update since types don't allow password column
+      const response = await fetch(
+        `https://afnfyivevmqihuqijusi.supabase.co/rest/v1/permissions?username=eq.${profile.username}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmbmZ5aXZldm1xaWh1cWlqdXNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNzQ4MzAsImV4cCI6MjA3MDc1MDgzMH0.iZNTzN55MZK8p0hrZzsaAxbSALp5tVrloUQUiosmbRU',
+            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmbmZ5aXZldm1xaWh1cWlqdXNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNzQ4MzAsImV4cCI6MjA3MDc1MDgzMH0.iZNTzN55MZK8p0hrZzsaAxbSALp5tVrloUQUiosmbRU'
+          },
+          body: JSON.stringify({ password: newPassword })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Password update failed');
+      }
+
+      // Update local profile state
+      setProfile({ ...profile, password: newPassword });
 
       return { error: null };
     } catch (error) {
@@ -145,21 +129,54 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const createUser = async (username: string, password: string, fullName: string, permissionLevel: number) => {
-    if (!user) return { error: { message: 'Nicht angemeldet' } };
+    if (!user || !profile) return { error: { message: 'Nicht angemeldet' } };
+
+    // Check if creator has permission level 10 (Schulleitung)
+    if (profile.permission_lvl < 10) {
+      return { error: { message: 'Keine Berechtigung zum Erstellen von Benutzern' } };
+    }
 
     try {
-      const { data, error } = await supabase.rpc('create_school_user', {
-        username_input: username,
-        password_input: password,
-        full_name_input: fullName,
-        permission_level_input: permissionLevel,
-        creator_user_id: user.id
-      });
+      // Check if username already exists
+      const checkResponse = await fetch(
+        `https://afnfyivevmqihuqijusi.supabase.co/rest/v1/permissions?username=eq.${username}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmbmZ5aXZldm1xaWh1cWlqdXNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNzQ4MzAsImV4cCI6MjA3MDc1MDgzMH0.iZNTzN55MZK8p0hrZzsaAxbSALp5tVrloUQUiosmbRU',
+            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmbmZ5aXZldm1xaWh1cWlqdXNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNzQ4MzAsImV4cCI6MjA3MDc1MDgzMH0.iZNTzN55MZK8p0hrZzsaAxbSALp5tVrloUQUiosmbRU'
+          }
+        }
+      );
+      const existingUsers = await checkResponse.json();
 
-      if (error) return { error };
-      
-      const result = data as any;
-      if (result?.error) return { error: { message: result.error } };
+      if (existingUsers && existingUsers.length > 0) {
+        return { error: { message: 'Benutzername bereits vergeben' } };
+      }
+
+      // Manual insert since types don't allow all columns
+      const response = await fetch(
+        'https://afnfyivevmqihuqijusi.supabase.co/rest/v1/permissions',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmbmZ5aXZldm1xaWh1cWlqdXNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNzQ4MzAsImV4cCI6MjA3MDc1MDgzMH0.iZNTzN55MZK8p0hrZzsaAxbSALp5tVrloUQUiosmbRU',
+            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmbmZ5aXZldm1xaWh1cWlqdXNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNzQ4MzAsImV4cCI6MjA3MDc1MDgzMH0.iZNTzN55MZK8p0hrZzsaAxbSALp5tVrloUQUiosmbRU'
+          },
+          body: JSON.stringify({
+            username,
+            password,
+            name: fullName,
+            permission_lvl: permissionLevel
+          })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('User creation failed');
+      }
 
       return { error: null };
     } catch (error) {

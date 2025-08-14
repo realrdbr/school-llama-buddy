@@ -92,17 +92,17 @@ const Dashboard = () => {
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <p className="font-medium text-foreground">{profile?.full_name || user?.email}</p>
+                <p className="font-medium text-foreground">{profile?.name || user?.email}</p>
                 <div className="flex items-center gap-2">
-                  <Badge variant={getPermissionBadgeVariant(profile?.permission_level || 1)}>
-                    {profile?.permission_name || "Benutzer"}
+                  <Badge variant={getPermissionBadgeVariant(profile?.permission_lvl || 1)}>
+                    {profile?.permission_lvl >= 8 ? "Schulleitung" : profile?.permission_lvl >= 5 ? "Lehrkraft" : "Schüler"}
                   </Badge>
-                  <span className={`text-sm ${getPermissionColor(profile?.permission_level || 1)}`}>
-                    Level {profile?.permission_level || 1}
+                  <span className={`text-sm ${getPermissionColor(profile?.permission_lvl || 1)}`}>
+                    Level {profile?.permission_lvl || 1}
                   </span>
                 </div>
               </div>
-              {profile?.permission_level && profile.permission_level >= 10 && (
+              {profile?.permission_lvl && profile.permission_lvl >= 10 && (
                 <Button variant="outline" size="sm" onClick={() => setShowCreateUser(true)}>
                   <UserPlus className="h-4 w-4 mr-2" />
                   Benutzer erstellen
@@ -123,11 +123,11 @@ const Dashboard = () => {
           {/* Welcome Section */}
           <Card>
             <CardHeader>
-              <CardTitle>Willkommen, {profile?.full_name || "Benutzer"}!</CardTitle>
+              <CardTitle>Willkommen, {profile?.name || "Benutzer"}!</CardTitle>
               <CardDescription>
-                {profile?.permission_level && profile.permission_level >= 8 
+                {profile?.permission_lvl && profile.permission_lvl >= 8 
                   ? "Als Administrator haben Sie Zugriff auf alle Systemfunktionen."
-                  : profile?.permission_level && profile.permission_level >= 5
+                  : profile?.permission_lvl && profile.permission_lvl >= 5
                   ? "Als Lehrkraft können Sie Stundenpläne und Ankündigungen verwalten."
                   : "Als Schüler können Sie Ihren Stundenplan einsehen und den Hausaufgaben-Assistenten nutzen."
                 }
@@ -136,7 +136,7 @@ const Dashboard = () => {
           </Card>
 
           {/* Admin Features */}
-          {profile?.permission_level && profile.permission_level >= 8 && (
+          {profile?.permission_lvl && profile.permission_lvl >= 8 && (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-foreground">Verwaltung</h2>
               {renderFeatureCards(adminFeatures)}
@@ -144,10 +144,10 @@ const Dashboard = () => {
           )}
 
           {/* Teacher Features */}
-          {profile?.permission_level && profile.permission_level >= 5 && (
+          {profile?.permission_lvl && profile.permission_lvl >= 5 && (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-foreground">
-                {profile.permission_level >= 8 ? "Lehrkraft-Funktionen" : "Ihre Funktionen"}
+                {profile.permission_lvl >= 8 ? "Lehrkraft-Funktionen" : "Ihre Funktionen"}
               </h2>
               {renderFeatureCards(teacherFeatures)}
             </div>
@@ -156,7 +156,7 @@ const Dashboard = () => {
           {/* Student Features */}
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-foreground">
-              {profile?.permission_level && profile.permission_level >= 5 ? "Schüler-Funktionen" : "Ihre Funktionen"}
+              {profile?.permission_lvl && profile.permission_lvl >= 5 ? "Schüler-Funktionen" : "Ihre Funktionen"}
             </h2>
             {renderFeatureCards(studentFeatures)}
           </div>

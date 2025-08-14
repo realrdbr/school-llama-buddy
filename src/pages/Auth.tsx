@@ -21,14 +21,9 @@ const Auth = () => {
 
   useEffect(() => {
     if (user && !loading) {
-      // Check if user must change password
-      if (profile?.must_change_password) {
-        setShowChangePassword(true);
-      } else {
-        navigate('/');
-      }
+      navigate('/');
     }
-  }, [user, loading, profile, navigate]);
+  }, [user, loading, navigate]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
