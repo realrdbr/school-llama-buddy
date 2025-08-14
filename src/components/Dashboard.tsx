@@ -9,7 +9,6 @@ import {
   Users, 
   Megaphone, 
   KeyRound, 
-  MessageCircle, 
   Settings,
   LogOut,
   Clock,
@@ -18,6 +17,7 @@ import {
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import CreateUserModal from './CreateUserModal';
+import AIAssistant from './AIAssistant';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -61,7 +61,6 @@ const Dashboard = () => {
   const studentFeatures = [
     { icon: Clock, title: "Stundenplan", description: "Aktueller Stundenplan und Vertretungen", path: "/stundenplan" },
     { icon: Calendar, title: "Vertretungsplan", description: "Aktuelle Vertretungen einsehen", path: "/vertretungsplan" },
-    { icon: MessageCircle, title: "Hausaufgaben-Assistent", description: "KI-gestützte Lernhilfe", path: "/hausaufgaben" },
     { icon: Megaphone, title: "Ankündigungen", description: "Aktuelle Schulnachrichten", path: "/announcements" }
   ];
 
@@ -129,6 +128,9 @@ const Dashboard = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-8">
+          {/* AI Assistant */}
+          <AIAssistant />
+          
           {/* Welcome Section */}
           <Card>
             <CardHeader>
