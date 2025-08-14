@@ -35,11 +35,11 @@ const Keycard = () => {
       navigate('/auth');
       return;
     }
-    if (profile && profile.permission_lvl < 8) {
+    if (profile && profile.permission_lvl < 10) {
       toast({
         variant: "destructive",
         title: "Zugriff verweigert",
-        description: "Sie haben keine Berechtigung für diese Seite."
+        description: "Nur die Schulleitung kann Keycards verwalten."
       });
       navigate('/');
       return;
@@ -80,7 +80,7 @@ const Keycard = () => {
     return 'Besucher - Gänge';
   };
 
-  const canManageKeycards = profile?.permission_lvl && profile.permission_lvl >= 8;
+  const canManageKeycards = profile?.permission_lvl && profile.permission_lvl >= 10;
 
   const handleCreateKeycard = async () => {
     if (!newKeycard.cardNumber || !newKeycard.owner) {

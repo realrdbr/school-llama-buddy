@@ -189,6 +189,15 @@ const Vertretungsplan = () => {
   };
 
   const handleCellClick = (classname: string, day: string, period: number, entry: ParsedScheduleEntry) => {
+    // Only allow editing if there's no existing substitution for this specific date/class/period
+    if (hasSubstitution(classname, day, period)) {
+      toast({
+        title: "Vertretung bereits vorhanden",
+        description: "Für diese Stunde ist bereits eine Vertretung eingetragen."
+      });
+      return;
+    }
+    
     setSelectedScheduleEntry({ class: classname, day, period, entry });
     setSubstitutionData({ 
       substituteTeacher: '', 
@@ -385,32 +394,41 @@ const Vertretungsplan = () => {
                           return (
                             <td key={day} className="border border-border p-1">
                               <div className="space-y-1">
-                                {parsedEntries.map((parsed, idx) => (
-                                  <div
-                                    key={idx}
-                                    className={`p-2 rounded cursor-pointer transition-colors min-h-[60px] flex flex-col justify-center ${
-                                      isSubstituted 
-                                        ? 'bg-destructive/20 text-destructive border border-destructive/50' 
-                                        : 'hover:bg-muted/50'
-                                    }`}
-                                    onClick={() => canEditSubstitutions && handleCellClick(selectedClass, day, entry.period, parsed)}
-                                  >
-                    <div className="text-sm font-medium">
-                      {isSubstituted ? (substitution?.subject || parsed.subject) : parsed.subject}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {isSubstituted ? (substitution?.substituteTeacher || 'ENTFALL') : parsed.teacher}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {isSubstituted ? (substitution?.room || parsed.room) : parsed.room}
-                    </div>
-                                    {isSubstituted && substitution?.note && (
-                                      <div className="text-xs text-destructive mt-1">
-                                        {substitution.note}
+                                {parsedEntries.map((parsed, idx) => {
+                                  // Check if there's a substitution for this specific date/class/period
+                                  const specificSubstitution = substitutions.find(sub => 
+                                    sub.class === selectedClass && 
+                                    sub.date === selectedDate && 
+                                    sub.period === entry.period
+                                  );
+                                  
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className={`p-2 rounded cursor-pointer transition-colors min-h-[60px] flex flex-col justify-center ${
+                                        specificSubstitution
+                                          ? 'bg-destructive/20 text-destructive border border-destructive/50' 
+                                          : 'hover:bg-muted/50'
+                                      }`}
+                                      onClick={() => canEditSubstitutions && handleCellClick(selectedClass, day, entry.period, parsed)}
+                                    >
+                                      <div className="text-sm font-medium">
+                                        {specificSubstitution ? (specificSubstitution.subject || parsed.subject) : parsed.subject}
                                       </div>
-                                    )}
-                                  </div>
-                                ))}
+                                      <div className="text-xs text-muted-foreground">
+                                        {specificSubstitution ? (specificSubstitution.substituteTeacher || 'ENTFALL') : parsed.teacher}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {specificSubstitution ? (specificSubstitution.room || parsed.room) : parsed.room}
+                                      </div>
+                                      {specificSubstitution?.note && (
+                                        <div className="text-xs text-destructive mt-1">
+                                          {specificSubstitution.note}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </td>
                           );
