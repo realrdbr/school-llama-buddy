@@ -50,6 +50,9 @@ verify_jwt = false
 [functions.offline-tts]
 verify_jwt = false
 
+[functions.python-tts]
+verify_jwt = false
+
 [functions.ai-document-analysis]
 verify_jwt = false
 

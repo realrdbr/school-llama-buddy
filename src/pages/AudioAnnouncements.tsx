@@ -86,7 +86,7 @@ const AudioAnnouncements = () => {
     try {
       console.log('Submitting TTS with user:', profile?.username);
       
-      const { data, error } = await supabase.functions.invoke('offline-tts', {
+      const { data, error } = await supabase.functions.invoke('python-tts', {
         body: {
           ...ttsForm,
           user_id: profile?.username  // Add username for custom auth

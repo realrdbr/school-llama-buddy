@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ArrowLeft, Calendar, Plus, Edit, Trash2, Clock } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import DebugVertretungsplan from '@/components/DebugVertretungsplan';
 
 interface SubstitutionEntry {
   id: string;
@@ -98,13 +99,20 @@ const Vertretungsplan = () => {
       const startDateString = startOfWeek.toISOString().split('T')[0];
       const endDateString = endOfWeek.toISOString().split('T')[0];
 
+      console.log('Fetching substitutions for date range:', startDateString, 'to', endDateString);
+
       const { data, error } = await supabase
         .from('vertretungsplan')
         .select('*')
         .gte('date', startDateString)
         .lte('date', endDateString);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      console.log('Raw substitution data from database:', data);
 
       const substitutionData = data.map(sub => ({
         id: sub.id,
@@ -118,6 +126,7 @@ const Vertretungsplan = () => {
         note: sub.note
       }));
 
+      console.log('Processed substitution data:', substitutionData);
       setSubstitutions(substitutionData);
     } catch (error) {
       console.error('Error fetching substitutions:', error);
@@ -569,6 +578,9 @@ const Vertretungsplan = () => {
               </CardContent>
             </Card>
           )}
+          
+          {/* Debug Component */}
+          <DebugVertretungsplan />
         </div>
       </main>
 
