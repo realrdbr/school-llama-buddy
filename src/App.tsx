@@ -12,6 +12,9 @@ import Announcements from "./pages/Announcements";
 import UserManagement from "./pages/UserManagement";
 import Vertretungsplan from "./pages/Vertretungsplan";
 import Klassenverwaltung from "./pages/Klassenverwaltung";
+import Hausaufgaben from "./pages/Hausaufgaben";
+import Keycard from "./pages/Keycard";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +33,9 @@ const App = () => (
             <Route path="/user-management" element={<UserManagement />} />
             <Route path="/vertretungsplan" element={<Vertretungsplan />} />
             <Route path="/klassenverwaltung" element={<Klassenverwaltung />} />
+            <Route path="/hausaufgaben" element={<Hausaufgaben />} />
+            <Route path="/keycard" element={<Keycard />} />
+            <Route path="/settings" element={<Settings />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

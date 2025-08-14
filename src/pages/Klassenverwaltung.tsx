@@ -25,7 +25,7 @@ const Klassenverwaltung = () => {
       navigate('/auth');
       return;
     }
-    if (profile && profile.permission_lvl < 6) {
+    if (profile && profile.permission_lvl < 5) {
       toast({
         variant: "destructive",
         title: "Zugriff verweigert",
@@ -42,17 +42,17 @@ const Klassenverwaltung = () => {
         students: 24,
         classTeacher: 'Frau Kunadt',
         room: 'R201',
-        subjects: ['Mathematik', 'Deutsch', 'Englisch', 'Geschichte', 'Biologie', 'Physik']
+        subjects: []
       },
       {
         name: '10c',
         students: 22,
         classTeacher: 'Herr König',
         room: 'R205',
-        subjects: ['Mathematik', 'Deutsch', 'Englisch', 'Geographie', 'Chemie', 'Sport']
+        subjects: []
       },
       {
-        name: 'Neue Klasse',
+        name: '9a',
         students: 0,
         classTeacher: 'Noch nicht zugewiesen',
         room: 'Noch nicht zugewiesen',
@@ -175,10 +175,6 @@ const Klassenverwaltung = () => {
                         <p className="text-sm text-muted-foreground">Schüler</p>
                         <p className="font-medium">{classInfo.students}</p>
                       </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Raum</p>
-                        <p className="font-medium">{classInfo.room}</p>
-                      </div>
                     </div>
                     
                     <div>
@@ -186,16 +182,18 @@ const Klassenverwaltung = () => {
                       <p className="font-medium">{classInfo.classTeacher}</p>
                     </div>
 
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-2">Fächer</p>
-                      <div className="flex flex-wrap gap-1">
-                        {classInfo.subjects.map((subject) => (
-                          <Badge key={subject} variant="outline" className="text-xs">
-                            {subject}
-                          </Badge>
-                        ))}
+                    {classInfo.subjects.length > 0 && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-2">Fächer</p>
+                        <div className="flex flex-wrap gap-1">
+                          {classInfo.subjects.map((subject) => (
+                            <Badge key={subject} variant="outline" className="text-xs">
+                              {subject}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     <div className="flex gap-2 pt-4">
                       <Button 

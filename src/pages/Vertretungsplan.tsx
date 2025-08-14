@@ -63,11 +63,11 @@ const Vertretungsplan = () => {
       navigate('/auth');
       return;
     }
-    if (profile && profile.permission_lvl < 6) {
+    if (profile && profile.permission_lvl < 1) {
       toast({
         variant: "destructive",
         title: "Zugriff verweigert",
-        description: "Sie haben keine Berechtigung für den Vertretungsplan."
+        description: "Sie haben keine Berechtigung für diese Seite."
       });
       navigate('/');
       return;
@@ -208,7 +208,7 @@ const Vertretungsplan = () => {
     });
   };
 
-  const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >= 6;
+  const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >= 5;
 
   return (
     <div className="min-h-screen bg-background">
@@ -225,7 +225,9 @@ const Vertretungsplan = () => {
                 <Calendar className="h-6 w-6 text-primary" />
                 <div>
                   <h1 className="text-2xl font-bold text-foreground">Vertretungsplan</h1>
-                  <p className="text-muted-foreground">Vertretungen verwalten</p>
+                  <p className="text-muted-foreground">
+                    {canEditSubstitutions ? "Vertretungen verwalten" : "Vertretungen einsehen"}
+                  </p>
                 </div>
               </div>
             </div>

@@ -34,13 +34,13 @@ const Dashboard = () => {
 
   const getPermissionBadgeVariant = (level: number) => {
     if (level >= 8) return "default"; // Schulleitung
-    if (level >= 6) return "secondary"; // Lehrer
-    return "outline"; // Schüler
+    if (level >= 5) return "secondary"; // Lehrer
+    return "outline"; // Besucher/Schüler
   };
 
   const getPermissionColor = (level: number) => {
     if (level >= 8) return "text-primary";
-    if (level >= 6) return "text-secondary-foreground";
+    if (level >= 5) return "text-secondary-foreground";
     return "text-muted-foreground";
   };
 
@@ -58,6 +58,7 @@ const Dashboard = () => {
 
   const studentFeatures = [
     { icon: Clock, title: "Stundenplan", description: "Aktueller Stundenplan und Vertretungen", path: "/stundenplan" },
+    { icon: Calendar, title: "Vertretungsplan", description: "Aktuelle Vertretungen einsehen", path: "/vertretungsplan" },
     { icon: MessageCircle, title: "Hausaufgaben-Assistent", description: "KI-gestützte Lernhilfe", path: "/hausaufgaben" },
     { icon: Megaphone, title: "Ankündigungen", description: "Aktuelle Schulnachrichten", path: "/announcements" }
   ];
@@ -101,7 +102,7 @@ const Dashboard = () => {
                 <p className="font-medium text-foreground">{profile?.name || user?.email}</p>
                 <div className="flex items-center gap-2">
                   <Badge variant={getPermissionBadgeVariant(profile?.permission_lvl || 1)}>
-                    {profile?.permission_lvl >= 8 ? "Schulleitung" : profile?.permission_lvl >= 6 ? "Lehrkraft" : "Schüler"}
+                    {profile?.permission_lvl >= 8 ? "Schulleitung" : profile?.permission_lvl >= 5 ? "Lehrkraft" : profile?.permission_lvl > 1 ? "Schüler" : "Besucher"}
                   </Badge>
                   <span className={`text-sm ${getPermissionColor(profile?.permission_lvl || 1)}`}>
                     Level {profile?.permission_lvl || 1}
@@ -135,9 +136,11 @@ const Dashboard = () => {
                   ? "Als Schulleitung haben Sie Zugriff auf alle Systemfunktionen."
                   : profile?.permission_lvl && profile.permission_lvl >= 8
                   ? "Als Administrator haben Sie Zugriff auf alle Systemfunktionen."
-                  : profile?.permission_lvl && profile.permission_lvl >= 6
+                  : profile?.permission_lvl && profile.permission_lvl >= 5
                   ? "Als Lehrkraft können Sie Stundenpläne und Ankündigungen verwalten."
-                  : "Als Schüler können Sie Ihren Stundenplan einsehen und den Hausaufgaben-Assistenten nutzen."
+                  : profile?.permission_lvl && profile.permission_lvl > 1
+                  ? "Als Schüler können Sie Ihren Stundenplan einsehen und den Hausaufgaben-Assistenten nutzen."
+                  : "Als Besucher haben Sie eingeschränkten Zugriff auf öffentliche Inhalte."
                 }
               </CardDescription>
             </CardHeader>
@@ -152,7 +155,7 @@ const Dashboard = () => {
           )}
 
           {/* Teacher Features */}
-          {profile?.permission_lvl && profile.permission_lvl >= 6 && (
+          {profile?.permission_lvl && profile.permission_lvl >= 5 && (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-foreground">
                 {profile.permission_lvl >= 8 ? "Lehrkraft-Funktionen" : "Ihre Funktionen"}
@@ -161,13 +164,15 @@ const Dashboard = () => {
             </div>
           )}
 
-          {/* Student Features */}
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-foreground">
-              {profile?.permission_lvl && profile.permission_lvl >= 6 ? "Schüler-Funktionen" : "Ihre Funktionen"}
-            </h2>
-            {renderFeatureCards(studentFeatures)}
-          </div>
+          {/* Student/Visitor Features */}
+          {profile?.permission_lvl && profile.permission_lvl >= 1 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold text-foreground">
+                {profile.permission_lvl >= 5 ? "Schüler-Funktionen" : profile.permission_lvl > 1 ? "Ihre Funktionen" : "Verfügbare Funktionen"}
+              </h2>
+              {renderFeatureCards(studentFeatures)}
+            </div>
+          )}
         </div>
       </main>
 
