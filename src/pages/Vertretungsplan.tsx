@@ -538,27 +538,33 @@ const Vertretungsplan = () => {
                       const isToday = substitution.date === new Date().toISOString().split('T')[0];
                       
                       return (
-                    <div key={substitution.id} className="flex items-center justify-between p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-                      <div className="flex items-center gap-4">
-                        <span className="font-medium">{substitution.period}. Std</span>
-                        <span>{substitution.subject}</span>
-                        <span className="text-muted-foreground">
-                          {substitution.teacher} → {substitution.substituteTeacher || 'Entfall'}
-                        </span>
-                        <span className="text-muted-foreground">{substitution.room}</span>
-                      </div>
-                      {canEditSubstitutions && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="text-destructive"
-                          onClick={() => handleDeleteSubstitution(substitution.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
+                        <div key={substitution.id} className="flex items-center justify-between p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                          <div className="flex items-center gap-4">
+                            <span className="font-medium text-sm">{dayName}</span>
+                            <span className="font-medium">{substitution.period}. Std</span>
+                            <span className="font-medium">{substitution.class}</span>
+                            <span>{substitution.subject}</span>
+                            <span className="text-muted-foreground">
+                              {substitution.teacher} → {substitution.substituteTeacher || 'Entfall'}
+                            </span>
+                            <span className="text-muted-foreground">{substitution.room}</span>
+                            {substitution.note && (
+                              <span className="text-xs text-muted-foreground italic">({substitution.note})</span>
+                            )}
+                          </div>
+                          {canEditSubstitutions && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-destructive"
+                              onClick={() => handleDeleteSubstitution(substitution.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
                 </div>
               </CardContent>
             </Card>
