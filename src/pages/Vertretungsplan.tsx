@@ -76,9 +76,35 @@ const Vertretungsplan = () => {
     }
     
     fetchSchedules();
-    // No sample data - start with empty substitutions
-    setSubstitutions([]);
-  }, [user, profile, navigate]);
+    fetchSubstitutions();
+  }, [user, profile, navigate, selectedDate]);
+
+  const fetchSubstitutions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('vertretungsplan')
+        .select('*')
+        .eq('date', selectedDate);
+
+      if (error) throw error;
+
+      const substitutionData = data.map(sub => ({
+        id: sub.id,
+        date: sub.date,
+        class: sub.class_name,
+        period: sub.period,
+        subject: sub.substitute_subject || sub.original_subject,
+        teacher: sub.original_teacher,
+        substituteTeacher: sub.substitute_teacher,
+        room: sub.substitute_room || sub.original_room,
+        note: sub.note
+      }));
+
+      setSubstitutions(substitutionData);
+    } catch (error) {
+      console.error('Error fetching substitutions:', error);
+    }
+  };
 
   const fetchSchedules = async () => {
     try {
@@ -207,18 +233,28 @@ const Vertretungsplan = () => {
 
       if (error) throw error;
 
-      // Create automatic announcement
+      // Create automatic announcement for ALL users
       const { error: announcementError } = await supabase.from('announcements').insert({
-        title: `Vertretungsplan geändert - Klasse ${selectedScheduleEntry.class}`,
-        content: `${getDayName(selectedScheduleEntry.day)}, ${selectedScheduleEntry.period}. Stunde: ${substitutionData.substituteSubject} wird von ${substitutionData.substituteTeacher || 'ENTFALL'} vertreten`,
+        title: `Vertretungsplan geändert - ${formatDate(selectedDate)}`,
+        content: `Klasse ${selectedScheduleEntry.class}, ${selectedScheduleEntry.period}. Stunde: ${substitutionData.substituteSubject} wird von ${substitutionData.substituteTeacher || 'ENTFALL'} vertreten (Raum: ${substitutionData.substituteRoom})`,
         author: profile?.name || 'Lehrkraft',
         priority: 'high',
-        target_class: selectedScheduleEntry.class
+        target_class: null, // null = für alle Benutzer
+        target_permission_level: null // null = für alle Permission Level
       });
 
       if (announcementError) console.error('Error creating announcement:', announcementError);
+
+      // Refresh substitutions to show the new one
+      await fetchSubstitutions();
     } catch (error) {
       console.error('Error saving substitution:', error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Vertretung konnte nicht gespeichert werden."
+      });
+      return;
     }
 
     setShowSubstitutionDialog(false);
@@ -228,12 +264,28 @@ const Vertretungsplan = () => {
     });
   };
 
-  const handleDeleteSubstitution = (id: string) => {
-    setSubstitutions(substitutions.filter(sub => sub.id !== id));
-    toast({
-      title: "Vertretung gelöscht",
-      description: "Die Vertretung wurde entfernt."
-    });
+  const handleDeleteSubstitution = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('vertretungsplan')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setSubstitutions(substitutions.filter(sub => sub.id !== id));
+      toast({
+        title: "Vertretung gelöscht",
+        description: "Die Vertretung wurde entfernt."
+      });
+    } catch (error) {
+      console.error('Error deleting substitution:', error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Vertretung konnte nicht gelöscht werden."
+      });
+    }
   };
 
   const formatDate = (dateString: string) => {
