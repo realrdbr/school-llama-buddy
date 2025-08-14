@@ -211,6 +211,31 @@ const Vertretungsplan = () => {
   const handleCreateSubstitution = async () => {
     if (!selectedScheduleEntry) return;
 
+    // Get the selected date and day of week
+    const selectedDateObj = new Date(selectedDate + 'T00:00:00');
+    const dayOfWeek = selectedDateObj.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    
+    // Convert day names to day numbers
+    const dayMapping = {
+      'monday': 1,
+      'tuesday': 2, 
+      'wednesday': 3,
+      'thursday': 4,
+      'friday': 5
+    };
+    
+    const selectedDayNumber = dayMapping[selectedScheduleEntry.day as keyof typeof dayMapping];
+    
+    // Only create substitution if the selected date matches the day of the week
+    if (dayOfWeek !== selectedDayNumber) {
+      toast({
+        variant: "destructive",
+        title: "Datum passt nicht zum Wochentag",
+        description: `Das ausgewählte Datum ist kein ${getDayName(selectedScheduleEntry.day)}.`
+      });
+      return;
+    }
+
     const substitution: SubstitutionEntry = {
       id: Date.now().toString(),
       date: selectedDate,
@@ -223,9 +248,7 @@ const Vertretungsplan = () => {
       note: substitutionData.note
     };
 
-    setSubstitutions([...substitutions, substitution]);
-    
-    // Save to database
+    // Save to database first
     try {
       const { error } = await supabase.from('vertretungsplan').insert({
         date: selectedDate,
@@ -240,22 +263,32 @@ const Vertretungsplan = () => {
         note: substitutionData.note
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
 
       // Create automatic announcement for ALL users
       const { error: announcementError } = await supabase.from('announcements').insert({
         title: `Vertretungsplan geändert - ${formatDate(selectedDate)}`,
-        content: `Klasse ${selectedScheduleEntry.class}, ${selectedScheduleEntry.period}. Stunde: ${substitutionData.substituteSubject} wird von ${substitutionData.substituteTeacher || 'ENTFALL'} vertreten (Raum: ${substitutionData.substituteRoom})`,
+        content: `Klasse ${selectedScheduleEntry.class}, ${getDayName(selectedScheduleEntry.day)} ${selectedScheduleEntry.period}. Stunde: ${substitutionData.substituteSubject} wird von ${substitutionData.substituteTeacher || 'ENTFALL'} vertreten (Raum: ${substitutionData.substituteRoom})`,
         author: profile?.name || 'Lehrkraft',
-        priority: 'high',
-        target_class: null, // null = für alle Benutzer
-        target_permission_level: null // null = für alle Permission Level
+        priority: 'high'
       });
 
       if (announcementError) console.error('Error creating announcement:', announcementError);
 
+      // Add to local state
+      setSubstitutions([...substitutions, substitution]);
+      
       // Refresh substitutions to show the new one
       await fetchSubstitutions();
+      
+      setShowSubstitutionDialog(false);
+      toast({
+        title: "Vertretung erstellt",
+        description: `Die Vertretung wurde erfolgreich für ${getDayName(selectedScheduleEntry.day)} gespeichert.`
+      });
     } catch (error) {
       console.error('Error saving substitution:', error);
       toast({
@@ -263,14 +296,7 @@ const Vertretungsplan = () => {
         title: "Fehler",
         description: "Vertretung konnte nicht gespeichert werden."
       });
-      return;
     }
-
-    setShowSubstitutionDialog(false);
-    toast({
-      title: "Vertretung erstellt",
-      description: `Die Vertretung wurde erfolgreich hinzugefügt und in der Datenbank gespeichert.`
-    });
   };
 
   const handleDeleteSubstitution = async (id: string) => {
@@ -395,12 +421,30 @@ const Vertretungsplan = () => {
                             <td key={day} className="border border-border p-1">
                               <div className="space-y-1">
                                 {parsedEntries.map((parsed, idx) => {
+                                  // Get the actual date for this specific weekday
+                                  const selectedDateObj = new Date(selectedDate + 'T00:00:00');
+                                  const dayOfWeek = selectedDateObj.getDay(); // 0 = Sunday, 1 = Monday, etc.
+                                  
+                                  // Convert day names to day numbers for comparison
+                                  const dayMapping = {
+                                    'monday': 1,
+                                    'tuesday': 2, 
+                                    'wednesday': 3,
+                                    'thursday': 4,
+                                    'friday': 5
+                                  };
+                                  
+                                  const currentDayNumber = dayMapping[day as keyof typeof dayMapping];
+                                  
+                                  // Only show substitution if the selected date matches this weekday
+                                  const isCorrectDay = dayOfWeek === currentDayNumber;
+                                  
                                   // Check if there's a substitution for this specific date/class/period
-                                  const specificSubstitution = substitutions.find(sub => 
+                                  const specificSubstitution = isCorrectDay ? substitutions.find(sub => 
                                     sub.class === selectedClass && 
                                     sub.date === selectedDate && 
                                     sub.period === entry.period
-                                  );
+                                  ) : null;
                                   
                                   return (
                                     <div
@@ -408,9 +452,11 @@ const Vertretungsplan = () => {
                                       className={`p-2 rounded cursor-pointer transition-colors min-h-[60px] flex flex-col justify-center ${
                                         specificSubstitution
                                           ? 'bg-destructive/20 text-destructive border border-destructive/50' 
-                                          : 'hover:bg-muted/50'
+                                          : isCorrectDay
+                                          ? 'hover:bg-muted/50'
+                                          : 'hover:bg-muted/30 opacity-60'
                                       }`}
-                                      onClick={() => canEditSubstitutions && handleCellClick(selectedClass, day, entry.period, parsed)}
+                                      onClick={() => canEditSubstitutions && isCorrectDay && handleCellClick(selectedClass, day, entry.period, parsed)}
                                     >
                                       <div className="text-sm font-medium">
                                         {specificSubstitution ? (specificSubstitution.subject || parsed.subject) : parsed.subject}
@@ -424,6 +470,11 @@ const Vertretungsplan = () => {
                                       {specificSubstitution?.note && (
                                         <div className="text-xs text-destructive mt-1">
                                           {specificSubstitution.note}
+                                        </div>
+                                      )}
+                                      {!isCorrectDay && (
+                                        <div className="text-xs text-muted-foreground mt-1 opacity-50">
+                                          (Anderer Wochentag)
                                         </div>
                                       )}
                                     </div>

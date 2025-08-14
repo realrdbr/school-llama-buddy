@@ -173,6 +173,7 @@ const Settings = () => {
                   <Input
                     id="server-ip"
                     value="192.168.1.100"
+                    readOnly
                     className="mt-1"
                   />
                 </div>
@@ -181,6 +182,7 @@ const Settings = () => {
                   <Input
                     id="server-port"
                     value="8080"
+                    readOnly
                     className="mt-1"
                   />
                 </div>
