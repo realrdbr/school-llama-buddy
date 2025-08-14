@@ -7,7 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Volume2, VolumeX, Mic, Upload, Play, Pause, RotateCcw } from 'lucide-react';
+import { Volume2, VolumeX, Mic, Upload, Play, Pause, RotateCcw, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import OfflineTTS from '@/components/OfflineTTS';
 
 interface AudioAnnouncement {
@@ -28,6 +29,7 @@ interface AudioAnnouncement {
 const AudioAnnouncements = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [announcements, setAnnouncements] = useState<AudioAnnouncement[]>([]);
   const [loading, setLoading] = useState(false);
   const [ttsForm, setTtsForm] = useState({
@@ -86,12 +88,21 @@ const AudioAnnouncements = () => {
     try {
       console.log('Submitting TTS with user:', profile?.username);
       
-      const { data, error } = await supabase.functions.invoke('python-tts', {
-        body: {
-          ...ttsForm,
-          user_id: profile?.username  // Add username for custom auth
-        }
-      });
+      // Erstelle TTS-Eintrag direkt in der Datenbank (ohne Python-Script)
+      const { data, error } = await supabase
+        .from('audio_announcements')
+        .insert({
+          title: ttsForm.title,
+          description: ttsForm.description || `TTS-Durchsage erstellt von ${profile?.username}`,
+          is_tts: true,
+          tts_text: ttsForm.text,
+          voice_id: ttsForm.voice_id,
+          schedule_date: ttsForm.schedule_date ? new Date(ttsForm.schedule_date).toISOString() : null,
+          is_active: true,
+          created_by: profile?.user_id || null
+        })
+        .select()
+        .single();
       
       console.log('TTS Response:', { data, error });
       
@@ -100,7 +111,7 @@ const AudioAnnouncements = () => {
         throw error;
       }
       
-      if (data?.success) {
+      if (data) {
         toast({
           title: "Erfolg",
           description: "TTS-Durchsage wurde erstellt"
@@ -118,7 +129,7 @@ const AudioAnnouncements = () => {
         // Refresh announcements
         fetchAnnouncements();
       } else {
-        throw new Error(data?.error || 'Unbekannter Fehler');
+        throw new Error('TTS-Durchsage konnte nicht erstellt werden');
       }
     } catch (error: any) {
       console.error('TTS Submit Error:', error);
@@ -332,7 +343,13 @@ const AudioAnnouncements = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Audio-Durchsagen</h1>
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="ghost" onClick={() => navigate('/')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Zurück
+        </Button>
+        <h1 className="text-2xl font-bold">Audio-Durchsagen</h1>
+      </div>
 
       {/* TTS Form */}
       <Card>

@@ -218,8 +218,16 @@ ${profile?.permission_lvl && profile.permission_lvl >= 10 ?
 WICHTIGE REGELN:
 1. Du kannst ECHTE AKTIONEN ausführen! Wenn ein Benutzer eine Aktion anfordert, führe sie aus.
 2. Wenn du eine Aktion ausführen sollst, antworte mit: "AKTION:[ACTION_NAME]|PARAMETER1:wert1|PARAMETER2:wert2|..."
-3. Beispiel: "AKTION:CREATE_ANNOUNCEMENT|title:Wichtiger Hinweis|content:Morgen ist schulfrei|priority:high"
+3. Verstehe umgangssprachliche Anfragen intelligent und flexibel!
+
+BEISPIELE FÜR VERTRETUNGSPLAN-ÄNDERUNGEN:
+- "morgen fällt die erste stunde aus" → AKTION:UPDATE_VERTRETUNGSPLAN|date:morgen|period:1|substituteTeacher:Entfall
+- "herr könig wird in der 10b vertreten" → AKTION:UPDATE_VERTRETUNGSPLAN|className:10b|originalTeacher:König|substituteTeacher:Vertretung
+- "raum 201 wird zu 204 gewechselt" → AKTION:UPDATE_VERTRETUNGSPLAN|originalRoom:201|substituteRoom:204
+- "frau müller übernimmt die mathe stunde" → AKTION:UPDATE_VERTRETUNGSPLAN|substituteTeacher:Müller|substituteSubject:Mathe
+
 4. Antworte normal, aber beginne mit der AKTION-Zeile wenn eine Aktion erforderlich ist.
+5. Bei unvollständigen Angaben verwende sinnvolle Standardwerte.
 
 Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
             },
