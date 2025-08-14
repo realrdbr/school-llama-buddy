@@ -125,7 +125,9 @@ const Dashboard = () => {
             <CardHeader>
               <CardTitle>Willkommen, {profile?.name || "Benutzer"}!</CardTitle>
               <CardDescription>
-                {profile?.permission_lvl && profile.permission_lvl >= 8 
+                {profile?.permission_lvl && profile.permission_lvl >= 10 
+                  ? "Als Schulleitung haben Sie Zugriff auf alle Systemfunktionen."
+                  : profile?.permission_lvl && profile.permission_lvl >= 8
                   ? "Als Administrator haben Sie Zugriff auf alle Systemfunktionen."
                   : profile?.permission_lvl && profile.permission_lvl >= 5
                   ? "Als Lehrkraft können Sie Stundenpläne und Ankündigungen verwalten."

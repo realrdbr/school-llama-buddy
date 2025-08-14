@@ -9,6 +9,7 @@ interface Profile {
   permission_lvl: number;
   password: string;
   created_at: string;
+  must_change_password?: boolean;
 }
 
 interface AuthContextType {
