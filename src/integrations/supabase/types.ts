@@ -53,6 +53,57 @@ export type Database = {
         }
         Relationships: []
       }
+      audio_announcements: {
+        Row: {
+          audio_file_path: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          duration_seconds: number | null
+          id: string
+          is_active: boolean
+          is_tts: boolean
+          played_at: string | null
+          schedule_date: string | null
+          title: string
+          tts_text: string | null
+          updated_at: string
+          voice_id: string | null
+        }
+        Insert: {
+          audio_file_path?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          duration_seconds?: number | null
+          id?: string
+          is_active?: boolean
+          is_tts?: boolean
+          played_at?: string | null
+          schedule_date?: string | null
+          title: string
+          tts_text?: string | null
+          updated_at?: string
+          voice_id?: string | null
+        }
+        Update: {
+          audio_file_path?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          duration_seconds?: number | null
+          id?: string
+          is_active?: boolean
+          is_tts?: boolean
+          played_at?: string | null
+          schedule_date?: string | null
+          title?: string
+          tts_text?: string | null
+          updated_at?: string
+          voice_id?: string | null
+        }
+        Relationships: []
+      }
       chat_conversations: {
         Row: {
           created_at: string
