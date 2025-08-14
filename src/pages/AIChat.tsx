@@ -264,7 +264,7 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
                 parameters,
                 userProfile: {
                   user_id: profile?.id,
-                  name: profile?.name,
+                  name: profile?.username || profile?.name,
                   permission_lvl: profile?.permission_lvl
                 }
               }

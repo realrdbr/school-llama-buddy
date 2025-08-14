@@ -12,30 +12,27 @@ serve(async (req) => {
   }
 
   try {
-    const { text, voice_id = 'alloy', title, description, schedule_date } = await req.json()
+    const { text, voice_id = 'alloy', title, description, schedule_date, user_id } = await req.json()
     
     // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Get user profile
-    const authHeader = req.headers.get('Authorization')!
-    const token = authHeader.replace('Bearer ', '')
-    const { data: user } = await supabase.auth.getUser(token)
+    // user_id is already extracted from the request body above
     
-    if (!user.user) {
-      throw new Error('Nicht authentifiziert')
+    if (!user_id) {
+      throw new Error('Nicht authentifiziert - user_id fehlt')
     }
 
-    // Check permissions
+    // Check permissions using our custom permission system
     const { data: profile } = await supabase
       .from('profiles')
       .select(`
         *,
         permissions!inner(permission_lvl)
       `)
-      .eq('user_id', user.user.id)
+      .eq('user_id', user_id)
       .single()
 
     if (!profile || profile.permissions.permission_lvl < 10) {
@@ -52,7 +49,7 @@ serve(async (req) => {
         tts_text: text,
         voice_id,
         schedule_date: schedule_date ? new Date(schedule_date).toISOString() : null,
-        created_by: user.user.id,
+        created_by: user_id,
         is_active: true
       })
       .select()
