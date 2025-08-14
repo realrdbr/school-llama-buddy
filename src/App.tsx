@@ -31,9 +31,9 @@ const App = () => (
             <Route path="/stundenplan" element={<Stundenplan />} />
             <Route path="/announcements" element={<Announcements />} />
             <Route path="/user-management" element={<UserManagement />} />
+            <Route path="/vertretungsplan" element={<Vertretungsplan />} />
             <Route path="/ai-chat" element={<AIChat />} />
             <Route path="/klassenverwaltung" element={<Klassenverwaltung />} />
-            
             <Route path="/keycard" element={<Keycard />} />
             <Route path="/settings" element={<Settings />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
