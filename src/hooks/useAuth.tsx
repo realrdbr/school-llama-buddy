@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface Profile {
   id: number;
+  user_id: string;
   username: string;
   name: string;
   permission_lvl: number;
@@ -67,6 +68,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(dummyUser);
       setProfile({
         id: userData.id,
+        user_id: userData.username, // Use username as user_id for our custom auth
         username: userData.username,
         name: userData.name,
         permission_lvl: userData.permission_lvl,

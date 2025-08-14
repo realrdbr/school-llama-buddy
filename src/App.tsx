@@ -40,6 +40,7 @@ const App = () => (
             <Route path="/klassenverwaltung" element={<Klassenverwaltung />} />
             <Route path="/keycard" element={<Keycard />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/tts" element={<AudioAnnouncements />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

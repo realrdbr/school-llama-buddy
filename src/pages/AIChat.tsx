@@ -263,7 +263,7 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
                 action: actionName.toLowerCase(),
                 parameters,
                 userProfile: {
-                  user_id: profile?.id,
+                  user_id: profile?.user_id,
                   name: profile?.username || profile?.name,
                   permission_lvl: profile?.permission_lvl
                 }
