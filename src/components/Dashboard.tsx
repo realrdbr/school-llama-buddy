@@ -13,7 +13,7 @@ import {
   Clock,
   BookOpen
 } from 'lucide-react';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
   const { user, profile, signOut } = useAuth();
