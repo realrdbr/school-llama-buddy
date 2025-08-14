@@ -26,28 +26,52 @@ const AIChat = () => {
     setInput('');
 
     try {
-      // Simulate AI response since Ollama might not be running locally
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const response = await fetch('http://localhost:11434/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'llama3.1:8b',
+          messages: [
+            {
+              role: 'system',
+              content: `Du bist ein KI-Assistent für ein Schulmanagementsystem. Der Benutzer "${profile?.name}" hat Berechtigung Level ${profile?.permission_lvl}. 
+              
+Verfügbare Aktionen basierend auf Berechtigung:
+${profile?.permission_lvl && profile.permission_lvl >= 10 ? 
+  '- Benutzer erstellen und verwalten\n- Vertretungen erstellen und löschen\n- Ankündigungen bearbeiten\n- Systemeinstellungen ändern' :
+  profile?.permission_lvl && profile.permission_lvl >= 9 ?
+  '- Vertretungen einsehen\n- Ankündigungen erstellen und bearbeiten\n- Klassen verwalten' :
+  '- Stundenplan einsehen\n- Vertretungen anzeigen\n- Ankündigungen lesen'
+}
+
+Antworte auf Deutsch und sei hilfreich bei schulbezogenen Fragen.`
+            },
+            ...conversation,
+            { role: 'user', content: currentInput }
+          ],
+          stream: false
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
       
       const assistantResponse = {
         role: 'assistant' as const,
-        content: `Hallo ${profile?.name}! Als Benutzer mit Berechtigung Level ${profile?.permission_lvl} kann ich Ihnen bei folgenden Aktionen helfen:
-
-${profile?.permission_lvl && profile.permission_lvl >= 10 ? 
-  '• Benutzer erstellen und verwalten\n• Vertretungen erstellen und löschen\n• Ankündigungen bearbeiten\n• Systemeinstellungen ändern' :
-  profile?.permission_lvl && profile.permission_lvl >= 9 ?
-  '• Vertretungen einsehen\n• Ankündigungen erstellen und bearbeiten\n• Klassen verwalten' :
-  '• Stundenplan einsehen\n• Vertretungen anzeigen\n• Ankündigungen lesen'
-}
-
-Ihre Anfrage "${currentInput}" wird verarbeitet. Die KI-Integration befindet sich noch in der Entwicklung.`
+        content: data.message.content
       };
       
       setConversation(prev => [...prev, assistantResponse]);
     } catch (error) {
+      console.error('Ollama error:', error);
       toast({
         title: "Fehler",
-        description: "Fehler beim Kontaktieren der KI",
+        description: "Ollama-Server nicht erreichbar. Stellen Sie sicher, dass Ollama läuft und das Modell 'llama3.1:8b' installiert ist.",
         variant: "destructive"
       });
     } finally {
