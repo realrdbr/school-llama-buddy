@@ -71,13 +71,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         name: userData.name,
         permission_lvl: userData.permission_lvl,
         password: userData.password,
-        created_at: userData.created_at
+        created_at: userData.created_at,
+        must_change_password: userData.must_change_password || false
       });
       
       setLoading(false);
       return { 
         error: null, 
-        mustChangePassword: false 
+        mustChangePassword: userData.must_change_password || false 
       };
     } catch (error) {
       setLoading(false);
@@ -94,10 +95,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { error: { message: 'Falsches aktuelles Passwort' } };
       }
 
-      // Update password using Supabase client
+      // Update password and remove must_change_password flag
       const { error } = await supabase
         .from('permissions')
-        .update({ password: newPassword } as any)
+        .update({ 
+          password: newPassword,
+          must_change_password: false 
+        } as any)
         .eq('username', profile.username);
 
       if (error) {
@@ -106,7 +110,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       // Update local profile state
-      setProfile({ ...profile, password: newPassword });
+      setProfile({ ...profile, password: newPassword, must_change_password: false });
 
       return { error: null };
     } catch (error) {
@@ -134,14 +138,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { error: { message: 'Benutzername bereits vergeben' } };
       }
 
-      // Create new user using Supabase client
+      // Create new user using Supabase client with must_change_password = true
       const { error: insertError } = await supabase
         .from('permissions')
         .insert([{
           username,
           password,
           name: fullName,
-          permission_lvl: permissionLevel
+          permission_lvl: permissionLevel,
+          must_change_password: true
         } as any]);
 
       if (insertError) {

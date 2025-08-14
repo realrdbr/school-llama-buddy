@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,7 @@ import { toast } from '@/hooks/use-toast';
 import CreateUserModal from './CreateUserModal';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
   const [showCreateUser, setShowCreateUser] = useState(false);
 
@@ -43,27 +45,31 @@ const Dashboard = () => {
   };
 
   const adminFeatures = [
-    { icon: Users, title: "Benutzerverwaltung", description: "Benutzer und Berechtigungen verwalten" },
-    { icon: KeyRound, title: "Keycard-System", description: "Zugangskontrolle konfigurieren" },
-    { icon: Settings, title: "Systemeinstellungen", description: "Arduino-Geräte verwalten" }
+    { icon: Users, title: "Benutzerverwaltung", description: "Benutzer und Berechtigungen verwalten", path: "/user-management" },
+    { icon: KeyRound, title: "Keycard-System", description: "Zugangskontrolle konfigurieren", path: "/keycard" },
+    { icon: Settings, title: "Systemeinstellungen", description: "Arduino-Geräte verwalten", path: "/settings" }
   ];
 
   const teacherFeatures = [
-    { icon: Calendar, title: "Vertretungsplan", description: "Stunden verwalten und Vertretungen planen" },
-    { icon: Megaphone, title: "Ankündigungen", description: "Durchsagen erstellen und verwalten" },
-    { icon: BookOpen, title: "Klassenverwaltung", description: "Klassen und Stundenpläne bearbeiten" }
+    { icon: Calendar, title: "Vertretungsplan", description: "Stunden verwalten und Vertretungen planen", path: "/vertretungsplan" },
+    { icon: Megaphone, title: "Ankündigungen", description: "Durchsagen erstellen und verwalten", path: "/announcements" },
+    { icon: BookOpen, title: "Klassenverwaltung", description: "Klassen und Stundenpläne bearbeiten", path: "/klassenverwaltung" }
   ];
 
   const studentFeatures = [
-    { icon: Clock, title: "Stundenplan", description: "Aktueller Stundenplan und Vertretungen" },
-    { icon: MessageCircle, title: "Hausaufgaben-Assistent", description: "KI-gestützte Lernhilfe" },
-    { icon: Megaphone, title: "Ankündigungen", description: "Aktuelle Schulnachrichten" }
+    { icon: Clock, title: "Stundenplan", description: "Aktueller Stundenplan und Vertretungen", path: "/stundenplan" },
+    { icon: MessageCircle, title: "Hausaufgaben-Assistent", description: "KI-gestützte Lernhilfe", path: "/hausaufgaben" },
+    { icon: Megaphone, title: "Ankündigungen", description: "Aktuelle Schulnachrichten", path: "/announcements" }
   ];
 
   const renderFeatureCards = (features: any[]) => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {features.map((feature, index) => (
-        <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer">
+        <Card 
+          key={index} 
+          className="hover:shadow-md transition-shadow cursor-pointer"
+          onClick={() => feature.path && navigate(feature.path)}
+        >
           <CardHeader className="pb-3">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-primary/10 rounded-lg">

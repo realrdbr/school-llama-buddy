@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           created_at: string
           id: number
+          must_change_password: boolean | null
           name: string
           password: string
           permission_lvl: number | null
@@ -26,6 +27,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: number
+          must_change_password?: boolean | null
           name: string
           password?: string
           permission_lvl?: number | null
@@ -34,6 +36,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: number
+          must_change_password?: boolean | null
           name?: string
           password?: string
           permission_lvl?: number | null
