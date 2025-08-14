@@ -1,28 +1,35 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Upload, Mic, Play, Pause, Trash2, Calendar, Download, Volume2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { Volume2, VolumeX, Mic, Upload, Play, Pause, RotateCcw } from 'lucide-react';
+import OfflineTTS from '@/components/OfflineTTS';
+
+interface AudioAnnouncement {
+  id: string;
+  title: string;
+  description?: string;
+  is_tts: boolean;
+  tts_text?: string;
+  voice_id?: string;
+  audio_file_path?: string;
+  duration_seconds?: number;
+  schedule_date?: string;
+  is_active: boolean;
+  played_at?: string;
+  created_at: string;
+}
 
 const AudioAnnouncements = () => {
-  const navigate = useNavigate();
   const { profile } = useAuth();
   const { toast } = useToast();
-  
-  const [announcements, setAnnouncements] = useState([]);
+  const [announcements, setAnnouncements] = useState<AudioAnnouncement[]>([]);
   const [loading, setLoading] = useState(false);
-  
-  // TTS Form state
   const [ttsForm, setTtsForm] = useState({
     title: '',
     description: '',
@@ -30,35 +37,32 @@ const AudioAnnouncements = () => {
     voice_id: 'alloy',
     schedule_date: ''
   });
-  
-  // Upload Form state
-  const [uploadForm, setUploadForm] = useState({
+
+  const [audioForm, setAudioForm] = useState({
     title: '',
     description: '',
+    audio_file: null as File | null,
     schedule_date: ''
   });
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+
+  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!profile || profile.permission_lvl < 10) {
-      navigate('/');
-      return;
-    }
-    loadAnnouncements();
-  }, [profile, navigate]);
+    fetchAnnouncements();
+  }, []);
 
-  const loadAnnouncements = async () => {
+  const fetchAnnouncements = async () => {
     try {
       const { data, error } = await supabase
         .from('audio_announcements')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       setAnnouncements(data || []);
     } catch (error) {
+      console.error('Error fetching announcements:', error);
       toast({
         title: "Fehler",
         description: "Durchsagen konnten nicht geladen werden",
@@ -69,10 +73,19 @@ const AudioAnnouncements = () => {
 
   const handleTTSSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ttsForm.title || !ttsForm.text) return;
+    if (!ttsForm.title || !ttsForm.text) {
+      toast({
+        title: "Fehler",
+        description: "Titel und Text sind erforderlich",
+        variant: "destructive"
+      });
+      return;
+    }
     
     setLoading(true);
     try {
+      console.log('Submitting TTS with user:', profile?.username);
+      
       const { data, error } = await supabase.functions.invoke('offline-tts', {
         body: {
           ...ttsForm,
@@ -80,23 +93,35 @@ const AudioAnnouncements = () => {
         }
       });
       
-      if (error) throw error;
+      console.log('TTS Response:', { data, error });
       
-      toast({
-        title: "Erfolg",
-        description: "TTS-Durchsage wurde erstellt"
-      });
+      if (error) {
+        console.error('TTS Error:', error);
+        throw error;
+      }
       
-      setTtsForm({
-        title: '',
-        description: '',
-        text: '',
-        voice_id: 'alloy',
-        schedule_date: ''
-      });
-      
-      loadAnnouncements();
-    } catch (error) {
+      if (data?.success) {
+        toast({
+          title: "Erfolg",
+          description: "TTS-Durchsage wurde erstellt"
+        });
+        
+        // Reset form
+        setTtsForm({
+          title: '',
+          description: '',
+          text: '',
+          voice_id: 'alloy',
+          schedule_date: ''
+        });
+        
+        // Refresh announcements
+        fetchAnnouncements();
+      } else {
+        throw new Error(data?.error || 'Unbekannter Fehler');
+      }
+    } catch (error: any) {
+      console.error('TTS Submit Error:', error);
       toast({
         title: "Fehler",
         description: error.message || "TTS-Durchsage konnte nicht erstellt werden",
@@ -107,52 +132,53 @@ const AudioAnnouncements = () => {
     }
   };
 
-  const handleFileUpload = async (e: React.FormEvent) => {
+  const handleAudioUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!uploadForm.title || !selectedFile) return;
-    
+    if (!audioForm.title || !audioForm.audio_file) return;
+
     setLoading(true);
     try {
-      // Upload file to storage
-      const fileName = `${Date.now()}-${selectedFile.name}`;
+      // Upload audio file to Supabase Storage
+      const fileName = `${Date.now()}_${audioForm.audio_file.name}`;
       const { error: uploadError } = await supabase.storage
         .from('audio-announcements')
-        .upload(fileName, selectedFile);
-      
+        .upload(fileName, audioForm.audio_file);
+
       if (uploadError) throw uploadError;
-      
+
       // Create announcement record
       const { error: insertError } = await supabase
         .from('audio_announcements')
         .insert({
-          title: uploadForm.title,
-          description: uploadForm.description,
-          audio_file_path: fileName,
+          title: audioForm.title,
+          description: audioForm.description,
           is_tts: false,
-          schedule_date: uploadForm.schedule_date || null,
-          created_by: profile.id.toString(),
-          is_active: true
+          audio_file_path: fileName,
+          schedule_date: audioForm.schedule_date || null,
+          is_active: true,
+          created_by: null
         });
-      
+
       if (insertError) throw insertError;
-      
+
       toast({
         title: "Erfolg",
         description: "Audio-Durchsage wurde hochgeladen"
       });
-      
-      setUploadForm({
+
+      // Reset form
+      setAudioForm({
         title: '',
         description: '',
+        audio_file: null,
         schedule_date: ''
       });
-      setSelectedFile(null);
-      
-      loadAnnouncements();
-    } catch (error) {
+
+      fetchAnnouncements();
+    } catch (error: any) {
       toast({
         title: "Fehler",
-        description: error.message || "Audio-Durchsage konnte nicht hochgeladen werden",
+        description: error.message || "Audio konnte nicht hochgeladen werden",
         variant: "destructive"
       });
     } finally {
@@ -160,41 +186,126 @@ const AudioAnnouncements = () => {
     }
   };
 
-  const deleteAnnouncement = async (id: string) => {
+  const playAnnouncement = async (announcement: AudioAnnouncement) => {
     try {
-      const { error } = await supabase
+      // Stop any currently playing audio
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+
+      let audioUrl = '';
+
+      if (announcement.is_tts && announcement.tts_text) {
+        // For TTS, use the Web Speech API directly
+        if ('speechSynthesis' in window) {
+          speechSynthesis.cancel();
+          
+          const utterance = new SpeechSynthesisUtterance(announcement.tts_text);
+          
+          // Try to find a German voice
+          const voices = speechSynthesis.getVoices();
+          const germanVoice = voices.find(voice => 
+            voice.lang.includes('de') || voice.name.includes('German')
+          );
+          
+          if (germanVoice) {
+            utterance.voice = germanVoice;
+          }
+          
+          utterance.lang = 'de-DE';
+          utterance.rate = 0.9;
+          utterance.pitch = 1;
+          utterance.volume = 0.8;
+          
+          utterance.onstart = () => {
+            setPlayingId(announcement.id);
+          };
+          
+          utterance.onend = () => {
+            setPlayingId(null);
+          };
+          
+          utterance.onerror = () => {
+            setPlayingId(null);
+            toast({
+              title: "TTS Fehler",
+              description: "Fehler bei der Sprachwiedergabe",
+              variant: "destructive"
+            });
+          };
+          
+          speechSynthesis.speak(utterance);
+          return;
+        } else {
+          throw new Error('Web Speech API nicht unterstützt');
+        }
+      } else if (announcement.audio_file_path) {
+        // For uploaded audio files
+        const { data } = supabase.storage
+          .from('audio-announcements')
+          .getPublicUrl(announcement.audio_file_path);
+        
+        audioUrl = data.publicUrl;
+      }
+
+      if (audioUrl) {
+        const audio = new Audio(audioUrl);
+        audio.onplay = () => setPlayingId(announcement.id);
+        audio.onended = () => setPlayingId(null);
+        audio.onerror = () => {
+          setPlayingId(null);
+          toast({
+            title: "Wiedergabe-Fehler",
+            description: "Audio konnte nicht abgespielt werden",
+            variant: "destructive"
+          });
+        };
+
+        setCurrentAudio(audio);
+        await audio.play();
+      }
+
+      // Mark as played
+      await supabase
         .from('audio_announcements')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      
+        .update({ played_at: new Date().toISOString() })
+        .eq('id', announcement.id);
+
+    } catch (error: any) {
+      console.error('Playback error:', error);
       toast({
-        title: "Erfolg",
-        description: "Durchsage wurde gelöscht"
-      });
-      
-      loadAnnouncements();
-    } catch (error) {
-      toast({
-        title: "Fehler",
-        description: "Durchsage konnte nicht gelöscht werden",
+        title: "Wiedergabe-Fehler",
+        description: error.message || "Audio konnte nicht abgespielt werden",
         variant: "destructive"
       });
     }
   };
 
-  const toggleActive = async (id: string, currentStatus: boolean) => {
+  const stopAnnouncement = () => {
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+    }
+    speechSynthesis.cancel();
+    setPlayingId(null);
+  };
+
+  const toggleAnnouncementStatus = async (id: string, isActive: boolean) => {
     try {
       const { error } = await supabase
         .from('audio_announcements')
-        .update({ is_active: !currentStatus })
+        .update({ is_active: !isActive })
         .eq('id', id);
-      
+
       if (error) throw error;
-      
-      loadAnnouncements();
-    } catch (error) {
+
+      fetchAnnouncements();
+      toast({
+        title: "Status geändert",
+        description: `Durchsage ${!isActive ? 'aktiviert' : 'deaktiviert'}`
+      });
+    } catch (error: any) {
       toast({
         title: "Fehler",
         description: "Status konnte nicht geändert werden",
@@ -203,418 +314,206 @@ const AudioAnnouncements = () => {
     }
   };
 
-  const playAudio = async (announcement: any) => {
-    try {
-      // Stop currently playing audio if any
-      if (audioElement) {
-        audioElement.pause();
-        audioElement.currentTime = 0;
-      }
-
-      let audioUrl = '';
-
-      if (announcement.is_tts) {
-        // For TTS, generate audio using local TTS function
-        const { data, error } = await supabase.functions.invoke('audio-tts', {
-          body: {
-            text: announcement.tts_text,
-            voice_id: announcement.voice_id || 'alloy',
-            user_id: profile?.username  // Add username for custom auth
-          }
-        });
-
-        if (error) throw error;
-
-        // Create audio URL from generated TTS (if implemented)
-        toast({
-          title: "TTS-Wiedergabe",
-          description: "TTS-Wiedergabe noch nicht implementiert",
-          variant: "destructive"
-        });
-        return;
-      } else {
-        // For uploaded audio files, get the file from storage
-        const { data, error } = await supabase.storage
-          .from('audio-announcements')
-          .download(announcement.audio_file_path);
-
-        if (error) throw error;
-
-        // Create object URL for the blob
-        audioUrl = URL.createObjectURL(data);
-      }
-
-      // Create and play audio element
-      const audio = new Audio(audioUrl);
-      setAudioElement(audio);
-      setCurrentlyPlaying(announcement.id);
-
-      audio.onended = () => {
-        setCurrentlyPlaying(null);
-        setAudioElement(null);
-        URL.revokeObjectURL(audioUrl); // Clean up object URL
-      };
-
-      audio.onerror = () => {
-        toast({
-          title: "Wiedergabe-Fehler",
-          description: "Audio konnte nicht abgespielt werden",
-          variant: "destructive"
-        });
-        setCurrentlyPlaying(null);
-        setAudioElement(null);
-      };
-
-      await audio.play();
-
-      toast({
-        title: "Wiedergabe gestartet",
-        description: `"${announcement.title}" wird abgespielt`
-      });
-
-    } catch (error) {
-      toast({
-        title: "Fehler",
-        description: "Audio konnte nicht abgespielt werden",
-        variant: "destructive"
-      });
-      setCurrentlyPlaying(null);
-    }
-  };
-
-  const stopAudio = () => {
-    if (audioElement) {
-      audioElement.pause();
-      audioElement.currentTime = 0;
-      setAudioElement(null);
-      setCurrentlyPlaying(null);
-    }
-  };
-
-  const downloadAudio = async (announcement: any) => {
-    try {
-      if (!announcement.audio_file_path) {
-        toast({
-          title: "Fehler",
-          description: "Keine Audio-Datei zum Download verfügbar",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const { data, error } = await supabase.storage
-        .from('audio-announcements')
-        .download(announcement.audio_file_path);
-
-      if (error) throw error;
-
-      // Create download link
-      const url = URL.createObjectURL(data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = announcement.title + '.mp3';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: "Download gestartet",
-        description: "Audio-Datei wird heruntergeladen"
-      });
-
-    } catch (error) {
-      toast({
-        title: "Fehler",
-        description: "Download fehlgeschlagen",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('de-DE');
-  };
-
+  // Check if user has permission (Level 10 required)
   if (!profile || profile.permission_lvl < 10) {
-    return null;
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Keine Berechtigung</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Sie benötigen mindestens Berechtigung Level 10 um Audio-Durchsagen zu verwalten.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Button 
-          variant="outline" 
-          onClick={() => navigate(-1)}
-          className="gap-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Zurück
-        </Button>
-        <h1 className="text-3xl font-bold">Audio-Durchsagen</h1>
-      </div>
+      <h1 className="text-2xl font-bold">Audio-Durchsagen</h1>
 
-      <Tabs defaultValue="create" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="create">Neue Durchsage</TabsTrigger>
-          <TabsTrigger value="manage">Verwalten</TabsTrigger>
-        </TabsList>
+      {/* TTS Form */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Volume2 className="h-5 w-5" />
+            Text-to-Speech Durchsage erstellen
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleTTSSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Titel *</label>
+              <Input
+                value={ttsForm.title}
+                onChange={(e) => setTtsForm({ ...ttsForm, title: e.target.value })}
+                placeholder="Titel der Durchsage"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-1">Beschreibung</label>
+              <Input
+                value={ttsForm.description}
+                onChange={(e) => setTtsForm({ ...ttsForm, description: e.target.value })}
+                placeholder="Kurze Beschreibung"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-1">Text *</label>
+              <Textarea
+                value={ttsForm.text}
+                onChange={(e) => setTtsForm({ ...ttsForm, text: e.target.value })}
+                placeholder="Text für die Sprachausgabe..."
+                rows={4}
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-1">Geplante Zeit</label>
+              <Input
+                type="datetime-local"
+                value={ttsForm.schedule_date}
+                onChange={(e) => setTtsForm({ ...ttsForm, schedule_date: e.target.value })}
+              />
+            </div>
+            
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading ? 'Erstelle...' : 'TTS-Durchsage erstellen'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
-        <TabsContent value="create" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Mic className="h-5 w-5" />
-                  Text-zu-Sprache
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleTTSSubmit} className="space-y-4">
-                  <div>
-                    <Label htmlFor="tts-title">Titel</Label>
-                    <Input
-                      id="tts-title"
-                      value={ttsForm.title}
-                      onChange={(e) => setTtsForm(prev => ({...prev, title: e.target.value}))}
-                      placeholder="Titel der Durchsage"
-                      required
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="tts-description">Beschreibung (optional)</Label>
-                    <Input
-                      id="tts-description"
-                      value={ttsForm.description}
-                      onChange={(e) => setTtsForm(prev => ({...prev, description: e.target.value}))}
-                      placeholder="Kurze Beschreibung"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="tts-text">Text</Label>
-                    <Textarea
-                      id="tts-text"
-                      value={ttsForm.text}
-                      onChange={(e) => setTtsForm(prev => ({...prev, text: e.target.value}))}
-                      placeholder="Text für die Durchsage eingeben..."
-                      className="min-h-32"
-                      required
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="tts-voice">Stimme</Label>
-                    <Select 
-                      value={ttsForm.voice_id} 
-                      onValueChange={(value) => setTtsForm(prev => ({...prev, voice_id: value}))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="alloy">Alloy</SelectItem>
-                        <SelectItem value="echo">Echo</SelectItem>
-                        <SelectItem value="fable">Fable</SelectItem>
-                        <SelectItem value="onyx">Onyx</SelectItem>
-                        <SelectItem value="nova">Nova</SelectItem>
-                        <SelectItem value="shimmer">Shimmer</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="tts-schedule">Zeitplan (optional)</Label>
-                    <Input
-                      id="tts-schedule"
-                      type="datetime-local"
-                      value={ttsForm.schedule_date}
-                      onChange={(e) => setTtsForm(prev => ({...prev, schedule_date: e.target.value}))}
-                    />
-                  </div>
-                  
-                  <Button type="submit" disabled={loading} className="w-full">
-                    TTS-Durchsage erstellen
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
+      {/* Audio Upload Form */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            Audio-Datei hochladen
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleAudioUpload} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Titel *</label>
+              <Input
+                value={audioForm.title}
+                onChange={(e) => setAudioForm({ ...audioForm, title: e.target.value })}
+                placeholder="Titel der Durchsage"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-1">Beschreibung</label>
+              <Input
+                value={audioForm.description}
+                onChange={(e) => setAudioForm({ ...audioForm, description: e.target.value })}
+                placeholder="Kurze Beschreibung"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-1">Audio-Datei *</label>
+              <Input
+                type="file"
+                accept="audio/*"
+                onChange={(e) => setAudioForm({ ...audioForm, audio_file: e.target.files?.[0] || null })}
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-1">Geplante Zeit</label>
+              <Input
+                type="datetime-local"
+                value={audioForm.schedule_date}
+                onChange={(e) => setAudioForm({ ...audioForm, schedule_date: e.target.value })}
+              />
+            </div>
+            
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading ? 'Lade hoch...' : 'Audio hochladen'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Upload className="h-5 w-5" />
-                  Audio-Datei hochladen
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleFileUpload} className="space-y-4">
-                  <div>
-                    <Label htmlFor="upload-title">Titel</Label>
-                    <Input
-                      id="upload-title"
-                      value={uploadForm.title}
-                      onChange={(e) => setUploadForm(prev => ({...prev, title: e.target.value}))}
-                      placeholder="Titel der Durchsage"
-                      required
-                    />
+      {/* Announcements List */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Durchsagen-Übersicht</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {announcements.map((announcement) => (
+              <div key={announcement.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-medium">{announcement.title}</h3>
+                    <Badge variant={announcement.is_active ? "default" : "secondary"}>
+                      {announcement.is_active ? 'Aktiv' : 'Inaktiv'}
+                    </Badge>
+                    <Badge variant="outline">
+                      {announcement.is_tts ? 'TTS' : 'Audio'}
+                    </Badge>
                   </div>
                   
-                  <div>
-                    <Label htmlFor="upload-description">Beschreibung (optional)</Label>
-                    <Input
-                      id="upload-description"
-                      value={uploadForm.description}
-                      onChange={(e) => setUploadForm(prev => ({...prev, description: e.target.value}))}
-                      placeholder="Kurze Beschreibung"
-                    />
-                  </div>
+                  {announcement.description && (
+                    <p className="text-sm text-muted-foreground mb-2">{announcement.description}</p>
+                  )}
                   
-                  <div>
-                    <Label htmlFor="upload-file">Audio-Datei (.mp3, .wav)</Label>
-                    <Input
-                      id="upload-file"
-                      type="file"
-                      accept=".mp3,.wav"
-                      onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                      required
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="upload-schedule">Zeitplan (optional)</Label>
-                    <Input
-                      id="upload-schedule"
-                      type="datetime-local"
-                      value={uploadForm.schedule_date}
-                      onChange={(e) => setUploadForm(prev => ({...prev, schedule_date: e.target.value}))}
-                    />
-                  </div>
-                  
-                  <Button type="submit" disabled={loading} className="w-full">
-                    Audio hochladen
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="manage">
-          <Card>
-            <CardHeader>
-              <CardTitle>Durchsagen verwalten</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {announcements.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">
-                    Keine Durchsagen vorhanden
-                  </p>
-                ) : (
-                  announcements.map((announcement: any) => (
-                    <div key={announcement.id} className="border rounded-lg p-4 space-y-3">
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <h3 className="font-semibold">{announcement.title}</h3>
-                          {announcement.description && (
-                            <p className="text-sm text-muted-foreground">
-                              {announcement.description}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>Erstellt: {formatDate(announcement.created_at)}</span>
-                            {announcement.schedule_date && (
-                              <>
-                                <Separator orientation="vertical" className="h-3" />
-                                <Calendar className="h-3 w-3" />
-                                <span>Geplant: {formatDate(announcement.schedule_date)}</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={announcement.is_tts ? "secondary" : "outline"}>
-                            {announcement.is_tts ? "TTS" : "Audio"}
-                          </Badge>
-                          <Badge variant={announcement.is_active ? "default" : "secondary"}>
-                            {announcement.is_active ? "Aktiv" : "Inaktiv"}
-                          </Badge>
-                        </div>
-                      </div>
-                      
-                      {announcement.is_tts && announcement.tts_text && (
-                        <div className="bg-muted p-3 rounded text-sm">
-                          <strong>Text:</strong> {announcement.tts_text}
-                        </div>
-                      )}
-                      
-                      <div className="flex items-center justify-between pt-2">
-                        <div className="flex items-center gap-2">
-                          {currentlyPlaying === announcement.id ? (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={stopAudio}
-                              className="gap-2"
-                            >
-                              <Pause className="h-4 w-4" />
-                              Stoppen
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={() => playAudio(announcement)}
-                              className="gap-2"
-                            >
-                              <Play className="h-4 w-4" />
-                              Abspielen
-                            </Button>
-                          )}
-                          
-                          {!announcement.is_tts && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => downloadAudio(announcement)}
-                              className="gap-2"
-                            >
-                              <Download className="h-4 w-4" />
-                              Download
-                            </Button>
-                          )}
-                          
-                          <Button
-                            size="sm"
-                            variant={announcement.is_active ? "secondary" : "default"}
-                            onClick={() => toggleActive(announcement.id, announcement.is_active)}
-                            className="gap-2"
-                          >
-                            <Volume2 className="h-4 w-4" />
-                            {announcement.is_active ? "Deaktivieren" : "Aktivieren"}
-                          </Button>
-                        </div>
-                        
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => deleteAnnouncement(announcement.id)}
-                          className="gap-2"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Löschen
-                        </Button>
-                      </div>
+                  {announcement.is_tts && announcement.tts_text && (
+                    <div className="mb-2">
+                      <OfflineTTS text={announcement.tts_text} voiceId={announcement.voice_id} />
                     </div>
-                  ))
-                )}
+                  )}
+                  
+                  <p className="text-xs text-muted-foreground">
+                    Erstellt: {new Date(announcement.created_at).toLocaleString('de-DE')}
+                    {announcement.schedule_date && (
+                      <> • Geplant: {new Date(announcement.schedule_date).toLocaleString('de-DE')}</>
+                    )}
+                    {announcement.played_at && (
+                      <> • Abgespielt: {new Date(announcement.played_at).toLocaleString('de-DE')}</>
+                    )}
+                  </p>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => playingId === announcement.id ? stopAnnouncement() : playAnnouncement(announcement)}
+                  >
+                    {playingId === announcement.id ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  </Button>
+                  
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => toggleAnnouncementStatus(announcement.id, announcement.is_active)}
+                  >
+                    {announcement.is_active ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            ))}
+            
+            {announcements.length === 0 && (
+              <p className="text-center text-muted-foreground py-8">
+                Keine Durchsagen vorhanden
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

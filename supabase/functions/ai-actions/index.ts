@@ -53,6 +53,8 @@ serve(async (req) => {
 
       case 'update_vertretungsplan':
         if (userProfile.permission_lvl >= 10) {
+          console.log('Raw parameters received:', parameters)
+          
           // Convert date parameter to proper date format
           let dateValue = new Date();
           if (parameters.date) {
@@ -74,21 +76,26 @@ serve(async (req) => {
             }
           }
           
+          // Ensure all required fields are present with fallbacks
+          const insertData = {
+            date: dateValue.toISOString().split('T')[0], // Format as YYYY-MM-DD
+            class_name: parameters.className || parameters.class_name || 'Unbekannte Klasse',
+            period: parseInt(parameters.period) || 1,
+            original_teacher: parameters.originalTeacher || parameters.original_teacher || 'Unbekannt',
+            original_subject: parameters.originalSubject || parameters.original_subject || 'Unbekannt', 
+            original_room: parameters.originalRoom || parameters.original_room || 'Unbekannt',
+            substitute_teacher: parameters.substituteTeacher || parameters.substitute_teacher || 'Vertretung',
+            substitute_subject: parameters.substituteSubject || parameters.substitute_subject || 'Vertretung',
+            substitute_room: parameters.substituteRoom || parameters.substitute_room || 'Unbekannt',
+            note: parameters.note || 'Keine Notizen',
+            created_by: null
+          }
+          
+          console.log('Inserting data:', insertData)
+          
           const { data, error } = await supabase
             .from('vertretungsplan')
-            .insert({
-              date: dateValue.toISOString().split('T')[0], // Format as YYYY-MM-DD
-              class_name: parameters.className || parameters.class_name,
-              period: parseInt(parameters.period) || 1,
-              original_teacher: parameters.originalTeacher || parameters.original_teacher,
-              original_subject: parameters.originalSubject || parameters.original_subject,
-              original_room: parameters.originalRoom || parameters.original_room,
-              substitute_teacher: parameters.substituteTeacher || parameters.substitute_teacher,
-              substitute_subject: parameters.substituteSubject || parameters.substitute_subject,
-              substitute_room: parameters.substituteRoom || parameters.substitute_room,
-              note: parameters.note || 'Keine Notizen',
-              created_by: null
-            })
+            .insert(insertData)
           
           if (!error) {
             result = { message: 'Vertretungsplan wurde erfolgreich aktualisiert.' }

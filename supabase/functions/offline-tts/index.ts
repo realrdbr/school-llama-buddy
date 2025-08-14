@@ -14,6 +14,8 @@ serve(async (req) => {
   try {
     const { text, voice_id = 'alloy', title, description, schedule_date, user_id } = await req.json()
     
+    console.log('TTS Request received:', { text, user_id, title })
+    
     // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -30,25 +32,38 @@ serve(async (req) => {
       .eq('username', user_id)
       .maybeSingle()
 
+    console.log('Permission check:', { user_id, profile })
+
     if (!profile || profile.permission_lvl < 10) {
       throw new Error('Keine Berechtigung für Audio-Ankündigungen - Level 10 erforderlich')
     }
 
-    // Create TTS announcement record (without actual audio generation for now)
+    // Get the actual UUID from profiles table for created_by
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('user_id')
+      .eq('username', user_id)
+      .maybeSingle()
+
+    console.log('User profile lookup:', { userProfile })
+
+    // Create TTS announcement record with proper created_by
     const { data: announcement, error: insertError } = await supabase
       .from('audio_announcements')
       .insert({
-        title,
-        description,
+        title: title || 'TTS Durchsage',
+        description: description || `Text-to-Speech Durchsage erstellt von ${user_id}`,
         is_tts: true,
         tts_text: text,
         voice_id,
         schedule_date: schedule_date ? new Date(schedule_date).toISOString() : null,
-        created_by: null,
+        created_by: userProfile?.user_id || null, // Use actual UUID if available
         is_active: true
       })
       .select()
-      .single()
+      .maybeSingle()
+
+    console.log('Insert result:', { announcement, insertError })
 
     if (insertError) {
       throw new Error(`Fehler beim Erstellen der Durchsage: ${insertError.message}`)
