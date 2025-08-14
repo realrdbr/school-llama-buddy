@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Megaphone, Plus } from 'lucide-react';
+import { ArrowLeft, Megaphone, Plus, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Announcement {
   id: string;
@@ -15,7 +16,7 @@ interface Announcement {
   content: string;
   author: string;
   created_at: string;
-  priority: 'normal' | 'high' | 'urgent';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
 }
 
 const Announcements = () => {
@@ -26,7 +27,7 @@ const Announcements = () => {
   const [newAnnouncement, setNewAnnouncement] = useState({
     title: '',
     content: '',
-    priority: 'normal' as 'normal' | 'high' | 'urgent'
+    priority: 'normal' as 'low' | 'normal' | 'high' | 'urgent'
   });
 
   useEffect(() => {
@@ -34,28 +35,34 @@ const Announcements = () => {
       navigate('/auth');
       return;
     }
-    // For demo purposes, show sample announcements
-    setAnnouncements([
-      {
-        id: '1',
-        title: 'Wichtige Schulnachricht',
-        content: 'Bitte beachten Sie die neuen Pausenzeiten ab nächster Woche.',
-        author: 'Schulleitung',
-        created_at: new Date().toISOString(),
-        priority: 'high'
-      },
-      {
-        id: '2',
-        title: 'Elternabend',
-        content: 'Der nächste Elternabend findet am 20. September statt.',
-        author: 'Klassenlehrer',
-        created_at: new Date(Date.now() - 86400000).toISOString(),
-        priority: 'normal'
-      }
-    ]);
+    fetchAnnouncements();
   }, [user, navigate]);
 
-  const handleCreateAnnouncement = () => {
+  const fetchAnnouncements = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('announcements')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const announcementData = data.map(ann => ({
+        id: ann.id,
+        title: ann.title,
+        content: ann.content,
+        author: ann.author,
+        created_at: ann.created_at,
+        priority: (ann.priority as 'low' | 'normal' | 'high' | 'urgent') || 'normal'
+      }));
+
+      setAnnouncements(announcementData);
+    } catch (error) {
+      console.error('Error fetching announcements:', error);
+    }
+  };
+
+  const handleCreateAnnouncement = async () => {
     if (!newAnnouncement.title || !newAnnouncement.content) {
       toast({
         variant: "destructive",
@@ -65,29 +72,63 @@ const Announcements = () => {
       return;
     }
 
-    const announcement: Announcement = {
-      id: Date.now().toString(),
-      title: newAnnouncement.title,
-      content: newAnnouncement.content,
-      author: profile?.name || 'Unbekannt',
-      created_at: new Date().toISOString(),
-      priority: newAnnouncement.priority
-    };
+    try {
+      const { error } = await supabase.from('announcements').insert({
+        title: newAnnouncement.title,
+        content: newAnnouncement.content,
+        author: profile?.name || 'Unbekannt',
+        priority: newAnnouncement.priority
+      });
 
-    setAnnouncements([announcement, ...announcements]);
-    setNewAnnouncement({ title: '', content: '', priority: 'normal' });
-    setShowCreateForm(false);
-    
-    toast({
-      title: "Ankündigung erstellt",
-      description: "Die Ankündigung wurde erfolgreich veröffentlicht."
-    });
+      if (error) throw error;
+
+      await fetchAnnouncements();
+      setNewAnnouncement({ title: '', content: '', priority: 'normal' });
+      setShowCreateForm(false);
+      
+      toast({
+        title: "Ankündigung erstellt",
+        description: "Die Ankündigung wurde erfolgreich veröffentlicht."
+      });
+    } catch (error) {
+      console.error('Error creating announcement:', error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Ankündigung konnte nicht erstellt werden."
+      });
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('announcements')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchAnnouncements();
+      toast({
+        title: "Ankündigung gelöscht",
+        description: "Die Ankündigung wurde entfernt."
+      });
+    } catch (error) {
+      console.error('Error deleting announcement:', error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Ankündigung konnte nicht gelöscht werden."
+      });
+    }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'urgent': return 'border-red-500 bg-red-50';
       case 'high': return 'border-orange-500 bg-orange-50';
+      case 'low': return 'border-gray-500 bg-gray-50';
       default: return 'border-blue-500 bg-blue-50';
     }
   };
@@ -96,6 +137,7 @@ const Announcements = () => {
     switch (priority) {
       case 'urgent': return 'Dringend';
       case 'high': return 'Wichtig';
+      case 'low': return 'Niedrig';
       default: return 'Normal';
     }
   };
@@ -168,6 +210,7 @@ const Announcements = () => {
                     onChange={(e) => setNewAnnouncement({...newAnnouncement, priority: e.target.value as any})}
                     className="w-full p-2 border border-border rounded-md"
                   >
+                    <option value="low">Niedrig</option>
                     <option value="normal">Normal</option>
                     <option value="high">Wichtig</option>
                     <option value="urgent">Dringend</option>
@@ -193,8 +236,19 @@ const Announcements = () => {
                       <Megaphone className="h-4 w-4" />
                       {announcement.title}
                     </CardTitle>
-                    <div className="text-sm text-muted-foreground">
-                      {getPriorityText(announcement.priority)}
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm text-muted-foreground">
+                        {getPriorityText(announcement.priority)}
+                      </div>
+                      {canCreateAnnouncements && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleDeleteAnnouncement(announcement.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
