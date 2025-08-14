@@ -14,7 +14,8 @@ import {
   Clock,
   BookOpen,
   UserPlus,
-  Volume2
+  Volume2,
+  FileText
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import CreateUserModal from './CreateUserModal';
@@ -57,6 +58,7 @@ const Dashboard = () => {
   const teacherFeatures = [
     { icon: Calendar, title: "Vertretungsplan", description: "Stunden verwalten und Vertretungen planen", path: "/vertretungsplan" },
     { icon: Megaphone, title: "Ankündigungen", description: "Durchsagen erstellen und verwalten", path: "/announcements" },
+    { icon: FileText, title: "Dokumenten-Analyse", description: "Material hochladen und KI-Fragen stellen", path: "/document-analysis" },
     { icon: BookOpen, title: "Klassenverwaltung", description: "Klassen und Stundenpläne bearbeiten", path: "/klassenverwaltung" }
   ];
 

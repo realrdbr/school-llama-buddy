@@ -9,7 +9,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Stundenplan from "./pages/Stundenplan";
 import Announcements from "./pages/Announcements";
-import AudioAnnouncements from "./pages/AudioAnnouncements";
+import DocumentAnalysis from "./pages/DocumentAnalysis";
 import UserManagement from "./pages/UserManagement";
 import Vertretungsplan from "./pages/Vertretungsplan";
 import Klassenverwaltung from "./pages/Klassenverwaltung";
@@ -31,7 +31,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/stundenplan" element={<Stundenplan />} />
             <Route path="/announcements" element={<Announcements />} />
-            <Route path="/audio-announcements" element={<AudioAnnouncements />} />
+            <Route path="/document-analysis" element={<DocumentAnalysis />} />
             <Route path="/user-management" element={<UserManagement />} />
             <Route path="/vertretungsplan" element={<Vertretungsplan />} />
             <Route path="/ai-chat" element={<AIChat />} />
