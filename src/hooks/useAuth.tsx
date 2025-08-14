@@ -38,27 +38,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setLoading(true);
       
-      // Direct query to permissions table  
-      const response = await fetch(
-        `https://afnfyivevmqihuqijusi.supabase.co/rest/v1/permissions?username=eq.${username}&password=eq.${password}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmbmZ5aXZldm1xaWh1cWlqdXNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNzQ4MzAsImV4cCI6MjA3MDc1MDgzMH0.iZNTzN55MZK8p0hrZzsaAxbSALp5tVrloUQUiosmbRU',
-            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmbmZ5aXZldm1xaWh1cWlqdXNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNzQ4MzAsImV4cCI6MjA3MDc1MDgzMH0.iZNTzN55MZK8p0hrZzsaAxbSALp5tVrloUQUiosmbRU'
-          }
-        }
-      );
+      // Use Supabase client instead of direct HTTP requests
+      const { data: users, error } = await supabase
+        .from('permissions')
+        .select('*')
+        .eq('username', username)
+        .eq('password', password);
 
-      const users = await response.json();
-
-      if (!response.ok || !users || users.length === 0) {
+      if (error || !users || users.length === 0) {
         setLoading(false);
         return { error: { message: 'Ungültiger Benutzername oder Passwort' } };
       }
 
-      const userData = users[0];
+      const userData = users[0] as any;
 
       // Create a dummy user for internal auth
       const dummyUser: User = {
@@ -101,22 +93,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { error: { message: 'Falsches aktuelles Passwort' } };
       }
 
-      // Manual update since types don't allow password column
-      const response = await fetch(
-        `https://afnfyivevmqihuqijusi.supabase.co/rest/v1/permissions?username=eq.${profile.username}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmbmZ5aXZldm1xaWh1cWlqdXNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNzQ4MzAsImV4cCI6MjA3MDc1MDgzMH0.iZNTzN55MZK8p0hrZzsaAxbSALp5tVrloUQUiosmbRU',
-            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmbmZ5aXZldm1xaWh1cWlqdXNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNzQ4MzAsImV4cCI6MjA3MDc1MDgzMH0.iZNTzN55MZK8p0hrZzsaAxbSALp5tVrloUQUiosmbRU'
-          },
-          body: JSON.stringify({ password: newPassword })
-        }
-      );
+      // Update password using Supabase client
+      const { error } = await supabase
+        .from('permissions')
+        .update({ password: newPassword } as any)
+        .eq('username', profile.username);
 
-      if (!response.ok) {
-        throw new Error('Password update failed');
+      if (error) {
+        console.error('Update error:', error);
+        return { error: { message: 'Fehler beim Aktualisieren des Passworts: ' + error.message } };
       }
 
       // Update local profile state
@@ -124,6 +109,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       return { error: null };
     } catch (error) {
+      console.error('Change password error:', error);
       return { error };
     }
   };
@@ -138,48 +124,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     try {
       // Check if username already exists
-      const checkResponse = await fetch(
-        `https://afnfyivevmqihuqijusi.supabase.co/rest/v1/permissions?username=eq.${username}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmbmZ5aXZldm1xaWh1cWlqdXNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNzQ4MzAsImV4cCI6MjA3MDc1MDgzMH0.iZNTzN55MZK8p0hrZzsaAxbSALp5tVrloUQUiosmbRU',
-            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmbmZ5aXZldm1xaWh1cWlqdXNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNzQ4MzAsImV4cCI6MjA3MDc1MDgzMH0.iZNTzN55MZK8p0hrZzsaAxbSALp5tVrloUQUiosmbRU'
-          }
-        }
-      );
-      const existingUsers = await checkResponse.json();
+      const { data: existingUsers } = await supabase
+        .from('permissions')
+        .select('id')
+        .eq('username', username);
 
       if (existingUsers && existingUsers.length > 0) {
         return { error: { message: 'Benutzername bereits vergeben' } };
       }
 
-      // Manual insert since types don't allow all columns
-      const response = await fetch(
-        'https://afnfyivevmqihuqijusi.supabase.co/rest/v1/permissions',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmbmZ5aXZldm1xaWh1cWlqdXNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNzQ4MzAsImV4cCI6MjA3MDc1MDgzMH0.iZNTzN55MZK8p0hrZzsaAxbSALp5tVrloUQUiosmbRU',
-            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmbmZ5aXZldm1xaWh1cWlqdXNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNzQ4MzAsImV4cCI6MjA3MDc1MDgzMH0.iZNTzN55MZK8p0hrZzsaAxbSALp5tVrloUQUiosmbRU'
-          },
-          body: JSON.stringify({
-            username,
-            password,
-            name: fullName,
-            permission_lvl: permissionLevel
-          })
-        }
-      );
+      // Create new user using Supabase client
+      const { error: insertError } = await supabase
+        .from('permissions')
+        .insert([{
+          username,
+          password,
+          name: fullName,
+          permission_lvl: permissionLevel
+        } as any]);
 
-      if (!response.ok) {
-        throw new Error('User creation failed');
+      if (insertError) {
+        console.error('Insert error:', insertError);
+        return { error: { message: 'Fehler beim Erstellen des Benutzers: ' + insertError.message } };
       }
 
       return { error: null };
     } catch (error) {
+      console.error('Create user error:', error);
       return { error };
     }
   };
