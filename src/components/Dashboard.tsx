@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,12 +12,15 @@ import {
   Settings,
   LogOut,
   Clock,
-  BookOpen
+  BookOpen,
+  UserPlus
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import CreateUserModal from './CreateUserModal';
 
 const Dashboard = () => {
   const { user, profile, signOut } = useAuth();
+  const [showCreateUser, setShowCreateUser] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -98,6 +102,12 @@ const Dashboard = () => {
                   </span>
                 </div>
               </div>
+              {profile?.permission_level && profile.permission_level >= 10 && (
+                <Button variant="outline" size="sm" onClick={() => setShowCreateUser(true)}>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Benutzer erstellen
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={handleSignOut}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Abmelden
@@ -152,6 +162,11 @@ const Dashboard = () => {
           </div>
         </div>
       </main>
+
+      <CreateUserModal 
+        isOpen={showCreateUser} 
+        onClose={() => setShowCreateUser(false)}
+      />
     </div>
   );
 };

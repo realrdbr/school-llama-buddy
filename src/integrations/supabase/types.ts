@@ -38,30 +38,42 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
-          email: string
+          created_by: string | null
+          email: string | null
           full_name: string | null
           id: string
+          must_change_password: boolean | null
+          password_hash: string | null
           permission_id: number | null
           updated_at: string
           user_id: string
+          username: string | null
         }
         Insert: {
           created_at?: string
-          email: string
+          created_by?: string | null
+          email?: string | null
           full_name?: string | null
           id?: string
+          must_change_password?: boolean | null
+          password_hash?: string | null
           permission_id?: number | null
           updated_at?: string
           user_id: string
+          username?: string | null
         }
         Update: {
           created_at?: string
-          email?: string
+          created_by?: string | null
+          email?: string | null
           full_name?: string | null
           id?: string
+          must_change_password?: boolean | null
+          password_hash?: string | null
           permission_id?: number | null
           updated_at?: string
           user_id?: string
+          username?: string | null
         }
         Relationships: [
           {
@@ -132,7 +144,34 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      change_user_password: {
+        Args: {
+          new_password: string
+          old_password: string
+          user_id_input: string
+        }
+        Returns: Json
+      }
+      create_school_user: {
+        Args: {
+          creator_user_id: string
+          full_name_input: string
+          password_input: string
+          permission_level_input: number
+          username_input: string
+        }
+        Returns: Json
+      }
+      verify_user_login: {
+        Args: { password_input: string; username_input: string }
+        Returns: {
+          full_name: string
+          must_change_password: boolean
+          permission_level: number
+          profile_id: string
+          user_id: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
