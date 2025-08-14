@@ -30,7 +30,7 @@ serve(async (req) => {
       .from('permissions')
       .select('permission_lvl')
       .eq('username', user_id)  // user_id is actually the username in our custom auth
-      .single()
+      .maybeSingle()
 
     if (!profile || profile.permission_lvl < 10) {
       throw new Error('Keine Berechtigung für Audio-Ankündigungen - Level 10 erforderlich')

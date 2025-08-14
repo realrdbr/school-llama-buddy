@@ -74,7 +74,10 @@ const AudioAnnouncements = () => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('audio-tts', {
-        body: ttsForm
+        body: {
+          ...ttsForm,
+          user_id: profile?.username  // Add username for custom auth
+        }
       });
       
       if (error) throw error;
@@ -215,7 +218,8 @@ const AudioAnnouncements = () => {
         const { data, error } = await supabase.functions.invoke('audio-tts', {
           body: {
             text: announcement.tts_text,
-            voice_id: announcement.voice_id || 'alloy'
+            voice_id: announcement.voice_id || 'alloy',
+            user_id: profile?.username  // Add username for custom auth
           }
         });
 

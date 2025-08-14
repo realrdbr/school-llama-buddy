@@ -53,12 +53,33 @@ serve(async (req) => {
 
       case 'update_vertretungsplan':
         if (userProfile.permission_lvl >= 10) {
+          // Convert date parameter to proper date format
+          let dateValue = new Date();
+          if (parameters.date) {
+            const dateParam = parameters.date.toLowerCase();
+            if (dateParam === 'morgen' || dateParam === 'tomorrow') {
+              dateValue = new Date();
+              dateValue.setDate(dateValue.getDate() + 1);
+            } else if (dateParam === 'heute' || dateParam === 'today') {
+              dateValue = new Date();
+            } else if (dateParam === 'übermorgen') {
+              dateValue = new Date();
+              dateValue.setDate(dateValue.getDate() + 2);
+            } else {
+              // Try to parse as date
+              const parsedDate = new Date(parameters.date);
+              if (!isNaN(parsedDate.getTime())) {
+                dateValue = parsedDate;
+              }
+            }
+          }
+          
           const { data, error } = await supabase
             .from('vertretungsplan')
             .insert({
-              date: parameters.date,
+              date: dateValue.toISOString().split('T')[0], // Format as YYYY-MM-DD
               class_name: parameters.className,
-              period: parameters.period,
+              period: parseInt(parameters.period) || 1,
               original_teacher: parameters.originalTeacher,
               original_subject: parameters.originalSubject,
               original_room: parameters.originalRoom,
