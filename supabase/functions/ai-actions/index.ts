@@ -78,16 +78,16 @@ serve(async (req) => {
             .from('vertretungsplan')
             .insert({
               date: dateValue.toISOString().split('T')[0], // Format as YYYY-MM-DD
-              class_name: parameters.className,
+              class_name: parameters.className || parameters.class_name,
               period: parseInt(parameters.period) || 1,
-              original_teacher: parameters.originalTeacher,
-              original_subject: parameters.originalSubject,
-              original_room: parameters.originalRoom,
-              substitute_teacher: parameters.substituteTeacher,
-              substitute_subject: parameters.substituteSubject,
-              substitute_room: parameters.substituteRoom,
-              note: parameters.note,
-              created_by: null  // Set to null since we're using username-based auth
+              original_teacher: parameters.originalTeacher || parameters.original_teacher,
+              original_subject: parameters.originalSubject || parameters.original_subject,
+              original_room: parameters.originalRoom || parameters.original_room,
+              substitute_teacher: parameters.substituteTeacher || parameters.substitute_teacher,
+              substitute_subject: parameters.substituteSubject || parameters.substitute_subject,
+              substitute_room: parameters.substituteRoom || parameters.substitute_room,
+              note: parameters.note || 'Keine Notizen',
+              created_by: null
             })
           
           if (!error) {
@@ -123,6 +123,34 @@ serve(async (req) => {
           }
         } else {
           result = { error: 'Keine Berechtigung zum Erstellen von Ankündigungen' }
+        }
+        break
+
+      case 'create_tts':
+        if (userProfile.permission_lvl >= 10) {
+          const { data, error } = await supabase
+            .from('audio_announcements')
+            .insert({
+              title: 'TTS Durchsage',
+              description: `Text-to-Speech Durchsage erstellt von ${userProfile.name}`,
+              is_tts: true,
+              tts_text: parameters.text,
+              voice_id: 'alloy',
+              is_active: true,
+              created_by: null
+            })
+          
+          if (!error) {
+            result = { 
+              message: 'TTS-Durchsage wurde erfolgreich erstellt!',
+              tts_text: parameters.text
+            }
+            success = true
+          } else {
+            result = { error: error.message }
+          }
+        } else {
+          result = { error: 'Keine Berechtigung für TTS-Durchsagen - Level 10 erforderlich' }
         }
         break
 
