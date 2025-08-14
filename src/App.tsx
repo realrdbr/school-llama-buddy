@@ -12,7 +12,7 @@ import Announcements from "./pages/Announcements";
 import UserManagement from "./pages/UserManagement";
 import Vertretungsplan from "./pages/Vertretungsplan";
 import Klassenverwaltung from "./pages/Klassenverwaltung";
-
+import AIChat from "./pages/AIChat";
 import Keycard from "./pages/Keycard";
 import Settings from "./pages/Settings";
 
@@ -31,7 +31,7 @@ const App = () => (
             <Route path="/stundenplan" element={<Stundenplan />} />
             <Route path="/announcements" element={<Announcements />} />
             <Route path="/user-management" element={<UserManagement />} />
-            <Route path="/vertretungsplan" element={<Vertretungsplan />} />
+            <Route path="/ai-chat" element={<AIChat />} />
             <Route path="/klassenverwaltung" element={<Klassenverwaltung />} />
             
             <Route path="/keycard" element={<Keycard />} />

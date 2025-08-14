@@ -128,9 +128,6 @@ const Dashboard = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-8">
-          {/* AI Assistant */}
-          <AIAssistant />
-          
           {/* Welcome Section */}
           <Card>
             <CardHeader>
@@ -149,7 +146,10 @@ const Dashboard = () => {
               </CardDescription>
             </CardHeader>
           </Card>
-
+          
+          {/* AI Assistant */}
+          <AIAssistant />
+          
           {/* Admin Features */}
           {profile?.permission_lvl && profile.permission_lvl >= 8 && (
             <div className="space-y-4">
