@@ -142,6 +142,7 @@ const Auth = () => {
       <ChangePasswordModal 
         isOpen={showChangePassword} 
         onClose={handlePasswordChanged}
+        isFirstLogin={true}
       />
     </>
   );

@@ -10,6 +10,8 @@ import NotFound from "./pages/NotFound";
 import Stundenplan from "./pages/Stundenplan";
 import Announcements from "./pages/Announcements";
 import UserManagement from "./pages/UserManagement";
+import Vertretungsplan from "./pages/Vertretungsplan";
+import Klassenverwaltung from "./pages/Klassenverwaltung";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +28,8 @@ const App = () => (
             <Route path="/stundenplan" element={<Stundenplan />} />
             <Route path="/announcements" element={<Announcements />} />
             <Route path="/user-management" element={<UserManagement />} />
+            <Route path="/vertretungsplan" element={<Vertretungsplan />} />
+            <Route path="/klassenverwaltung" element={<Klassenverwaltung />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

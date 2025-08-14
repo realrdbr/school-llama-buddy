@@ -10,9 +10,10 @@ import { Loader2, Lock } from 'lucide-react';
 interface ChangePasswordModalProps {
   isOpen: boolean;
   onClose: () => void;
+  isFirstLogin?: boolean;
 }
 
-const ChangePasswordModal = ({ isOpen, onClose }: ChangePasswordModalProps) => {
+const ChangePasswordModal = ({ isOpen, onClose, isFirstLogin = false }: ChangePasswordModalProps) => {
   const { changePassword } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -31,7 +32,7 @@ const ChangePasswordModal = ({ isOpen, onClose }: ChangePasswordModalProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.oldPassword || !formData.newPassword || !formData.confirmPassword) {
+    if (!formData.newPassword || !formData.confirmPassword) {
       toast({
         variant: "destructive",
         title: "Fehler",
@@ -40,11 +41,20 @@ const ChangePasswordModal = ({ isOpen, onClose }: ChangePasswordModalProps) => {
       return;
     }
 
+    if (!isFirstLogin && !formData.oldPassword) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Bitte geben Sie Ihr aktuelles Passwort ein."
+      });
+      return;
+    }
+
     if (formData.newPassword !== formData.confirmPassword) {
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Die neuen Passwörter stimmen nicht überein."
+        description: "Die Passwörter stimmen nicht überein."
       });
       return;
     }
@@ -53,13 +63,16 @@ const ChangePasswordModal = ({ isOpen, onClose }: ChangePasswordModalProps) => {
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Das neue Passwort muss mindestens 6 Zeichen lang sein."
+        description: "Das Passwort muss mindestens 6 Zeichen lang sein."
       });
       return;
     }
 
     setIsLoading(true);
-    const { error } = await changePassword(formData.oldPassword, formData.newPassword);
+    const { error } = await changePassword(
+      isFirstLogin ? 'dummy' : formData.oldPassword, 
+      formData.newPassword
+    );
 
     if (error) {
       toast({
@@ -94,17 +107,19 @@ const ChangePasswordModal = ({ isOpen, onClose }: ChangePasswordModalProps) => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="oldPassword">Aktuelles Passwort</Label>
-              <Input
-                id="oldPassword"
-                name="oldPassword"
-                type="password"
-                value={formData.oldPassword}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
+            {!isFirstLogin && (
+              <div className="space-y-2">
+                <Label htmlFor="oldPassword">Aktuelles Passwort</Label>
+                <Input
+                  id="oldPassword"
+                  name="oldPassword"
+                  type="password"
+                  value={formData.oldPassword}
+                  onChange={handleInputChange}
+                  required={!isFirstLogin}
+                />
+              </div>
+            )}
             
             <div className="space-y-2">
               <Label htmlFor="newPassword">Neues Passwort</Label>

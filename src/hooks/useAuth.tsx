@@ -90,8 +90,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (!user || !profile) return { error: { message: 'Nicht angemeldet' } };
 
     try {
-      // Verify old password
-      if (profile.password !== oldPassword) {
+      // For first login, skip old password verification
+      if (oldPassword !== 'dummy' && profile.password !== oldPassword) {
         return { error: { message: 'Falsches aktuelles Passwort' } };
       }
 
