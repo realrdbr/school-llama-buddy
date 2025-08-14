@@ -13,7 +13,8 @@ import {
   LogOut,
   Clock,
   BookOpen,
-  UserPlus
+  UserPlus,
+  Volume2
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import CreateUserModal from './CreateUserModal';
@@ -48,6 +49,7 @@ const Dashboard = () => {
 
   const adminFeatures = [
     { icon: Users, title: "Benutzerverwaltung", description: "Benutzer und Berechtigungen verwalten", path: "/user-management" },
+    { icon: Volume2, title: "Audio-Durchsagen", description: "Durchsagen verwalten und TTS", path: "/audio-announcements" },
     { icon: KeyRound, title: "Keycard-System", description: "Zugangskontrolle konfigurieren", path: "/keycard" },
     { icon: Settings, title: "Systemeinstellungen", description: "Arduino-Geräte verwalten", path: "/settings" }
   ];
