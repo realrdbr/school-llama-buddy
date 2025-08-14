@@ -109,6 +109,48 @@ export type Database = {
           },
         ]
       }
+      document_analysis: {
+        Row: {
+          analysis_result: Json | null
+          content_summary: string | null
+          created_at: string
+          file_name: string
+          file_path: string
+          file_type: string
+          grade_level: string | null
+          id: string
+          subject: string | null
+          updated_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          analysis_result?: Json | null
+          content_summary?: string | null
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_type: string
+          grade_level?: string | null
+          id?: string
+          subject?: string | null
+          updated_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          analysis_result?: Json | null
+          content_summary?: string | null
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_type?: string
+          grade_level?: string | null
+          id?: string
+          subject?: string | null
+          updated_at?: string
+          uploaded_by?: string
+        }
+        Relationships: []
+      }
       permissions: {
         Row: {
           created_at: string
