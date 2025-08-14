@@ -32,38 +32,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Remove the problematic useEffect that conflicts with HMR
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Fetch profile when user is authenticated
-        if (session?.user) {
-          setTimeout(() => {
-            fetchUserProfile(session.user.id);
-          }, 0);
-        } else {
-          setProfile(null);
-        }
-        setLoading(false);
-      }
-    );
-
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        setTimeout(() => {
-          fetchUserProfile(session.user.id);
-        }, 0);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    // Simple initialization without Supabase auth listeners
+    setLoading(false);
   }, []);
 
   const fetchUserProfile = async (userId: string) => {
@@ -88,7 +60,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setProfile({
         ...data,
         permission_level: data.permissions?.permission_lvl,
-        permission_name: data.permissions?.name
+        permission_name: data.permissions?.name,
+        must_change_password: data.must_change_password
       });
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -97,18 +70,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signInWithUsername = async (username: string, password: string) => {
     try {
+      setLoading(true);
+      
       const { data, error } = await supabase.rpc('verify_user_login', {
         username_input: username,
         password_input: password
       });
 
       if (error || !data || data.length === 0) {
+        setLoading(false);
         return { error: { message: 'Ungültiger Benutzername oder Passwort' } };
       }
 
       const userData = data[0];
       
-      // Create a dummy session for internal auth
+      // Create a dummy user for internal auth
       const dummyUser: User = {
         id: userData.user_id,
         app_metadata: {},
@@ -118,6 +94,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         email: `${username}@internal.school`
       };
 
+      // Set user and profile state
       setUser(dummyUser);
       setProfile({
         id: userData.profile_id,
@@ -129,12 +106,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         permission_name: '',
         must_change_password: userData.must_change_password
       });
-
+      
+      setLoading(false);
       return { 
         error: null, 
         mustChangePassword: userData.must_change_password 
       };
     } catch (error) {
+      setLoading(false);
       return { error };
     }
   };
