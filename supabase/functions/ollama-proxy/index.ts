@@ -16,16 +16,42 @@ serve(async (req) => {
     const requestBody = await req.json()
 
     // Forward request to local Ollama instance
-    const ollamaResponse = await fetch('http://127.0.0.1:11434/api/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody)
-    })
+    // Try multiple possible Ollama endpoints for local development
+    const ollamaUrls = [
+      'http://host.docker.internal:11434/api/chat',
+      'http://localhost:11434/api/chat',
+      'http://127.0.0.1:11434/api/chat'
+    ];
+    
+    let ollamaResponse;
+    let lastError;
+    
+    for (const url of ollamaUrls) {
+      try {
+        console.log(`Trying Ollama at: ${url}`);
+        ollamaResponse = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody)
+        });
 
-    if (!ollamaResponse.ok) {
-      throw new Error(`Ollama API error: ${ollamaResponse.status}`)
+        if (ollamaResponse.ok) {
+          console.log(`Successfully connected to Ollama at: ${url}`);
+          break;
+        } else {
+          throw new Error(`Ollama API error: ${ollamaResponse.status}`);
+        }
+      } catch (error) {
+        console.error(`Failed to connect to ${url}:`, error.message);
+        lastError = error;
+        ollamaResponse = null;
+      }
+    }
+
+    if (!ollamaResponse) {
+      throw new Error(`Could not connect to Ollama. Last error: ${lastError?.message}`);
     }
 
     const responseData = await ollamaResponse.json()
