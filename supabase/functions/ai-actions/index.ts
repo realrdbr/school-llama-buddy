@@ -113,7 +113,7 @@ serve(async (req) => {
               author: userProfile.name,
               priority: parameters.priority || 'normal',
               target_class: parameters.targetClass,
-              target_permission_level: parameters.targetPermissionLevel,
+              target_permission_level: parseInt(parameters.targetPermissionLevel) || null,
               created_by: userProfile.user_id?.toString() || null
             })
           

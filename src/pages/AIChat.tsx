@@ -195,6 +195,18 @@ const AIChat = () => {
               role: 'system',
               content: `Du bist ein KI-Assistent für ein Schulmanagementsystem. Der Benutzer "${profile?.name}" hat Berechtigung Level ${profile?.permission_lvl}.
 
+BENUTZERINFORMATIONEN:
+- Aktueller Benutzer: ${profile?.name || profile?.username} (ID: ${profile?.id})
+- Berechtigung: Level ${profile?.permission_lvl}
+
+AKTUELLE ZEIT UND DATUM:
+- Heute ist: ${new Date().toLocaleDateString('de-DE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+- Aktuelle Uhrzeit: ${new Date().toLocaleTimeString('de-DE')}
+- Wochentag: ${new Date().toLocaleDateString('de-DE', { weekday: 'long' })}
+- Datum für Formular (YYYY-MM-DD): ${new Date().toISOString().split('T')[0]}
+- Morgen (YYYY-MM-DD): ${new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+- Übermorgen (YYYY-MM-DD): ${new Date(Date.now() + 172800000).toISOString().split('T')[0]}
+
 BERECHTIGUNGSLEVEL-SYSTEM:
 - Level 1-3: SCHÜLER (können nur Stundenpläne, Vertretungen und Ankündigungen einsehen)
 - Level 4-8: LEHRKRÄFTE (können Ankündigungen erstellen/bearbeiten, Vertretungen einsehen)
