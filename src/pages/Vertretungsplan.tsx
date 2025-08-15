@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,6 +42,15 @@ interface ParsedScheduleEntry {
   room: string;
 }
 
+interface ScheduleDbEntry {
+  Stunde: number;
+  monday: string;
+  tuesday: string;
+  wednesday: string;
+  thursday: string;
+  friday: string;
+}
+
 const Vertretungsplan = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
@@ -63,6 +72,13 @@ const Vertretungsplan = () => {
   });
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedClass, setSelectedClass] = useState('10b');
+  const [aiSuggestions, setAiSuggestions] = useState<{
+    teachers: string[];
+    rooms: string[];
+    loading: boolean;
+  }>({ teachers: [], rooms: [], loading: false });
+  const [showAiSuggestions, setShowAiSuggestions] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -81,9 +97,9 @@ const Vertretungsplan = () => {
     
     fetchSchedules();
     fetchSubstitutions();
-  }, [user, profile, navigate, selectedDate]);
+  }, [user, profile, navigate, selectedDate, fetchSubstitutions]);
 
-  const fetchSubstitutions = async () => {
+  const fetchSubstitutions = useCallback(async () => {
     try {
       // Get the week range for the selected date
       const selectedDateObj = new Date(selectedDate + 'T00:00:00');
@@ -133,7 +149,7 @@ const Vertretungsplan = () => {
     } catch (error) {
       console.error('Error fetching substitutions:', error);
     }
-  };
+  }, [selectedDate]);
 
   const fetchSchedules = async () => {
     try {
@@ -141,7 +157,7 @@ const Vertretungsplan = () => {
       const { data: schedule10c } = await supabase.from('Stundenplan_10c_A').select('*');
       
       // Transform data to match ScheduleEntry interface
-      const transform = (data: any[]) => data.map(item => ({
+      const transform = (data: ScheduleDbEntry[]) => data.map((item) => ({
         period: item.Stunde,
         monday: item.monday,
         tuesday: item.tuesday,
@@ -273,6 +289,51 @@ const Vertretungsplan = () => {
     setShowSubstitutionDialog(true);
   };
 
+  const getAiSuggestions = async () => {
+    if (!selectedScheduleEntry) return;
+
+    setAiSuggestions(prev => ({ ...prev, loading: true }));
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-actions', {
+        body: {
+          action: 'suggest_substitution',
+          parameters: {
+            originalTeacher: selectedScheduleEntry.entry.teacher,
+            className: selectedScheduleEntry.class,
+            period: selectedScheduleEntry.period,
+            date: selectedScheduleEntry.targetDate || selectedDate
+          },
+          userProfile: profile
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setAiSuggestions({
+          teachers: data.result.suggestedTeachers || [],
+          rooms: data.result.suggestedRooms || [],
+          loading: false
+        });
+        setShowAiSuggestions(true);
+        toast({
+          title: "KI-Vorschläge",
+          description: data.result.message || "Vorschläge wurden generiert"
+        });
+      } else {
+        throw new Error(data.result.error);
+      }
+    } catch (error: unknown) {
+      console.error('Error getting AI suggestions:', error);
+      setAiSuggestions(prev => ({ ...prev, loading: false }));
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: error instanceof Error ? error.message : "KI-Vorschläge konnten nicht abgerufen werden"
+      });
+    }
+  };
+
   const handleCreateSubstitution = async () => {
     if (!selectedScheduleEntry) return;
 
@@ -329,6 +390,8 @@ const Vertretungsplan = () => {
       await fetchSubstitutions();
       
       setShowSubstitutionDialog(false);
+      setShowAiSuggestions(false); // Reset AI suggestions
+      setAiSuggestions({ teachers: [], rooms: [], loading: false }); // Clear AI data
       toast({
         title: "Vertretung erstellt",
         description: `Die Vertretung wurde erfolgreich für ${getDayName(selectedScheduleEntry.day)} gespeichert.`
@@ -612,13 +675,45 @@ const Vertretungsplan = () => {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="substituteTeacher">Vertretungslehrer</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="substituteTeacher">Vertretungslehrer</Label>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={getAiSuggestions}
+                    disabled={aiSuggestions.loading}
+                    className="flex items-center gap-1"
+                  >
+                    <Bot className="h-3 w-3" />
+                    {aiSuggestions.loading ? 'Lade...' : 'KI-Vorschläge'}
+                  </Button>
+                </div>
                 <Input
                   id="substituteTeacher"
                   value={substitutionData.substituteTeacher}
                   onChange={(e) => setSubstitutionData({...substitutionData, substituteTeacher: e.target.value})}
                   placeholder="Leer lassen für Entfall"
                 />
+                
+                {/* AI Teacher Suggestions */}
+                {showAiSuggestions && aiSuggestions.teachers.length > 0 && (
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">KI-Vorschläge (verfügbare Lehrkräfte):</Label>
+                    <div className="flex flex-wrap gap-1">
+                      {aiSuggestions.teachers.map((teacher, index) => (
+                        <Button
+                          key={index}
+                          variant="outline"
+                          size="sm"
+                          className="h-6 px-2 py-0 text-xs"
+                          onClick={() => setSubstitutionData({...substitutionData, substituteTeacher: teacher})}
+                        >
+                          {teacher}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -639,6 +734,26 @@ const Vertretungsplan = () => {
                   onChange={(e) => setSubstitutionData({...substitutionData, substituteRoom: e.target.value})}
                   placeholder="Raum"
                 />
+                
+                {/* AI Room Suggestions */}
+                {showAiSuggestions && aiSuggestions.rooms.length > 0 && (
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">KI-Vorschläge (verfügbare Räume):</Label>
+                    <div className="flex flex-wrap gap-1">
+                      {aiSuggestions.rooms.map((room, index) => (
+                        <Button
+                          key={index}
+                          variant="outline"
+                          size="sm"
+                          className="h-6 px-2 py-0 text-xs"
+                          onClick={() => setSubstitutionData({...substitutionData, substituteRoom: room})}
+                        >
+                          {room}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div className="space-y-2">
@@ -652,8 +767,57 @@ const Vertretungsplan = () => {
               </div>
               
               <div className="flex gap-2">
-                <Button onClick={handleCreateSubstitution}>Vertretung erstellen</Button>
+                <Button onClick={() => setShowConfirmDialog(true)}>Vertretung erstellen</Button>
                 <Button variant="outline" onClick={() => setShowSubstitutionDialog(false)}>
+                  Abbrechen
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      
+      {/* Confirmation Dialog */}
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Vertretung bestätigen</DialogTitle>
+          </DialogHeader>
+          {selectedScheduleEntry && (
+            <div className="space-y-4">
+              <div className="text-sm">
+                <p className="font-medium">Möchten Sie diese Vertretung erstellen?</p>
+              </div>
+              
+              <div className="p-3 bg-muted rounded-md space-y-2">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <span className="font-medium">Klasse:</span>
+                  <span>{selectedScheduleEntry.class}</span>
+                  <span className="font-medium">Stunde:</span>
+                  <span>{selectedScheduleEntry.period}.</span>
+                  <span className="font-medium">Ursprünglich:</span>
+                  <span>{selectedScheduleEntry.entry.teacher} - {selectedScheduleEntry.entry.subject}</span>
+                  <span className="font-medium">Vertretung:</span>
+                  <span>{substitutionData.substituteTeacher || 'ENTFALL'} - {substitutionData.substituteSubject}</span>
+                  <span className="font-medium">Raum:</span>
+                  <span>{substitutionData.substituteRoom}</span>
+                  {substitutionData.note && (
+                    <>
+                      <span className="font-medium">Notiz:</span>
+                      <span>{substitutionData.note}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button onClick={() => {
+                  setShowConfirmDialog(false);
+                  handleCreateSubstitution();
+                }}>
+                  Ja, erstellen
+                </Button>
+                <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>
                   Abbrechen
                 </Button>
               </div>

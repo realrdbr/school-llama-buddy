@@ -156,6 +156,111 @@ serve(async (req) => {
         }
         break
 
+      case 'generate_vertretungsplan':
+        if (userProfile.permission_lvl >= 10) {
+          try {
+            // Get available teachers and rooms from database for suggestions
+            const { data: teachers } = await supabase
+              .from('profiles')
+              .select('name, username')
+              .not('name', 'is', null)
+              .limit(10);
+
+            const { data: existingSubstitutions } = await supabase
+              .from('vertretungsplan')
+              .select('substitute_teacher, substitute_room, date, period')
+              .gte('date', new Date().toISOString().split('T')[0]);
+
+            // Simple AI logic for suggestions based on context
+            const suggestions = [];
+            const context = parameters.context || '';
+            const prompt = parameters.prompt || '';
+
+            // Generate basic suggestions based on available data
+            if (teachers && teachers.length > 0) {
+              const availableTeachers = teachers.filter(t => 
+                !existingSubstitutions?.some(sub => sub.substitute_teacher === t.name)
+              ).slice(0, 3);
+
+              if (availableTeachers.length > 0) {
+                suggestions.push(`Verfügbare Lehrkräfte: ${availableTeachers.map(t => t.name).join(', ')}`);
+              }
+            }
+
+            // Room suggestions (basic logic)
+            const commonRooms = ['101', '102', '103', '201', '202', '203', 'Aula', 'Turnhalle'];
+            const occupiedRooms = existingSubstitutions?.map(sub => sub.substitute_room) || [];
+            const availableRooms = commonRooms.filter(room => !occupiedRooms.includes(room)).slice(0, 3);
+            
+            if (availableRooms.length > 0) {
+              suggestions.push(`Verfügbare Räume: ${availableRooms.join(', ')}`);
+            }
+
+            suggestions.push('Empfehlung: Prüfen Sie die aktuellen Stundenpläne für Konflikte');
+            suggestions.push('Hinweis: Informieren Sie betroffene Klassen rechtzeitig');
+
+            result = { 
+              message: 'Vertretungsvorschläge generiert',
+              suggestions: suggestions,
+              availableTeachers: teachers?.map(t => t.name) || [],
+              availableRooms: availableRooms
+            };
+            success = true;
+          } catch (error) {
+            result = { error: `Fehler bei der Generierung: ${error.message}` };
+          }
+        } else {
+          result = { error: 'Keine Berechtigung für AI-Vertretungsplanung - Level 10 erforderlich' };
+        }
+        break
+
+      case 'suggest_substitution':
+        if (userProfile.permission_lvl >= 10) {
+          try {
+            // Get context for current substitution request
+            const originalTeacher = parameters.originalTeacher || '';
+            const className = parameters.className || '';
+            const period = parameters.period || 1;
+            const date = parameters.date || new Date().toISOString().split('T')[0];
+
+            // Query database for suggestions
+            const { data: teachers } = await supabase
+              .from('profiles')
+              .select('name, username')
+              .not('name', 'is', null);
+
+            const { data: conflicts } = await supabase
+              .from('vertretungsplan')
+              .select('substitute_teacher, substitute_room, class_name, period')
+              .eq('date', date)
+              .eq('period', period);
+
+            // Filter out teachers already assigned in this period
+            const busyTeachers = conflicts?.map(c => c.substitute_teacher) || [];
+            const availableTeachers = teachers?.filter(t => 
+              t.name !== originalTeacher && !busyTeachers.includes(t.name)
+            ) || [];
+
+            // Room suggestions
+            const occupiedRooms = conflicts?.map(c => c.substitute_room) || [];
+            const allRooms = ['101', '102', '103', '201', '202', '203', '301', '302', 'Aula', 'Turnhalle', 'Computerraum'];
+            const availableRooms = allRooms.filter(room => !occupiedRooms.includes(room));
+
+            result = {
+              suggestedTeachers: availableTeachers.slice(0, 5).map(t => t.name),
+              suggestedRooms: availableRooms.slice(0, 5),
+              conflicts: conflicts?.length || 0,
+              message: `${availableTeachers.length} Lehrkräfte und ${availableRooms.length} Räume verfügbar`
+            };
+            success = true;
+          } catch (error) {
+            result = { error: `Fehler bei Vorschlagsgenerierung: ${error.message}` };
+          }
+        } else {
+          result = { error: 'Keine Berechtigung für Vertretungsvorschläge' };
+        }
+        break
+
       default:
         result = { error: 'Unbekannte Aktion' }
     }
