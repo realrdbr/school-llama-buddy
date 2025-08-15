@@ -86,46 +86,42 @@ const AudioAnnouncements = () => {
     
     setLoading(true);
     try {
-      console.log('Submitting TTS with user:', profile?.username);
-      
-      // Verwende ElevenLabs TTS Edge Function
-      const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
-        body: {
-          text: ttsForm.text,
-          voice_id: ttsForm.voice_id,
+      // Erstelle TTS-Durchsage direkt in der Datenbank (lokale Lösung)
+      const { error } = await supabase
+        .from('audio_announcements')
+        .insert({
           title: ttsForm.title,
           description: ttsForm.description || `TTS-Durchsage erstellt von ${profile?.username}`,
-          user_id: profile?.user_id
-        }
-      });
-      
-      console.log('TTS Response:', { data, error });
+          is_tts: true,
+          tts_text: ttsForm.text,
+          voice_id: ttsForm.voice_id,
+          schedule_date: ttsForm.schedule_date || null,
+          is_active: true,
+          created_by: profile?.user_id,
+          duration_seconds: Math.ceil(ttsForm.text.length / 15) // Grobe Schätzung
+        });
       
       if (error) {
         console.error('TTS Error:', error);
         throw error;
       }
       
-      if (data?.success) {
-        toast({
-          title: "Erfolg",
-          description: "TTS-Durchsage wurde mit ElevenLabs erstellt"
-        });
-        
-        // Reset form
-        setTtsForm({
-          title: '',
-          description: '',
-          text: '',
-          voice_id: 'Aria',
-          schedule_date: ''
-        });
-        
-        // Refresh announcements
-        fetchAnnouncements();
-      } else {
-        throw new Error(data?.error || 'TTS-Durchsage konnte nicht erstellt werden');
-      }
+      toast({
+        title: "Erfolg",
+        description: "TTS-Durchsage wurde erfolgreich erstellt (lokale TTS)"
+      });
+      
+      // Reset form
+      setTtsForm({
+        title: '',
+        description: '',
+        text: '',
+        voice_id: 'Aria',
+        schedule_date: ''
+      });
+      
+      // Refresh announcements
+      fetchAnnouncements();
     } catch (error: any) {
       console.error('TTS Submit Error:', error);
       toast({
