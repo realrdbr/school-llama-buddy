@@ -458,16 +458,18 @@ serve(async (req) => {
       
       case 'get_teachers': {
         try {
-          const { data, error } = await supabase.from('teachers').select('*');
+          const { data, error } = await supabase.from('teachers').select('*').order('last name');
           if (error) throw error;
-          const teachers = (data || []).map((t: any) => ({
+          const teachersRaw = (data || []) as any[];
+          const teachers = teachersRaw.map((t: any) => ({
             firstName: t['first name'],
             lastName: t['last name'],
             shortened: t['shortened'],
             subjects: t['subjects'],
             fav_rooms: t['fav_rooms'] || null,
           }));
-          result = { message: `Es wurden ${teachers.length} Lehrkräfte geladen.`, teachers };
+          const textList = teachers.map(t => `- ${t.lastName}, ${t.firstName} [${t.shortened}] — ${t.subjects}`).join('\n');
+          result = { message: `Es wurden ${teachers.length} Lehrkräfte geladen.`, teachers, textList };
           success = true;
         } catch (e: any) {
           console.error('get_teachers error:', e);
@@ -494,28 +496,64 @@ serve(async (req) => {
             const map: Record<string, string> = { montag:'monday', dienstag:'tuesday', mittwoch:'wednesday', donnerstag:'thursday', freitag:'friday' };
             return map[d] || d;
           };
-          const dayKey = dayParam ? normalizeDay(dayParam) : null;
+          const dayKey = dayParam ? normalizeDay(dayParam) : '';
 
+          // Parse helper like used in substitution planning
+          const parseCell = (cell?: string) => {
+            if (!cell) return [] as Array<{subject:string, teacher:string, room:string}>;
+            return cell.split('|').map(s => s.trim()).filter(Boolean).map(sub => {
+              const parts = sub.split(/\s+/);
+              if (parts.length >= 3) {
+                return { subject: parts[0], teacher: parts[1], room: parts[2] };
+              }
+              return { subject: sub, teacher: '', room: '' } as any;
+            });
+          };
+
+          // Build weekly grid data
           const schedule = (rows || []).map((r: any) => {
             const period = r['Stunde'];
-            const entry = dayKey ? r[dayKey as keyof typeof r] : null;
-            return dayKey
-              ? { period, entry }
-              : {
-                  period,
-                  monday: r['monday'],
-                  tuesday: r['tuesday'],
-                  wednesday: r['wednesday'],
-                  thursday: r['thursday'],
-                  friday: r['friday'],
-                };
+            return {
+              period,
+              monday: r['monday'],
+              tuesday: r['tuesday'],
+              wednesday: r['wednesday'],
+              thursday: r['thursday'],
+              friday: r['friday'],
+            };
           });
+
+          // Build human friendly strings
+          const formatEntry = (s?: string) => {
+            const entries = parseCell(s);
+            if (entries.length === 0) return '';
+            return entries.map(e => `${e.subject}${e.teacher?` (${e.teacher}`:''}${e.room?`${e.teacher?`, `:''}${e.room}`:''}${e.teacher?`)`:''}`).join(' | ');
+          };
+
+          // Create ASCII table similar to UI
+          const pad = (str: string, len: number) => (str || '').padEnd(len, ' ');
+          const colWidths = { Stunde: 6, Mo: 18, Di: 18, Mi: 18, Do: 18, Fr: 18 };
+          const header = `${pad('Stunde', colWidths.Stunde)} | ${pad('Montag', colWidths.Mo)} | ${pad('Dienstag', colWidths.Di)} | ${pad('Mittwoch', colWidths.Mi)} | ${pad('Donnerstag', colWidths.Do)} | ${pad('Freitag', colWidths.Fr)}`;
+          const sep = `${'-'.repeat(colWidths.Stunde)}-+-${'-'.repeat(colWidths.Mo)}-+-${'-'.repeat(colWidths.Di)}-+-${'-'.repeat(colWidths.Mi)}-+-${'-'.repeat(colWidths.Do)}-+-${'-'.repeat(colWidths.Fr)}`;
+          const lines: string[] = [header, sep];
+
+          for (const r of schedule) {
+            if (dayKey) {
+              const entry = formatEntry((r as any)[dayKey]);
+              lines.push(`${pad(String(r.period), colWidths.Stunde)} | ${pad(entry, colWidths.Mo)}${' '.repeat(colWidths.Di+colWidths.Mi+colWidths.Do+colWidths.Fr + 13)}`);
+            } else {
+              lines.push(`${pad(String(r.period), colWidths.Stunde)} | ${pad(formatEntry(r.monday), colWidths.Mo)} | ${pad(formatEntry(r.tuesday), colWidths.Di)} | ${pad(formatEntry(r.wednesday), colWidths.Mi)} | ${pad(formatEntry(r.thursday), colWidths.Do)} | ${pad(formatEntry(r.friday), colWidths.Fr)}`);
+            }
+          }
+
+          const textTable = lines.join('\n');
 
           result = {
             message: dayKey
               ? `Stundenplan für Klasse ${className.toUpperCase()} am ${dayParam.charAt(0).toUpperCase() + dayParam.slice(1)}`
               : `Stundenplan (Woche) für Klasse ${className.toUpperCase()}`,
             schedule,
+            textTable,
           };
           success = true;
         } catch (e: any) {
