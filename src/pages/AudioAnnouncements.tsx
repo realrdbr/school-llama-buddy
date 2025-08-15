@@ -140,10 +140,10 @@ const AudioAnnouncements = () => {
 
     setLoading(true);
     try {
-      // Upload audio file to Supabase Storage
+      // Upload audio file to Supabase Storage (use audio-files bucket for consistency)
       const fileName = `${Date.now()}_${audioForm.audio_file.name}`;
       const { error: uploadError } = await supabase.storage
-        .from('audio-announcements')
+        .from('audio-files')
         .upload(fileName, audioForm.audio_file);
 
       if (uploadError) throw uploadError;
@@ -157,8 +157,8 @@ const AudioAnnouncements = () => {
           is_tts: false,
           audio_file_path: fileName,
           schedule_date: audioForm.schedule_date || null,
-          is_active: true,
-          created_by: profile?.id?.toString()
+          is_active: true
+          // created_by is now nullable, so we don't need to set it
         });
 
       if (insertError) throw insertError;
@@ -243,9 +243,9 @@ const AudioAnnouncements = () => {
           throw new Error('Web Speech API nicht unterstützt');
         }
       } else if (announcement.audio_file_path) {
-        // For uploaded audio files
+        // For uploaded audio files (use audio-files bucket)
         const { data } = supabase.storage
-          .from('audio-announcements')
+          .from('audio-files')
           .getPublicUrl(announcement.audio_file_path);
         
         audioUrl = data.publicUrl;

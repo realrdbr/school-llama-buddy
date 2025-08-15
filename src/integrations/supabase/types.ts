@@ -57,7 +57,7 @@ export type Database = {
         Row: {
           audio_file_path: string | null
           created_at: string
-          created_by: string
+          created_by: string | null
           description: string | null
           duration_seconds: number | null
           id: string
@@ -73,7 +73,7 @@ export type Database = {
         Insert: {
           audio_file_path?: string | null
           created_at?: string
-          created_by: string
+          created_by?: string | null
           description?: string | null
           duration_seconds?: number | null
           id?: string
@@ -89,7 +89,7 @@ export type Database = {
         Update: {
           audio_file_path?: string | null
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           description?: string | null
           duration_seconds?: number | null
           id?: string
@@ -289,6 +289,30 @@ export type Database = {
           thursday?: string | null
           tuesday?: string | null
           wednesday?: string | null
+        }
+        Relationships: []
+      }
+      teachers: {
+        Row: {
+          fav_rooms: string | null
+          "first name": string
+          "last name": string
+          shortened: string
+          subjects: string
+        }
+        Insert: {
+          fav_rooms?: string | null
+          "first name"?: string
+          "last name"?: string
+          shortened: string
+          subjects: string
+        }
+        Update: {
+          fav_rooms?: string | null
+          "first name"?: string
+          "last name"?: string
+          shortened?: string
+          subjects?: string
         }
         Relationships: []
       }
