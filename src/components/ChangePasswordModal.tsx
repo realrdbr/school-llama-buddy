@@ -41,14 +41,6 @@ const ChangePasswordModal = ({ isOpen, onClose, isFirstLogin = false }: ChangePa
       return;
     }
 
-    if (!isFirstLogin && !formData.oldPassword) {
-      toast({
-        variant: "destructive",
-        title: "Fehler",
-        description: "Bitte geben Sie Ihr aktuelles Passwort ein."
-      });
-      return;
-    }
 
     if (formData.newPassword !== formData.confirmPassword) {
       toast({
@@ -70,7 +62,7 @@ const ChangePasswordModal = ({ isOpen, onClose, isFirstLogin = false }: ChangePa
 
     setIsLoading(true);
     const { error } = await changePassword(
-      isFirstLogin ? '' : formData.oldPassword, 
+      '', 
       formData.newPassword
     );
 
@@ -102,24 +94,11 @@ const ChangePasswordModal = ({ isOpen, onClose, isFirstLogin = false }: ChangePa
             <CardTitle>Passwort ändern</CardTitle>
           </div>
           <CardDescription>
-            Bitte geben Sie Ihr aktuelles und neues Passwort ein.
+            Bitte geben Sie Ihr neues Passwort ein.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!isFirstLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="oldPassword">Aktuelles Passwort</Label>
-                <Input
-                  id="oldPassword"
-                  name="oldPassword"
-                  type="password"
-                  value={formData.oldPassword}
-                  onChange={handleInputChange}
-                  required={!isFirstLogin}
-                />
-              </div>
-            )}
             
             <div className="space-y-2">
               <Label htmlFor="newPassword">Neues Passwort</Label>

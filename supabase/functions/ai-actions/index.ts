@@ -156,6 +156,22 @@ serve(async (req) => {
         }
         break
 
+      case 'generate_vertretungsplan':
+        if (userProfile.permission_lvl >= 10) {
+          result = { 
+            message: 'AI-Vertretungsplan-Generator ist noch in Entwicklung. Verwenden Sie stattdessen die Vertretungsplan-Bearbeitung.',
+            suggestions: [
+              'Verwenden Sie "Vertretung erstellen" für spezifische Einträge',
+              'Nutzen Sie die normale Vertretungsplan-Verwaltung',
+              'Feature kommt in einer zukünftigen Version'
+            ]
+          }
+          success = true
+        } else {
+          result = { error: 'Keine Berechtigung für AI-Vertretungsplan-Generator - Level 10 erforderlich' }
+        }
+        break
+
       default:
         result = { error: 'Unbekannte Aktion' }
     }
