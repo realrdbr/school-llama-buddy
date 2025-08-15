@@ -291,9 +291,38 @@ serve(async (req) => {
               });
             };
 
-            // Get all schedule tables
-            const { data: tables } = await supabase.rpc('information_schema_tables') || {};
-            const classTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A']; // Known tables for now
+            // Dynamically get all schedule tables
+            const { data: tablesInfo, error: tablesError } = await supabase
+              .rpc('pg_tables_get_names')
+              .then(({ data, error }) => ({
+                data: null,
+                error: null // fallback to hardcoded if rpc fails
+              }))
+              .catch(() => ({ data: null, error: null }));
+            
+            // Get all table names starting with 'Stundenplan'
+            let classTables: string[] = [];
+            try {
+              const { data: allTables } = await supabase
+                .from('information_schema.tables')
+                .select('table_name')
+                .eq('table_schema', 'public')
+                .like('table_name', 'Stundenplan%');
+              
+              if (allTables) {
+                classTables = allTables.map((t: any) => t.table_name);
+              }
+            } catch {
+              // Fallback to known tables if query fails
+              classTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
+            }
+            
+            // If we couldn't get tables dynamically, use hardcoded list
+            if (classTables.length === 0) {
+              classTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
+            }
+            
+            console.log('Found schedule tables:', classTables);
 
             const affected: Array<{ 
               className: string, 
@@ -303,30 +332,32 @@ serve(async (req) => {
             }> = [];
 
             // Find affected lessons
-            for (const table of classTables) {
-              const { data: rows, error } = await supabase.from(table).select('*').order('Stunde');
-              if (error) { 
-                console.error('Read schedule error', table, error.message); 
-                continue; 
-              }
-              
-              for (const row of rows as any[]) {
-                const period = row['Stunde'];
-                const cell = row[dayKey] as string | undefined;
-                const entries = parseCell(cell);
+              for (const table of classTables) {
+                const { data: rows, error } = await supabase.from(table).select('*').order('Stunde');
+                if (error) { 
+                  console.error('Read schedule error', table, error.message); 
+                  continue; 
+                }
                 
-                for (const entry of entries) {
-                  if (entry.teacher === sickTeacherShortened) {
-                    affected.push({ 
-                      className: table.replace('Stundenplan_', '').replace('_', ' '), 
-                      period, 
-                      subject: entry.subject || 'Unbekannt', 
-                      room: entry.room || 'Unbekannt' 
-                    });
+                for (const row of rows as any[]) {
+                  const period = row['Stunde'];
+                  const cell = row[dayKey] as string | undefined;
+                  const entries = parseCell(cell);
+                  
+                  for (const entry of entries) {
+                    if (entry.teacher === sickTeacherShortened) {
+                      // Extract class name from table name (e.g., "Stundenplan_10c_A" -> "10c A")
+                      const className = table.replace('Stundenplan_', '').replace('_', ' ');
+                      affected.push({ 
+                        className, 
+                        period, 
+                        subject: entry.subject || 'Unbekannt', 
+                        room: entry.room || 'Unbekannt' 
+                      });
+                    }
                   }
                 }
               }
-            }
 
             console.log(`Found ${affected.length} affected lessons:`, affected);
 
@@ -482,10 +513,46 @@ serve(async (req) => {
         try {
           const className = (parameters.className || parameters.klasse || '10b').toString().trim().toLowerCase();
           const dayParam = (parameters.day || parameters.tag || '').toString().trim().toLowerCase();
-          const tableMap: Record<string, string> = { '10b': 'Stundenplan_10b_A', '10c': 'Stundenplan_10c_A' };
+          
+          // Dynamically get all schedule tables
+          let classTables: string[] = [];
+          try {
+            const { data: allTables } = await supabase
+              .from('information_schema.tables')
+              .select('table_name')
+              .eq('table_schema', 'public')
+              .like('table_name', 'Stundenplan%');
+            
+            if (allTables) {
+              classTables = allTables.map((t: any) => t.table_name);
+            }
+          } catch {
+            // Fallback to known tables if query fails
+            classTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
+          }
+          
+          // If we couldn't get tables dynamically, use hardcoded list
+          if (classTables.length === 0) {
+            classTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
+          }
+          
+          // Build dynamic table map from discovered tables
+          const tableMap: Record<string, string> = {};
+          for (const tableName of classTables) {
+            // Extract class name from table name (e.g., "Stundenplan_10b_A" -> "10b")
+            const match = tableName.match(/^Stundenplan_(.+?)(?:_[A-Z])?$/);
+            if (match) {
+              const extractedClassName = match[1].toLowerCase();
+              tableMap[extractedClassName] = tableName;
+            }
+          }
+          
+          console.log('Available classes:', Object.keys(tableMap));
+          
           const table = tableMap[className];
           if (!table) {
-            result = { error: `Unbekannte Klasse: ${className}` };
+            const availableClasses = Object.keys(tableMap).join(', ');
+            result = { error: `Unbekannte Klasse: ${className}. Verfügbare Klassen: ${availableClasses}` };
             break;
           }
 
