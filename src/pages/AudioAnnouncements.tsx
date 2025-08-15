@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Volume2, VolumeX, Mic, Upload, Play, Pause, RotateCcw, ArrowLeft } from 'lucide-react';
+import { Volume2, VolumeX, Mic, Upload, Play, Pause, RotateCcw, ArrowLeft, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import OfflineTTS from '@/components/OfflineTTS';
 
@@ -316,6 +316,29 @@ const AudioAnnouncements = () => {
     }
   };
 
+  const handleDeleteAnnouncement = async (announcement: AudioAnnouncement) => {
+    const confirmed = window.confirm('Durchsage wirklich löschen?');
+    if (!confirmed) return;
+    try {
+      // Delete database record first
+      const { error } = await supabase
+        .from('audio_announcements')
+        .delete()
+        .eq('id', announcement.id);
+      if (error) throw error;
+
+      // Try to delete audio file from storage (if present)
+      if (announcement.audio_file_path) {
+        await supabase.storage.from('audio-files').remove([announcement.audio_file_path]);
+      }
+
+      toast({ title: 'Gelöscht', description: 'Durchsage wurde gelöscht' });
+      fetchAnnouncements();
+    } catch (e: any) {
+      toast({ title: 'Fehler', description: e.message || 'Löschen fehlgeschlagen', variant: 'destructive' });
+    }
+  };
+
   // Check if user has permission (Level 10 required)
   if (!profile || profile.permission_lvl < 10) {
     return (
@@ -509,6 +532,15 @@ const AudioAnnouncements = () => {
                     onClick={() => toggleAnnouncementStatus(announcement.id, announcement.is_active)}
                   >
                     {announcement.is_active ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => handleDeleteAnnouncement(announcement)}
+                    aria-label="Durchsage löschen"
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>

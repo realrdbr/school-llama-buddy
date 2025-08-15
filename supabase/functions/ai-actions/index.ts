@@ -185,28 +185,38 @@ serve(async (req) => {
 
             console.log(`E.D.U.A.R.D. planning substitution for ${teacherName} on ${dateParam}`);
 
-            // Parse date and weekday
+            // Parse date including German weekday words
             let dateValue = new Date();
             const lower = String(dateParam).toLowerCase();
+            const weekdayMap: Record<string, number> = { montag:1, dienstag:2, mittwoch:3, donnerstag:4, freitag:5 };
             if (lower === 'morgen' || lower === 'tomorrow') {
               dateValue.setDate(dateValue.getDate() + 1);
             } else if (lower === 'übermorgen') {
               dateValue.setDate(dateValue.getDate() + 2);
             } else if (lower !== 'heute' && lower !== 'today') {
-              const parsed = new Date(dateParam);
-              if (!isNaN(parsed.getTime())) dateValue = parsed;
+              if (weekdayMap[lower]) {
+                const today = new Date();
+                const todayDow = today.getDay() === 0 ? 7 : today.getDay(); // 1..7
+                let diff = weekdayMap[lower] - todayDow;
+                if (diff < 0) diff += 7;
+                if (diff === 0) diff = 7; // same day → next week
+                dateValue.setDate(today.getDate() + diff);
+              } else {
+                const parsed = new Date(dateParam);
+                if (!isNaN(parsed.getTime())) dateValue = parsed;
+              }
             }
             
             const weekday = dateValue.getDay(); // 0=Sun ... 6=Sat
-            const weekdayMap: Record<number, 'monday'|'tuesday'|'wednesday'|'thursday'|'friday'> = {
+            const weekdayKeyMap: Record<number, 'monday'|'tuesday'|'wednesday'|'thursday'|'friday'> = {
               1: 'monday', 2: 'tuesday', 3: 'wednesday', 4: 'thursday', 5: 'friday'
             } as const;
             
-            if (!(weekday in weekdayMap)) {
+            if (!(weekday in weekdayKeyMap)) {
               result = { error: 'E.D.U.A.R.D.: Ausgewähltes Datum liegt am Wochenende' }
               break;
             }
-            const dayKey = weekdayMap[weekday as 1|2|3|4|5];
+            const dayKey = weekdayKeyMap[weekday as 1|2|3|4|5];
 
             // Load all teachers from database
             const { data: teachersData, error: teachersError } = await supabase
@@ -445,6 +455,26 @@ serve(async (req) => {
           result = { error: 'Keine Berechtigung für automatische Vertretungsplanung - Level 9 erforderlich' }
         }
         break
+      
+      case 'get_teachers': {
+        try {
+          const { data, error } = await supabase.from('teachers').select('*');
+          if (error) throw error;
+          const teachers = (data || []).map((t: any) => ({
+            firstName: t['first name'],
+            lastName: t['last name'],
+            shortened: t['shortened'],
+            subjects: t['subjects'],
+            fav_rooms: t['fav_rooms'] || null,
+          }));
+          result = { message: `Es wurden ${teachers.length} Lehrkräfte geladen.`, teachers };
+          success = true;
+        } catch (e: any) {
+          console.error('get_teachers error:', e);
+          result = { error: e.message || 'Fehler beim Laden der Lehrkräfte' };
+        }
+        break
+      }
 
       case 'get_schedule': {
         try {
