@@ -420,6 +420,14 @@ export type Database = {
         }
         Returns: Json
       }
+      get_current_user_permission_level: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      is_current_user_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       verify_user_login: {
         Args: { password_input: string; username_input: string }
         Returns: {
