@@ -83,7 +83,7 @@ serve(async (req) => {
             substitute_subject: parameters.substituteSubject || parameters.substitute_subject || 'Vertretung',
             substitute_room: parameters.substituteRoom || parameters.substitute_room || 'Unbekannt',
             note: parameters.note || 'Keine Notizen',
-            created_by: userProfile.user_id || null
+            created_by: null
           }
           
           console.log('Inserting data:', insertData)
@@ -114,7 +114,7 @@ serve(async (req) => {
               priority: parameters.priority || 'normal',
               target_class: parameters.targetClass,
               target_permission_level: parseInt(parameters.targetPermissionLevel) || null,
-              created_by: userProfile.user_id?.toString() || null
+              created_by: null
             })
           
           if (!error) {
@@ -169,6 +169,138 @@ serve(async (req) => {
           success = true
         } else {
           result = { error: 'Keine Berechtigung für AI-Vertretungsplan-Generator - Level 10 erforderlich' }
+        }
+        break
+
+      case 'plan_substitution':
+        if (userProfile.permission_lvl >= 9) {
+          try {
+            const teacherName = parameters.teacherName || parameters.teacher || parameters.name;
+            const dateParam = parameters.date || parameters.datum || 'today';
+
+            if (!teacherName) {
+              result = { error: 'Lehrkraft-Name fehlt (teacherName)' }
+              break;
+            }
+
+            // Parse date and weekday
+            let dateValue = new Date();
+            const lower = String(dateParam).toLowerCase();
+            if (lower === 'morgen' || lower === 'tomorrow') {
+              dateValue.setDate(dateValue.getDate() + 1);
+            } else if (lower === 'übermorgen') {
+              dateValue.setDate(dateValue.getDate() + 2);
+            } else if (lower !== 'heute' && lower !== 'today') {
+              const parsed = new Date(dateParam);
+              if (!isNaN(parsed.getTime())) dateValue = parsed;
+            }
+            const weekday = dateValue.getDay(); // 0=Sun ... 6=Sat
+            const weekdayMap: Record<number, 'monday'|'tuesday'|'wednesday'|'thursday'|'friday'> = {
+              1: 'monday', 2: 'tuesday', 3: 'wednesday', 4: 'thursday', 5: 'friday'
+            } as const;
+            if (!(weekday in weekdayMap)) {
+              result = { error: 'Ausgewähltes Datum liegt am Wochenende' }
+              break;
+            }
+            const dayKey = weekdayMap[weekday as 1|2|3|4|5];
+
+            const normalize = (s: string) => s.toLowerCase().replace(/\b(fr\.?|herr|frau|hr\.?|fr\.?)/g, '').trim();
+            const normSick = normalize(teacherName);
+
+            const parseCell = (cell?: string) => {
+              if (!cell) return [] as Array<{subject: string, teacher: string, room: string}>;
+              return cell.split('|').map(s => s.trim()).filter(Boolean).map(sub => {
+                const parts = sub.split(/\s+/);
+                if (parts.length >= 3) {
+                  return { subject: parts[0], teacher: parts[1], room: parts[2] };
+                }
+                return { subject: sub, teacher: '', room: '' } as any;
+              });
+            };
+
+            const classTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
+            const affected: Array<{ className: string, period: number, subject: string, room: string }> = [];
+            const expertise: Record<string, Set<string>> = {};
+
+            for (const table of classTables) {
+              const { data: rows, error } = await supabase.from(table).select('*').order('Stunde');
+              if (error) { console.error('Read schedule error', table, error.message); continue; }
+              for (const row of rows as any[]) {
+                const period = row['Stunde'];
+                const cell = row[dayKey] as string | undefined;
+                const entries = parseCell(cell);
+                // build expertise from all days (simple heuristic)
+                const dayKeys = ['monday','tuesday','wednesday','thursday','friday'] as const;
+                for (const dk of dayKeys) {
+                  const e2 = parseCell(row[dk]);
+                  for (const e of e2) {
+                    const n = normalize(e.teacher);
+                    if (!n) continue;
+                    if (!expertise[n]) expertise[n] = new Set<string>();
+                    if (e.subject) expertise[n].add(e.subject);
+                  }
+                }
+                for (const e of entries) {
+                  if (normalize(e.teacher) === normSick) {
+                    affected.push({ className: table.replace('Stundenplan_', ''), period, subject: e.subject || 'Unbekannt', room: e.room || 'Unbekannt' });
+                  }
+                }
+              }
+            }
+
+            // Helper to check availability of a teacher at given dayKey+period
+            const isFree = async (teacherNorm: string, period: number) => {
+              for (const table of classTables) {
+                const { data: rows } = await supabase.from(table).select('Stunde,'+dayKey).eq('Stunde', period);
+                const row = (rows as any[])[0];
+                if (!row) continue;
+                const entries = parseCell(row[dayKey]);
+                if (entries.some(e => normalize(e.teacher) === teacherNorm)) return false;
+              }
+              return true;
+            };
+
+            const confirmations: string[] = [];
+            for (const a of affected) {
+              // Find candidate
+              let chosen: string | null = null;
+              const candidates = Object.keys(expertise).filter(t => t !== normSick && expertise[t].has(a.subject));
+              for (const cand of candidates) {
+                if (await isFree(cand, a.period)) { chosen = cand; break; }
+              }
+              const chosenDisplay = chosen ? chosen : 'Vertretung';
+
+              // Insert into vertretungsplan
+              await supabase.from('vertretungsplan').insert({
+                date: dateValue.toISOString().split('T')[0],
+                class_name: a.className,
+                period: a.period,
+                original_teacher: teacherName,
+                original_subject: a.subject,
+                original_room: a.room,
+                substitute_teacher: chosenDisplay,
+                substitute_subject: a.subject,
+                substitute_room: a.room,
+                note: 'Automatisch geplant',
+                created_by: null
+              });
+
+              const dateStr = dateValue.toISOString().split('T')[0];
+              confirmations.push(`${chosenDisplay} übernimmt die ${a.period}. Stunde ${a.subject} für ${teacherName} am ${dateStr}.`);
+            }
+
+            if (confirmations.length === 0) {
+              result = { error: 'Keine betroffenen Stunden gefunden' };
+            } else {
+              result = { message: 'Vertretungen geplant', confirmations };
+              success = true;
+            }
+          } catch (e) {
+            console.error('plan_substitution error:', e);
+            result = { error: e.message || 'Fehler bei der Vertretungsplanung' };
+          }
+        } else {
+          result = { error: 'Keine Berechtigung für automatische Vertretungsplanung - Level 9 erforderlich' }
         }
         break
 

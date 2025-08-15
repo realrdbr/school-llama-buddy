@@ -36,14 +36,18 @@ const AIChat = () => {
   // Load conversation when selected
   const loadConversation = async (conversationId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('role, content')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true });
+      const userId = profile?.id?.toString();
+      const { data, error } = await supabase.functions.invoke('chat-service', {
+        body: {
+          action: 'list_messages',
+          conversationId,
+          profileId: userId,
+        }
+      });
 
       if (error) throw error;
-      setConversation((data || []) as ChatMessage[]);
+      const msgs = (data?.messages || []).map((m: any) => ({ role: m.role, content: m.content })) as ChatMessage[];
+      setConversation(msgs);
       setCurrentConversationId(conversationId);
     } catch (error) {
       console.error('Error loading conversation:', error);
@@ -213,15 +217,16 @@ BERECHTIGUNGSLEVEL-SYSTEM:
 - Level 9: KOORDINATION/STELLVERTRETUNG (können Vertretungen erstellen/bearbeiten, Klassen verwalten)
 - Level 10: SCHULLEITUNG/ADMIN (können Benutzer verwalten, alle Systemeinstellungen ändern)
 
-VERFÜGBARE AKTIONEN für Level ${profile?.permission_lvl}:
+Verf fcGBARE AKTIONEN f fcr Level ${profile?.permission_lvl}:
 ${profile?.permission_lvl && profile.permission_lvl >= 10 ? 
-  '- CREATE_USER: Benutzer erstellen (Parameter: email, password, username, fullName, permissionLevel)\n- UPDATE_VERTRETUNGSPLAN: Vertretung erstellen (Parameter: date, className, period, originalTeacher, originalSubject, originalRoom, substituteTeacher, substituteSubject, substituteRoom, note)\n- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- CREATE_TTS: Text-to-Speech Durchsage erstellen (Parameter: text)' :
+  '- CREATE_USER: Benutzer erstellen (Parameter: email, password, username, fullName, permissionLevel)\n- UPDATE_VERTRETUNGSPLAN: Vertretung erstellen (Parameter: date, className, period, originalTeacher, originalSubject, originalRoom, substituteTeacher, substituteSubject, substituteRoom, note)\n- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- CREATE_TTS: Text-to-Speech Durchsage erstellen (Parameter: text)\n- PLAN_SUBSTITUTION: Automatische Vertretung bei Krankmeldung (Parameter: teacherName, date)' :
   profile?.permission_lvl && profile.permission_lvl >= 9 ?
-  '- UPDATE_VERTRETUNGSPLAN: Vertretung erstellen (Parameter: date, className, period, originalTeacher, originalSubject, originalRoom, substituteTeacher, substituteSubject, substituteRoom, note)\n- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)' :
+  '- UPDATE_VERTRETUNGSPLAN: Vertretung erstellen (Parameter: date, className, period, originalTeacher, originalSubject, originalRoom, substituteTeacher, substituteSubject, substituteRoom, note)\n- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- PLAN_SUBSTITUTION: Automatische Vertretung bei Krankmeldung (Parameter: teacherName, date)' :
   profile?.permission_lvl && profile.permission_lvl >= 4 ?
   '- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)' :
   'Keine Aktionen verfügbar'
 }
+
 
 WICHTIGE REGELN:
 1. Du kannst ECHTE AKTIONEN ausführen! Wenn ein Benutzer eine Aktion anfordert, führe sie aus.

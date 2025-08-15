@@ -61,3 +61,6 @@ verify_jwt = false
 
 [functions.ollama-proxy]
 verify_jwt = false
+
+[functions.chat-service]
+verify_jwt = false
