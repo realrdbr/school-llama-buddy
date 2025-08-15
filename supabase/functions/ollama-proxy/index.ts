@@ -15,9 +15,10 @@ serve(async (req) => {
   try {
     const requestBody = await req.json()
 
-    // Forward request to local Ollama instance
-    // Try multiple possible Ollama endpoints for local development
+    // Forward request to Ollama instance
+    // Try public IP first, then fallback to local endpoints for development
     const ollamaUrls = [
+      'http://79.243.36.52:11434/api/chat',
       'http://host.docker.internal:11434/api/chat',
       'http://localhost:11434/api/chat',
       'http://127.0.0.1:11434/api/chat'
