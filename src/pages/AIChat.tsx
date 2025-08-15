@@ -299,7 +299,39 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
             if (actionError) {
               assistantContent += `\n\nFehler bei der Ausführung: ${actionError.message}`;
             } else if (actionResult?.success) {
-              assistantContent += `\n\n✅ ${actionResult.result.message || 'Aktion erfolgreich ausgeführt!'}`;
+              // Render structured data from edge function to avoid Halluzinationen
+              const res = actionResult.result || {};
+              let details = '';
+              switch (actionName.toLowerCase()) {
+                case 'get_teachers': {
+                  const list = (res.teachers || []) as Array<any>;
+                  const lines = list.map((t: any) => `- ${t.firstName} ${t.lastName} (${t.subjects}) [${t.shortened}]`).join('\n');
+                  details = `\n\nLehrkräfte (${list.length}):\n${lines || '- Keine Daten -'}`;
+                  break;
+                }
+                case 'get_schedule': {
+                  const rows = (res.schedule || []) as Array<any>;
+                  if (rows.length && 'entry' in rows[0]) {
+                    // Tagesansicht
+                    const lines = rows.map((r: any) => `Stunde ${r.period}: ${r.entry || '-'}`).join('\n');
+                    details = `\n\nStundenplan (Tag):\n${lines}`;
+                  } else if (rows.length) {
+                    // Wochenansicht (kompakt)
+                    const lines = rows.map((r: any) => `Stunde ${r.period}: Mo:${r.monday||'-'} Di:${r.tuesday||'-'} Mi:${r.wednesday||'-'} Do:${r.thursday||'-'} Fr:${r.friday||'-'}`).join('\n');
+                    details = `\n\nStundenplan (Woche):\n${lines}`;
+                  }
+                  break;
+                }
+                case 'plan_substitution': {
+                  const conf = (res.confirmations || []) as Array<string>;
+                  if (conf.length) details = `\n\nBestätigungen:\n- ${conf.join('\n- ')}`;
+                  break;
+                }
+                default: {
+                  // No special rendering
+                }
+              }
+              assistantContent = `\n\n✅ ${res.message || 'Aktion erfolgreich ausgeführt!'}${details}`;
             } else {
               assistantContent += `\n\n❌ ${actionResult?.result?.error || 'Aktion fehlgeschlagen'}`;
             }
