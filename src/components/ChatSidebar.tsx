@@ -30,6 +30,8 @@ const ChatSidebar = ({ currentConversationId, onConversationSelect, onNewChat }:
     if (!profile?.id) return;
 
     try {
+      const userId = profile.id.toString();
+      
       // Hole Konversationen über Edge Function (um RLS-Probleme zu vermeiden)
       const { data, error } = await supabase.functions.invoke('chat-service', {
         body: {
