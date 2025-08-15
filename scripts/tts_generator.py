@@ -13,18 +13,14 @@ def create_tts_announcement(text, title="TTS Durchsage", voice_rate=200):
         # Initialize the TTS engine
         engine = pyttsx3.init()
         
-        # Set properties
-        engine.setProperty('rate', voice_rate)  # Speed of speech
-        engine.setProperty('volume', 0.9)      # Volume level (0.0 to 1.0)
+        # Set basic properties only
+        try:
+            engine.setProperty('rate', voice_rate)  # Speed of speech
+            engine.setProperty('volume', 0.9)      # Volume level (0.0 to 1.0)
+        except Exception as prop_error:
+            print(f"Warning: Could not set properties: {prop_error}", file=sys.stderr)
         
-        # Try to set German voice if available
-        voices = engine.getProperty('voices')
-        for voice in voices:
-            if 'german' in voice.name.lower() or 'deutsch' in voice.name.lower():
-                engine.setProperty('voice', voice.id)
-                break
-        
-        # Create audio file path
+        # Create audio file path (use WAV for better compatibility)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         audio_file = f"tts_announcement_{timestamp}.wav"
         audio_path = os.path.join(os.getcwd(), "public", "audio", audio_file)
@@ -32,13 +28,13 @@ def create_tts_announcement(text, title="TTS Durchsage", voice_rate=200):
         # Ensure directory exists
         os.makedirs(os.path.dirname(audio_path), exist_ok=True)
         
-        # Save to file
+        # Save to file - just use WAV for now
         engine.save_to_file(text, audio_path)
         engine.runAndWait()
         
-        # Also speak it immediately
-        engine.say(text)
-        engine.runAndWait()
+        # Check if file was actually created
+        if not os.path.exists(audio_path):
+            raise Exception(f"Audio file was not created at {audio_path}")
         
         return {
             "success": True,

@@ -50,6 +50,57 @@ const AudioAnnouncements = () => {
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
 
+  // Helper function for Web Speech API TTS playback
+  const playTTSWithWebSpeech = (announcement: AudioAnnouncement) => {
+    if (!announcement.tts_text) return;
+    
+    if ('speechSynthesis' in window) {
+      speechSynthesis.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(announcement.tts_text);
+      
+      // Try to find a German voice
+      const voices = speechSynthesis.getVoices();
+      const germanVoice = voices.find(voice => 
+        voice.lang.includes('de') || voice.name.includes('German')
+      );
+      
+      if (germanVoice) {
+        utterance.voice = germanVoice;
+      }
+      
+      utterance.lang = 'de-DE';
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+      utterance.volume = 0.8;
+      
+      utterance.onstart = () => {
+        setPlayingId(announcement.id);
+      };
+      
+      utterance.onend = () => {
+        setPlayingId(null);
+      };
+      
+      utterance.onerror = () => {
+        setPlayingId(null);
+        toast({
+          title: "TTS Fehler",
+          description: "Fehler bei der Sprachwiedergabe",
+          variant: "destructive"
+        });
+      };
+      
+      speechSynthesis.speak(utterance);
+    } else {
+      toast({
+        title: "Nicht unterstützt",
+        description: "Text-to-Speech wird in diesem Browser nicht unterstützt",
+        variant: "destructive"
+      });
+    }
+  };
+
   useEffect(() => {
     fetchAnnouncements();
   }, []);
@@ -86,30 +137,57 @@ const AudioAnnouncements = () => {
     
     setLoading(true);
     try {
-      // Erstelle TTS-Durchsage direkt in der Datenbank (lokale Lösung)
-      const { error } = await supabase
-        .from('audio_announcements')
-        .insert({
-          title: ttsForm.title,
-          description: ttsForm.description || `TTS-Durchsage erstellt von ${profile?.username}`,
-          is_tts: true,
-          tts_text: ttsForm.text,
-          voice_id: ttsForm.voice_id,
-          schedule_date: ttsForm.schedule_date || null,
-          is_active: true,
-          created_by: profile?.id?.toString(),
-          duration_seconds: Math.ceil(ttsForm.text.length / 15) // Grobe Schätzung
+      // Try backend TTS first (Python TTS)
+      let backendSuccess = false;
+      try {
+        const { data, error } = await supabase.functions.invoke('python-tts', {
+          body: {
+            text: ttsForm.text,
+            title: ttsForm.title,
+            description: ttsForm.description || `TTS-Durchsage erstellt von ${profile?.username}`,
+            voice_id: ttsForm.voice_id,
+            schedule_date: ttsForm.schedule_date || null,
+            user_id: profile?.username
+          }
         });
-      
-      if (error) {
-        console.error('TTS Error:', error);
-        throw error;
+
+        if (error) throw error;
+        
+        if (data?.success) {
+          backendSuccess = true;
+          toast({
+            title: "Erfolg",
+            description: "TTS-Durchsage wurde erfolgreich mit Backend erstellt"
+          });
+        }
+      } catch (backendError: any) {
+        console.warn('Backend TTS failed, falling back to local storage:', backendError);
+        
+        // Fallback: Create TTS entry in database for Web Speech API playback
+        const { error } = await supabase
+          .from('audio_announcements')
+          .insert({
+            title: ttsForm.title,
+            description: ttsForm.description || `TTS-Durchsage erstellt von ${profile?.username}`,
+            is_tts: true,
+            tts_text: ttsForm.text,
+            voice_id: ttsForm.voice_id,
+            schedule_date: ttsForm.schedule_date || null,
+            is_active: true,
+            created_by: profile?.id?.toString(),
+            duration_seconds: Math.ceil(ttsForm.text.length / 15) // Grobe Schätzung
+          });
+        
+        if (error) {
+          console.error('Fallback TTS Error:', error);
+          throw error;
+        }
+        
+        toast({
+          title: "Erfolg",
+          description: "TTS-Durchsage wurde erfolgreich erstellt (Fallback zu Web Speech API)"
+        });
       }
-      
-      toast({
-        title: "Erfolg",
-        description: "TTS-Durchsage wurde erfolgreich erstellt (lokale TTS)"
-      });
       
       // Reset form
       setTtsForm({
@@ -199,49 +277,32 @@ const AudioAnnouncements = () => {
       let audioUrl = '';
 
       if (announcement.is_tts && announcement.tts_text) {
-        // For TTS, use the Web Speech API directly
-        if ('speechSynthesis' in window) {
-          speechSynthesis.cancel();
+        // For TTS, first try backend-generated audio file, then fallback to Web Speech API
+        if (announcement.audio_file_path) {
+          // Backend-generated audio file exists
+          const audioUrl = `/audio/${announcement.audio_file_path}`;
           
-          const utterance = new SpeechSynthesisUtterance(announcement.tts_text);
-          
-          // Try to find a German voice
-          const voices = speechSynthesis.getVoices();
-          const germanVoice = voices.find(voice => 
-            voice.lang.includes('de') || voice.name.includes('German')
-          );
-          
-          if (germanVoice) {
-            utterance.voice = germanVoice;
+          try {
+            const audio = new Audio(audioUrl);
+            audio.onplay = () => setPlayingId(announcement.id);
+            audio.onended = () => setPlayingId(null);
+            audio.onerror = () => {
+              // If backend audio fails, fallback to Web Speech API
+              console.warn('Backend audio failed, falling back to Web Speech API');
+              playTTSWithWebSpeech(announcement);
+            };
+
+            setCurrentAudio(audio);
+            await audio.play();
+            return;
+          } catch (error) {
+            console.warn('Failed to play backend audio, falling back to Web Speech API:', error);
           }
-          
-          utterance.lang = 'de-DE';
-          utterance.rate = 0.9;
-          utterance.pitch = 1;
-          utterance.volume = 0.8;
-          
-          utterance.onstart = () => {
-            setPlayingId(announcement.id);
-          };
-          
-          utterance.onend = () => {
-            setPlayingId(null);
-          };
-          
-          utterance.onerror = () => {
-            setPlayingId(null);
-            toast({
-              title: "TTS Fehler",
-              description: "Fehler bei der Sprachwiedergabe",
-              variant: "destructive"
-            });
-          };
-          
-          speechSynthesis.speak(utterance);
-          return;
-        } else {
-          throw new Error('Web Speech API nicht unterstützt');
         }
+        
+        // Fallback to Web Speech API
+        playTTSWithWebSpeech(announcement);
+        return;
       } else if (announcement.audio_file_path) {
         // For uploaded audio files
         const { data } = supabase.storage
