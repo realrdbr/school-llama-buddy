@@ -7,9 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Calendar, Plus, Edit, Trash2, Clock } from 'lucide-react';
+import { ArrowLeft, Calendar, Plus, Edit, Trash2, Clock, Bot } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import RoleBasedLayout from '@/components/RoleBasedLayout';
+import AIVertretungsGenerator from '@/components/AIVertretungsGenerator';
 import DebugVertretungsplan from '@/components/DebugVertretungsplan';
 
 interface SubstitutionEntry {
@@ -428,6 +430,11 @@ const Vertretungsplan = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-6">
+          
+          {/* AI Generator - nur für Schulleitung */}
+          <RoleBasedLayout requiredPermission={10}>
+            <AIVertretungsGenerator onGenerated={fetchSubstitutions} />
+          </RoleBasedLayout>
           {/* Schedule Table */}
           <Card>
             <CardHeader>

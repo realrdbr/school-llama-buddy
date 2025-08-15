@@ -88,7 +88,7 @@ serve(async (req) => {
             substitute_subject: parameters.substituteSubject || parameters.substitute_subject || 'Vertretung',
             substitute_room: parameters.substituteRoom || parameters.substitute_room || 'Unbekannt',
             note: parameters.note || 'Keine Notizen',
-            created_by: null
+            created_by: userProfile.user_id || null
           }
           
           console.log('Inserting data:', insertData)

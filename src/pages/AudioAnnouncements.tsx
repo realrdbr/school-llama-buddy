@@ -36,7 +36,7 @@ const AudioAnnouncements = () => {
     title: '',
     description: '',
     text: '',
-    voice_id: 'alloy',
+    voice_id: 'Aria',
     schedule_date: ''
   });
 
@@ -88,21 +88,16 @@ const AudioAnnouncements = () => {
     try {
       console.log('Submitting TTS with user:', profile?.username);
       
-      // Erstelle TTS-Eintrag direkt in der Datenbank (ohne Python-Script)
-      const { data, error } = await supabase
-        .from('audio_announcements')
-        .insert({
+      // Verwende ElevenLabs TTS Edge Function
+      const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
+        body: {
+          text: ttsForm.text,
+          voice_id: ttsForm.voice_id,
           title: ttsForm.title,
           description: ttsForm.description || `TTS-Durchsage erstellt von ${profile?.username}`,
-          is_tts: true,
-          tts_text: ttsForm.text,
-          voice_id: ttsForm.voice_id,
-          schedule_date: ttsForm.schedule_date ? new Date(ttsForm.schedule_date).toISOString() : null,
-          is_active: true,
-          created_by: profile?.user_id || null
-        })
-        .select()
-        .single();
+          user_id: profile?.user_id
+        }
+      });
       
       console.log('TTS Response:', { data, error });
       
@@ -111,10 +106,10 @@ const AudioAnnouncements = () => {
         throw error;
       }
       
-      if (data) {
+      if (data?.success) {
         toast({
           title: "Erfolg",
-          description: "TTS-Durchsage wurde erstellt"
+          description: "TTS-Durchsage wurde mit ElevenLabs erstellt"
         });
         
         // Reset form
@@ -122,14 +117,14 @@ const AudioAnnouncements = () => {
           title: '',
           description: '',
           text: '',
-          voice_id: 'alloy',
+          voice_id: 'Aria',
           schedule_date: ''
         });
         
         // Refresh announcements
         fetchAnnouncements();
       } else {
-        throw new Error('TTS-Durchsage konnte nicht erstellt werden');
+        throw new Error(data?.error || 'TTS-Durchsage konnte nicht erstellt werden');
       }
     } catch (error: any) {
       console.error('TTS Submit Error:', error);
