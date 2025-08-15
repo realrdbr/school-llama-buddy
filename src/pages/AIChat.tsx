@@ -12,6 +12,9 @@ import ChatSidebar from '@/components/ChatSidebar';
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  id?: string;
+  timestamp?: Date;
+  metadata?: any;
 }
 
 const AIChat = () => {
@@ -24,6 +27,52 @@ const AIChat = () => {
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const addMessage = (role: 'user' | 'assistant', content: string, metadata?: any) => {
+    const message: ChatMessage = {
+      id: Date.now().toString(),
+      role,
+      content,
+      timestamp: new Date(),
+      metadata
+    };
+    
+    setConversation(prev => [...prev, message]);
+  };
+
+  const handleConfirmSubstitution = async (substitutionData: any) => {
+    try {
+      setIsLoading(true);
+      
+      const actionResult = await supabase.functions.invoke('ai-actions', {
+        body: { 
+          action: 'confirm_substitution', 
+          parameters: { substitution_data: substitutionData }, 
+          userProfile: {
+            user_id: profile?.id,
+            name: profile?.username || profile?.name,
+            permission_lvl: profile?.permission_lvl
+          }
+        }
+      });
+
+      if (actionResult.error) {
+        throw new Error(actionResult.error.message);
+      }
+
+      const result = actionResult.data;
+      if (result.success) {
+        addMessage('assistant', result.result.message || 'Vertretungsplan wurde erfolgreich erstellt!');
+      } else {
+        addMessage('assistant', result.result.error || 'Fehler beim Erstellen des Vertretungsplans');
+      }
+    } catch (error) {
+      console.error('Error confirming substitution:', error);
+      addMessage('assistant', 'Fehler beim Bestätigen der Vertretung');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -299,8 +348,27 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
             if (actionError) {
               assistantContent += `\n\nFehler bei der Ausführung: ${actionError.message}`;
             } else if (actionResult?.success) {
-              // Render structured data from edge function to avoid Halluzinationen
               const res = actionResult.result || {};
+              
+              // Check if this is a substitution plan that needs confirmation
+              if (res.confirmation_needed && res.substitution_data) {
+                const assistantResponse = {
+                  role: 'assistant' as const,
+                  content: res.message,
+                  id: Date.now().toString(),
+                  timestamp: new Date(),
+                  metadata: {
+                    type: 'substitution_confirmation',
+                    data: res.substitution_data
+                  }
+                };
+                
+                setConversation(prev => [...prev, assistantResponse]);
+                setIsLoading(false);
+                return; // Exit early to avoid double message
+              }
+              
+              // Render structured data from edge function to avoid Halluzinationen
               let details = '';
               switch (actionName.toLowerCase()) {
                 case 'get_teachers': {
@@ -355,7 +423,9 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
       
       const assistantResponse = {
         role: 'assistant' as const,
-        content: assistantContent
+        content: assistantContent,
+        id: Date.now().toString(),
+        timestamp: new Date()
       };
       
       setConversation(prev => [...prev, assistantResponse]);
@@ -468,21 +538,43 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
                   <div className="flex-1 space-y-4 overflow-y-auto max-h-[60vh]">
                     {conversation.map((message, index) => (
                       <div
-                        key={index}
+                        key={message.id || index}
                         className={`p-4 rounded-lg ${
                           message.role === 'user'
                             ? 'bg-primary text-primary-foreground ml-8'
                             : 'bg-muted mr-8'
                         }`}
                       >
-                         <div 
-                           className="prose prose-sm max-w-none dark:prose-invert"
-                           dangerouslySetInnerHTML={{ 
-                             __html: message.content
-                               .replace(/\n/g, '<br>')
-                               .replace(/```([^`]+)```/g, '<pre style="background:#f5f5f5;padding:8px;border-radius:4px;overflow-x:auto;"><code>$1</code></pre>')
-                           }}
-                         />
+                        {message.metadata?.type === 'substitution_confirmation' ? (
+                          <div>
+                            <div className="whitespace-pre-line">{message.content}</div>
+                            <div className="mt-4 flex gap-2">
+                              <Button 
+                                onClick={() => handleConfirmSubstitution(message.metadata.data)}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                                disabled={isLoading}
+                              >
+                                ✅ Vertretungsplan erstellen
+                              </Button>
+                              <Button 
+                                variant="outline"
+                                onClick={() => addMessage('assistant', 'Vertretungsplanung abgebrochen.')}
+                                disabled={isLoading}
+                              >
+                                ❌ Abbrechen
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div 
+                            className="prose prose-sm max-w-none dark:prose-invert"
+                            dangerouslySetInnerHTML={{ 
+                              __html: message.content
+                                .replace(/\n/g, '<br>')
+                                .replace(/```([^`]+)```/g, '<pre style="background:#f5f5f5;padding:8px;border-radius:4px;overflow-x:auto;"><code>$1</code></pre>')
+                            }}
+                          />
+                        )}
                       </div>
                     ))}
                      {isLoading && (

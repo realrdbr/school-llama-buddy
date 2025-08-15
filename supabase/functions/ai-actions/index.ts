@@ -279,6 +279,24 @@ serve(async (req) => {
 
             console.log(`E.D.U.A.R.D. found sick teacher: ${sickTeacherShortened} (${teacherMap[sickTeacherShortened].name})`);
 
+            // Dynamically discover all schedule tables
+            const { data: allTables, error: tablesError } = await supabase
+              .rpc('sql', { 
+                query: `SELECT table_name FROM information_schema.tables 
+                        WHERE table_schema = 'public' 
+                        AND table_name LIKE 'Stundenplan_%'` 
+              });
+
+            let classTables: string[] = [];
+            if (!tablesError && allTables) {
+              classTables = allTables.map((row: any) => row.table_name);
+            } else {
+              // Fallback to known tables
+              classTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
+            }
+
+            console.log('Available schedule tables:', classTables);
+
             // Parse schedule entries
             const parseCell = (cell?: string) => {
               if (!cell) return [] as Array<{subject: string, teacher: string, room: string}>;
@@ -290,10 +308,6 @@ serve(async (req) => {
                 return { subject: sub, teacher: '', room: '' } as any;
               });
             };
-
-            // Get all schedule tables
-            const { data: tables } = await supabase.rpc('information_schema_tables') || {};
-            const classTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A']; // Known tables for now
 
             const affected: Array<{ 
               className: string, 
@@ -330,6 +344,15 @@ serve(async (req) => {
 
             console.log(`Found ${affected.length} affected lessons:`, affected);
 
+            if (affected.length === 0) {
+              result = { 
+                message: `E.D.U.A.R.D.: Keine Stunden von ${teacherMap[sickTeacherShortened].name} am ${dateValue.toLocaleDateString('de-DE')} gefunden.`,
+                confirmation_needed: false
+              };
+              success = true;
+              break;
+            }
+
             // Helper to check if a teacher is available at a specific time
             const isTeacherAvailable = async (teacherShortened: string, period: number): Promise<boolean> => {
               for (const table of classTables) {
@@ -346,15 +369,16 @@ serve(async (req) => {
               return true; // Teacher is free
             };
 
-            // Find substitute teachers and create substitution entries
-            const confirmations: string[] = [];
-            const substitutions: Array<{
+            // Find substitute teachers for each affected lesson
+            const proposedSubstitutions: Array<{
               period: number;
               className: string;
               subject: string;
               originalTeacher: string;
               substituteTeacher: string;
+              substituteShortened: string;
               room: string;
+              note: string;
             }> = [];
 
             for (const lesson of affected) {
@@ -390,62 +414,60 @@ serve(async (req) => {
                 }
               }
 
-              const substituteTeacher = bestSubstitute || 'Vertretung';
-              const substituteTeacherName = bestSubstitute ? teacherMap[bestSubstitute].name : 'Vertretung';
+              const substituteShortened = bestSubstitute || 'VER';
+              const substituteTeacher = bestSubstitute ? teacherMap[bestSubstitute].name : 'Vertretung';
+              const note = bestSubstitute ? 
+                `${substituteTeacher} kann ${lesson.subject} unterrichten` : 
+                'Keine passende Lehrkraft verfügbar';
 
-              // Insert into vertretungsplan
-              const { error: insertError } = await supabase.from('vertretungsplan').insert({
-                date: dateValue.toISOString().split('T')[0],
-                class_name: lesson.className,
-                period: lesson.period,
-                original_teacher: teacherMap[sickTeacherShortened].name,
-                original_subject: lesson.subject,
-                original_room: lesson.room,
-                substitute_teacher: substituteTeacherName,
-                substitute_subject: lesson.subject,
-                substitute_room: lesson.room,
-                note: bestSubstitute ? 
-                  `E.D.U.A.R.D.: ${substituteTeacherName} kann ${lesson.subject} unterrichten` : 
-                  'E.D.U.A.R.D.: Keine passende Lehrkraft verfügbar',
-                created_by: null
-              });
-
-              if (insertError) {
-                console.error('Error inserting substitution:', insertError);
-                continue;
-              }
-
-              substitutions.push({
+              proposedSubstitutions.push({
                 period: lesson.period,
                 className: lesson.className,
                 subject: lesson.subject,
                 originalTeacher: teacherMap[sickTeacherShortened].name,
-                substituteTeacher: substituteTeacherName,
-                room: lesson.room
+                substituteTeacher,
+                substituteShortened,
+                room: lesson.room,
+                note
               });
-
-              const dateStr = dateValue.toLocaleDateString('de-DE');
-              const confirmation = `${substituteTeacherName} übernimmt die ${lesson.period}. Stunde ${lesson.subject} in Klasse ${lesson.className} für ${teacherMap[sickTeacherShortened].name} am ${dateStr} (Raum ${lesson.room}).`;
-              confirmations.push(confirmation);
             }
 
-            if (confirmations.length === 0) {
-              result = { 
-                error: `Keine Unterrichtsstunden für ${teacherMap[sickTeacherShortened]?.name || teacherName} am ${dateValue.toLocaleDateString('de-DE')} gefunden.` 
-              };
-            } else {
-              result = { 
-                message: `Vertretungsplan für ${teacherMap[sickTeacherShortened].name} erfolgreich erstellt`,
-                confirmations,
-                details: {
-                  sickTeacher: teacherMap[sickTeacherShortened].name,
-                  date: dateValue.toLocaleDateString('de-DE'),
-                  affectedLessons: affected.length,
-                  substitutions
-                }
-              };
-              success = true;
-            }
+            // Create summary message with proposed substitutions
+            const summaryLines = [
+              `**Vertretungsplanung für ${teacherMap[sickTeacherShortened].name} am ${dateStr}**`,
+              `\nBetroffene Stunden: ${affected.length}`,
+              '\n**Vorgeschlagene Vertretungen:**'
+            ];
+
+            proposedSubstitutions.forEach(sub => {
+              summaryLines.push(
+                `• ${sub.period}. Stunde: ${sub.className} - ${sub.subject} (${sub.room})`
+              );
+              summaryLines.push(`  → ${sub.substituteTeacher} (${sub.note})`);
+            });
+
+            result = {
+              message: summaryLines.join('\n'),
+              confirmation_needed: true,
+              substitution_data: {
+                sick_teacher: teacherMap[sickTeacherShortened].name,
+                date: dateValue.toISOString().split('T')[0],
+                substitutions: proposedSubstitutions.map(sub => ({
+                  date: dateValue.toISOString().split('T')[0],
+                  class_name: sub.className,
+                  period: sub.period,
+                  original_teacher: sub.originalTeacher,
+                  original_subject: sub.subject,
+                  original_room: sub.room,
+                  substitute_teacher: sub.substituteTeacher,
+                  substitute_subject: sub.subject,
+                  substitute_room: sub.room,
+                  note: `E.D.U.A.R.D.: ${sub.note}`,
+                  created_by: null
+                }))
+              }
+            };
+            success = true;
 
           } catch (e) {
             console.error('plan_substitution error:', e);
