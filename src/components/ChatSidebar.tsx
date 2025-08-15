@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, MessageSquare, Trash2 } from 'lucide-react';
+import { Plus, MessageSquare, Trash2, TrashIcon } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -85,6 +85,36 @@ const ChatSidebar = ({ currentConversationId, onConversationSelect, onNewChat }:
     }
   };
 
+  const deleteAllConversations = async () => {
+    if (!profile?.id) return;
+
+    try {
+      const userId = profile.id.toString();
+      
+      const { error } = await supabase
+        .from('chat_conversations')
+        .delete()
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      setConversations([]);
+      onConversationSelect(null);
+
+      toast({
+        title: "Erfolg",
+        description: "Alle Chats wurden gelöscht"
+      });
+    } catch (error) {
+      console.error('Error deleting all conversations:', error);
+      toast({
+        title: "Fehler",
+        description: "Chats konnten nicht gelöscht werden",
+        variant: "destructive"
+      });
+    }
+  };
+
   useEffect(() => {
     fetchConversations();
   }, [profile?.id]);
@@ -104,11 +134,22 @@ const ChatSidebar = ({ currentConversationId, onConversationSelect, onNewChat }:
 
   return (
     <div className="w-80 border-r bg-card flex flex-col">
-      <div className="p-4 border-b">
+      <div className="p-4 border-b space-y-2">
         <Button onClick={onNewChat} className="w-full">
           <Plus className="h-4 w-4 mr-2" />
           Neuer Chat
         </Button>
+        {conversations.length > 0 && (
+          <Button 
+            onClick={deleteAllConversations} 
+            variant="outline" 
+            size="sm" 
+            className="w-full text-destructive hover:bg-destructive hover:text-destructive-foreground"
+          >
+            <TrashIcon className="h-4 w-4 mr-2" />
+            Alle löschen
+          </Button>
+        )}
       </div>
 
       <ScrollArea className="flex-1">
