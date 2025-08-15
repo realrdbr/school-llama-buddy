@@ -446,6 +446,55 @@ serve(async (req) => {
         }
         break
 
+      case 'get_schedule': {
+        try {
+          const className = (parameters.className || parameters.klasse || '10b').toString().trim().toLowerCase();
+          const dayParam = (parameters.day || parameters.tag || '').toString().trim().toLowerCase();
+          const tableMap: Record<string, string> = { '10b': 'Stundenplan_10b_A', '10c': 'Stundenplan_10c_A' };
+          const table = tableMap[className];
+          if (!table) {
+            result = { error: `Unbekannte Klasse: ${className}` };
+            break;
+          }
+
+          const { data: rows, error } = await supabase.from(table).select('*').order('Stunde');
+          if (error) throw error;
+
+          const normalizeDay = (d: string) => {
+            const map: Record<string, string> = { montag:'monday', dienstag:'tuesday', mittwoch:'wednesday', donnerstag:'thursday', freitag:'friday' };
+            return map[d] || d;
+          };
+          const dayKey = dayParam ? normalizeDay(dayParam) : null;
+
+          const schedule = (rows || []).map((r: any) => {
+            const period = r['Stunde'];
+            const entry = dayKey ? r[dayKey as keyof typeof r] : null;
+            return dayKey
+              ? { period, entry }
+              : {
+                  period,
+                  monday: r['monday'],
+                  tuesday: r['tuesday'],
+                  wednesday: r['wednesday'],
+                  thursday: r['thursday'],
+                  friday: r['friday'],
+                };
+          });
+
+          result = {
+            message: dayKey
+              ? `Stundenplan für Klasse ${className.toUpperCase()} am ${dayParam.charAt(0).toUpperCase() + dayParam.slice(1)}`
+              : `Stundenplan (Woche) für Klasse ${className.toUpperCase()}`,
+            schedule,
+          };
+          success = true;
+        } catch (e: any) {
+          console.error('get_schedule error:', e);
+          result = { error: e.message || 'Fehler beim Laden des Stundenplans' };
+        }
+        break
+      }
+
       default:
         result = { error: 'Unbekannte Aktion' }
     }

@@ -38,12 +38,46 @@ const AIVertretungsGenerator = ({ onGenerated }: AIVertretungsGeneratorProps) =>
 
     setLoading(true);
     try {
+      // Extrahiere Lehrkraft und Datum aus dem Prompt
+      const text = prompt.trim();
+
+      // Lehrkraft: suche nach "Herr/Frau <Name>" oder nehme den ersten Eigennamen
+      const nameMatch = text.match(/(?:herr|frau)\s+([A-Za-zÄÖÜäöüß-]+)/i) || text.match(/\b([A-ZÄÖÜ][a-zäöüß-]{2,})\b/);
+      const teacherName = nameMatch ? nameMatch[1] : text;
+
+      // Datum: heute | morgen | übermorgen | Wochentag (nächster)
+      const weekdayMatch = text.match(/montag|dienstag|mittwoch|donnerstag|freitag|heute|morgen|übermorgen/i);
+      const now = new Date();
+      let targetDate = new Date(now);
+      const toISO = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().split('T')[0];
+
+      if (weekdayMatch) {
+        const w = weekdayMatch[0].toLowerCase();
+        if (w === 'heute') {
+          // heute
+        } else if (w === 'morgen') {
+          targetDate.setDate(targetDate.getDate() + 1);
+        } else if (w === 'übermorgen') {
+          targetDate.setDate(targetDate.getDate() + 2);
+        } else {
+          const map: Record<string, number> = { montag: 1, dienstag: 2, mittwoch: 3, donnerstag: 4, freitag: 5 };
+          const targetDow = map[w];
+          const todayDow = targetDate.getDay(); // 0..6
+          const todayMap: Record<number, number> = { 0: 7, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6 };
+          const cur = todayMap[todayDow];
+          let diff = targetDow - cur;
+          if (diff < 0) diff += 7;
+          if (diff === 0) diff = 7; // wenn gleicher Tag genannt, nimm nächste Woche
+          targetDate.setDate(targetDate.getDate() + diff);
+        }
+      }
+
       const { data, error } = await supabase.functions.invoke('ai-actions', {
         body: {
           action: 'plan_substitution',
           parameters: {
-            teacherName: prompt,
-            date: 'today'
+            teacherName,
+            date: toISO(targetDate)
           },
           userProfile: {
             user_id: profile?.id,
