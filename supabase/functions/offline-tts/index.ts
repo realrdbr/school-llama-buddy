@@ -47,6 +47,9 @@ serve(async (req) => {
 
     console.log('User profile lookup:', { userProfile })
 
+    // Generate a UUID for created_by - use user's UUID if available, otherwise generate one
+    const createdByUuid = userProfile?.user_id || crypto.randomUUID()
+
     // Create TTS announcement record with proper created_by
     const { data: announcement, error: insertError } = await supabase
       .from('audio_announcements')
@@ -57,7 +60,7 @@ serve(async (req) => {
         tts_text: text,
         voice_id,
         schedule_date: schedule_date ? new Date(schedule_date).toISOString() : null,
-        created_by: userProfile?.user_id || null, // Use actual UUID if available
+        created_by: createdByUuid, // Use valid UUID
         is_active: true
       })
       .select()

@@ -307,10 +307,31 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
       }
     } catch (error) {
       console.error('Ollama error:', error);
+      
+      // Try to get detailed error message from the proxy response
+      let errorMessage = "Ollama-Server nicht erreichbar. Stellen Sie sicher, dass Ollama läuft und das Modell 'llama3.1:8b' installiert ist.";
+      let errorDetails = "";
+      
+      if (error && typeof error === 'object' && 'message' in error) {
+        const errorObj = error as any;
+        if (errorObj.message && errorObj.message.includes('details')) {
+          try {
+            const parsedError = JSON.parse(errorObj.message);
+            if (parsedError.details) {
+              errorDetails = parsedError.details;
+            }
+          } catch {
+            // If parsing fails, use the message as is
+            errorMessage = errorObj.message;
+          }
+        }
+      }
+      
       toast({
-        title: "Fehler",
-        description: "Ollama-Server nicht erreichbar. Stellen Sie sicher, dass Ollama läuft und das Modell 'llama3.1:8b' installiert ist.",
-        variant: "destructive"
+        title: "Ollama-Verbindungsfehler",
+        description: errorDetails || errorMessage,
+        variant: "destructive",
+        duration: 10000 // Show for 10 seconds to give time to read troubleshooting info
       });
     } finally {
       setIsLoading(false);
