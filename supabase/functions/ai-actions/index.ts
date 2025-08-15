@@ -183,7 +183,7 @@ serve(async (req) => {
               break;
             }
 
-            console.log(`Planning substitution for ${teacherName} on ${dateParam}`);
+            console.log(`E.D.U.A.R.D. planning substitution for ${teacherName} on ${dateParam}`);
 
             // Parse date and weekday
             let dateValue = new Date();
@@ -203,7 +203,7 @@ serve(async (req) => {
             } as const;
             
             if (!(weekday in weekdayMap)) {
-              result = { error: 'Ausgewähltes Datum liegt am Wochenende' }
+              result = { error: 'E.D.U.A.R.D.: Ausgewähltes Datum liegt am Wochenende' }
               break;
             }
             const dayKey = weekdayMap[weekday as 1|2|3|4|5];
@@ -214,8 +214,8 @@ serve(async (req) => {
               .select('*');
 
             if (teachersError) {
-              console.error('Error loading teachers:', teachersError);
-              result = { error: 'Fehler beim Laden der Lehrerdaten' };
+              console.error('E.D.U.A.R.D. Error loading teachers:', teachersError);
+              result = { error: 'E.D.U.A.R.D.: Fehler beim Laden der Lehrerdaten' };
               break;
             }
 
@@ -263,11 +263,11 @@ serve(async (req) => {
             }
 
             if (!sickTeacherShortened) {
-              result = { error: `Lehrkraft "${teacherName}" nicht in der Datenbank gefunden` };
+              result = { error: `E.D.U.A.R.D.: Lehrkraft "${teacherName}" nicht in der Datenbank gefunden` };
               break;
             }
 
-            console.log(`Found sick teacher: ${sickTeacherShortened} (${teacherMap[sickTeacherShortened].name})`);
+            console.log(`E.D.U.A.R.D. found sick teacher: ${sickTeacherShortened} (${teacherMap[sickTeacherShortened].name})`);
 
             // Parse schedule entries
             const parseCell = (cell?: string) => {
@@ -395,8 +395,8 @@ serve(async (req) => {
                 substitute_subject: lesson.subject,
                 substitute_room: lesson.room,
                 note: bestSubstitute ? 
-                  `Automatisch geplant - ${substituteTeacherName} kann ${lesson.subject} unterrichten` : 
-                  'Automatisch geplant - Keine passende Lehrkraft verfügbar',
+                  `E.D.U.A.R.D.: ${substituteTeacherName} kann ${lesson.subject} unterrichten` : 
+                  'E.D.U.A.R.D.: Keine passende Lehrkraft verfügbar',
                 created_by: null
               });
 

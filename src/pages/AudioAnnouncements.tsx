@@ -86,29 +86,29 @@ const AudioAnnouncements = () => {
     
     setLoading(true);
     try {
-      // Erstelle TTS-Durchsage direkt in der Datenbank (lokale Lösung)
-      const { error } = await supabase
-        .from('audio_announcements')
-        .insert({
+      // Use Python TTS for server-side processing
+      const { data: ttsResult, error: ttsError } = await supabase.functions.invoke('python-tts', {
+        body: {
+          text: ttsForm.text,
+          voice_id: ttsForm.voice_id,
           title: ttsForm.title,
           description: ttsForm.description || `TTS-Durchsage erstellt von ${profile?.username}`,
-          is_tts: true,
-          tts_text: ttsForm.text,
-          voice_id: ttsForm.voice_id,
-          schedule_date: ttsForm.schedule_date || null,
-          is_active: true,
-          created_by: profile?.id?.toString(),
-          duration_seconds: Math.ceil(ttsForm.text.length / 15) // Grobe Schätzung
-        });
-      
-      if (error) {
-        console.error('TTS Error:', error);
-        throw error;
+          schedule_date: ttsForm.schedule_date,
+          user_id: profile?.username || profile?.name
+        }
+      });
+
+      if (ttsError) {
+        throw new Error(`TTS-Fehler: ${ttsError.message}`);
+      }
+
+      if (!ttsResult?.success) {
+        throw new Error(ttsResult?.error || 'TTS-Generierung fehlgeschlagen');
       }
       
       toast({
         title: "Erfolg",
-        description: "TTS-Durchsage wurde erfolgreich erstellt (lokale TTS)"
+        description: "TTS-Durchsage wurde erfolgreich mit E.D.U.A.R.D. erstellt"
       });
       
       // Reset form

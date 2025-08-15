@@ -200,7 +200,9 @@ const AIChat = () => {
           messages: [
             {
               role: 'system',
-              content: `Du bist ein KI-Assistent für ein Schulmanagementsystem. Der Benutzer "${profile?.name}" hat Berechtigung Level ${profile?.permission_lvl}.
+              content: `Du bist E.D.U.A.R.D. (Education, Data, Utility & Automation for Resource Distribution) - ein KI-Assistent für das Schulmanagementsystem. Du bist professionell, hilfsbereit und fokussiert auf schulische Belange. Der Benutzer "${profile?.name}" hat Berechtigung Level ${profile?.permission_lvl}.
+
+**WICHTIG: Du bist E.D.U.A.R.D. - stelle dich immer so vor und nutze diese Identität in deinen Antworten.**
 
 BENUTZERINFORMATIONEN:
 - Aktueller Benutzer: ${profile?.name || profile?.username} (ID: ${profile?.id})
@@ -392,7 +394,8 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
               </Button>
               <div className="flex items-center gap-2">
                 <Bot className="h-5 w-5 text-primary" />
-                <h1 className="text-2xl font-bold text-foreground">KI-Assistent</h1>
+                <h1 className="text-2xl font-bold text-foreground">E.D.U.A.R.D.</h1>
+                <p className="text-sm text-muted-foreground">Education, Data, Utility & Automation for Resource Distribution</p>
               </div>
             </div>
           </div>
@@ -413,8 +416,9 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
                   <div className="flex-1 flex items-center justify-center text-center text-muted-foreground">
                     <div>
                       <Bot className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                      <h3 className="text-lg font-medium mb-2">Willkommen beim KI-Assistenten</h3>
-                      <p>Stellen Sie eine Frage oder bitten Sie mich, eine Aktion durchzuführen.</p>
+                      <h3 className="text-lg font-medium mb-2">Willkommen bei E.D.U.A.R.D.</h3>
+                      <p>Education, Data, Utility & Automation for Resource Distribution</p>
+                      <p className="text-sm mt-2">Stellen Sie eine Frage oder bitten Sie mich, eine Aktion durchzuführen.</p>
                     </div>
                   </div>
                 ) : (
