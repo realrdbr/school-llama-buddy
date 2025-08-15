@@ -68,7 +68,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(dummyUser);
       setProfile({
         id: userData.id,
-        user_id: userData.username, // Use username as user_id for our custom auth
+        user_id: userData.id.toString(), // Use numeric ID as string to avoid UUID conflicts
         username: userData.username,
         name: userData.name,
         permission_lvl: userData.permission_lvl,

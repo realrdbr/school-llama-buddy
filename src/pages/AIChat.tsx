@@ -187,12 +187,9 @@ const AIChat = () => {
         }
       }
 
-      const response = await fetch('http://localhost:11434/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      // Use Supabase Edge Function as proxy to avoid CORS issues
+      const { data: responseData, error: proxyError } = await supabase.functions.invoke('ollama-proxy', {
+        body: {
           model: 'llama3.1:8b',
           messages: [
             {
@@ -235,14 +232,14 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
             { role: 'user', content: currentInput + fileContext }
           ],
           stream: false
-        }),
+        }
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (proxyError) {
+        throw new Error(`Proxy error: ${proxyError.message}`);
       }
 
-      const data = await response.json();
+      const data = responseData;
       let assistantContent = data.message.content;
       
       // Check if AI wants to perform an action
