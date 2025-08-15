@@ -96,9 +96,9 @@ const Auth = () => {
             <div className="mx-auto mb-4 w-12 h-12 bg-primary rounded-full flex items-center justify-center">
               <School className="h-6 w-6 text-primary-foreground" />
             </div>
-            <CardTitle className="text-2xl font-bold">E.D.U.A.R.T.</CardTitle>
+            <CardTitle className="text-2xl font-bold">E.D.U.A.R.D.</CardTitle>
             <CardDescription>
-              Schulmanagementsystem - Anmeldung
+              Education, Data, Utility & Automation for Resource Distribution
             </CardDescription>
           </CardHeader>
           <CardContent>

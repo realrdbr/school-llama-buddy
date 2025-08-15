@@ -40,23 +40,28 @@ const AIVertretungsGenerator = ({ onGenerated }: AIVertretungsGeneratorProps) =>
     try {
       const { data, error } = await supabase.functions.invoke('ai-actions', {
         body: {
-          action: 'generate_vertretungsplan',
+          action: 'plan_substitution',
           parameters: {
-            prompt: prompt,
-            context: 'automatic_generation'
+            teacherName: prompt,
+            date: 'today'
           },
-          userProfile: profile
+          userProfile: {
+            user_id: profile?.id,
+            name: profile?.name || profile?.username,
+            permission_lvl: profile?.permission_lvl
+          }
         }
       });
 
       if (error) throw error;
 
       if (data.success) {
+        const result = data.result;
         toast({
-          title: "AI-Vertretungsplan generiert",
-          description: data.result.message
+          title: 'Vertretungsplanung',
+          description: result.message || 'Planung abgeschlossen.'
         });
-        setSuggestions(data.result.suggestions || []);
+        setSuggestions(result.confirmations || result.suggestions || []);
         onGenerated?.();
       } else {
         throw new Error(data.result.error);

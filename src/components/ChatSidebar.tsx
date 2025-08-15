@@ -58,12 +58,16 @@ const ChatSidebar = ({ currentConversationId, onConversationSelect, onNewChat }:
     e.stopPropagation();
     
     try {
-      const { error } = await supabase
-        .from('chat_conversations')
-        .delete()
-        .eq('id', conversationId);
+      const userId = profile?.id?.toString();
+      const { data, error } = await supabase.functions.invoke('chat-service', {
+        body: {
+          action: 'delete_conversation',
+          profileId: userId,
+          conversationId,
+        }
+      });
 
-      if (error) throw error;
+      if (error || !data?.success) throw (error || new Error('Delete failed'));
 
       setConversations(prev => prev.filter(conv => conv.id !== conversationId));
       
@@ -91,12 +95,14 @@ const ChatSidebar = ({ currentConversationId, onConversationSelect, onNewChat }:
     try {
       const userId = profile.id.toString();
       
-      const { error } = await supabase
-        .from('chat_conversations')
-        .delete()
-        .eq('user_id', userId);
+      const { data, error } = await supabase.functions.invoke('chat-service', {
+        body: {
+          action: 'delete_all_conversations',
+          profileId: userId,
+        }
+      });
 
-      if (error) throw error;
+      if (error || !data?.success) throw (error || new Error('Delete all failed'));
 
       setConversations([]);
       onConversationSelect(null);

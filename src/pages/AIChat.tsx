@@ -62,13 +62,17 @@ const AIChat = () => {
   // Save message to database
   const saveMessage = async (message: ChatMessage, conversationId: string) => {
     try {
-      await supabase
-        .from('chat_messages')
-        .insert({
-          conversation_id: conversationId,
+      const userId = profile?.id?.toString();
+      const { data, error } = await supabase.functions.invoke('chat-service', {
+        body: {
+          action: 'add_message',
+          profileId: userId,
+          conversationId,
           role: message.role,
-          content: message.content
-        });
+          content: message.content,
+        }
+      });
+      if (error || !data?.success) throw (error || new Error('Save message failed'));
     } catch (error) {
       console.error('Error saving message:', error);
     }
@@ -82,17 +86,16 @@ const AIChat = () => {
       // First, check if user has auth session and get the real user_id
       const userId = profile?.id?.toString() || 'anonymous';
       
-      const { data, error } = await supabase
-        .from('chat_conversations')
-        .insert({
-          user_id: userId,
-          title: firstMessage.slice(0, 50) + (firstMessage.length > 50 ? '...' : '')
-        })
-        .select()
-        .single();
+      const { data, error } = await supabase.functions.invoke('chat-service', {
+        body: {
+          action: 'create_conversation',
+          profileId: userId,
+          title: firstMessage.slice(0, 50) + (firstMessage.length > 50 ? '...' : ''),
+        }
+      });
 
-      if (error) throw error;
-      return data.id;
+      if (error || !data?.success) throw (error || new Error('Create conversation failed'));
+      return data.conversationId as string;
     } catch (error) {
       console.error('Error creating conversation:', error);
       return null;
@@ -317,10 +320,14 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
         await saveMessage(assistantResponse, conversationId);
         
         // Update conversation timestamp
-        await supabase
-          .from('chat_conversations')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', conversationId);
+          const userId = profile?.id?.toString();
+          await supabase.functions.invoke('chat-service', {
+            body: {
+              action: 'touch_conversation',
+              profileId: userId,
+              conversationId,
+            }
+          });
       }
     } catch (error) {
       console.error('Ollama error:', error);

@@ -99,8 +99,8 @@ const Dashboard = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">E.D.U.A.R.T.</h1>
-              <p className="text-muted-foreground">Schulmanagementsystem</p>
+              <h1 className="text-2xl font-bold text-foreground">E.D.U.A.R.D.</h1>
+              <p className="text-muted-foreground">Education, Data, Utility & Automation for Resource Distribution</p>
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
