@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTS Demo - Backend-First Workflow</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .audio-player {
+            margin-top: 16px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .status {
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: 4px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 TTS Demo - Backend-First Workflow</h1>
+        <p>Diese Demonstration zeigt den neuen TTS-Workflow, der Backend-generierte Audio-Dateien bevorzugt und Web Speech API als Fallback verwendet.</p>
+        
+        <form id="ttsForm">
+            <div class="form-group">
+                <label for="title">Titel *</label>
+                <input type="text" id="title" required placeholder="Titel der TTS-Durchsage">
+            </div>
+            
+            <div class="form-group">
+                <label for="text">Text *</label>
+                <textarea id="text" required rows="4" placeholder="Text für die TTS-Ausgabe"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="voice">Stimme</label>
+                <select id="voice">
+                    <option value="Aria">Aria</option>
+                    <option value="Alloy">Alloy</option>
+                    <option value="Echo">Echo</option>
+                </select>
+            </div>
+            
+            <button type="submit">🎵 TTS erstellen (Backend-First)</button>
+        </form>
+        
+        <div id="status"></div>
+        
+        <div class="audio-player" style="display: none;" id="audioPlayer">
+            <h3>🔊 Generierte Audio-Datei</h3>
+            <audio controls style="width: 100%;" id="audioElement">
+                Ihr Browser unterstützt das Audio-Element nicht.
+            </audio>
+            <p><strong>Workflow:</strong> <span id="workflowType"></span></p>
+        </div>
+        
+        <div class="info">
+            <h3>📋 Implementierung</h3>
+            <ol>
+                <li><strong>Backend-First:</strong> Zuerst wird versucht, die Audio-Datei über das Python TTS Backend zu generieren</li>
+                <li><strong>Fallback:</strong> Bei Backend-Fehlern wird automatisch auf Web Speech API zurückgegriffen</li>
+                <li><strong>Audio-Serving:</strong> Backend-generierte Dateien werden als statische Assets bereitgestellt</li>
+                <li><strong>Format:</strong> WAV-Dateien für maximale Kompatibilität (MP3 in Produktion möglich)</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('ttsForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const title = document.getElementById('title').value;
+            const text = document.getElementById('text').value;
+            const voice = document.getElementById('voice').value;
+            const status = document.getElementById('status');
+            const audioPlayer = document.getElementById('audioPlayer');
+            const audioElement = document.getElementById('audioElement');
+            const workflowType = document.getElementById('workflowType');
+            
+            status.innerHTML = '<div class="info">⏳ Erstelle TTS-Audio...</div>';
+            audioPlayer.style.display = 'none';
+            
+            try {
+                // Simulate backend TTS call
+                const mockBackendSuccess = Math.random() > 0.3; // 70% success rate for demo
+                
+                if (mockBackendSuccess) {
+                    // Simulate backend audio file generation
+                    const timestamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15);
+                    const audioFile = `tts_announcement_${timestamp}.wav`;
+                    
+                    // Use one of our existing test files for demo
+                    const audioUrl = '/test-audio.wav';
+                    
+                    audioElement.src = audioUrl;
+                    workflowType.textContent = 'Backend-generierte Audio-Datei';
+                    audioPlayer.style.display = 'block';
+                    
+                    status.innerHTML = '<div class="success">✅ TTS-Audio erfolgreich über Backend erstellt!</div>';
+                } else {
+                    // Fallback to Web Speech API
+                    if ('speechSynthesis' in window) {
+                        const utterance = new SpeechSynthesisUtterance(text);
+                        
+                        // Try to find a German voice
+                        const voices = speechSynthesis.getVoices();
+                        const germanVoice = voices.find(voice => 
+                            voice.lang.includes('de') || voice.name.includes('German')
+                        );
+                        
+                        if (germanVoice) {
+                            utterance.voice = germanVoice;
+                        }
+                        
+                        utterance.lang = 'de-DE';
+                        utterance.rate = 0.9;
+                        
+                        speechSynthesis.speak(utterance);
+                        
+                        workflowType.textContent = 'Web Speech API (Fallback)';
+                        audioPlayer.style.display = 'none';
+                        
+                        status.innerHTML = '<div class="info">🗣️ Backend nicht verfügbar - Fallback zu Web Speech API verwendet</div>';
+                    } else {
+                        throw new Error('Weder Backend TTS noch Web Speech API verfügbar');
+                    }
+                }
+                
+            } catch (error) {
+                status.innerHTML = `<div class="error">❌ Fehler: ${error.message}</div>`;
+            }
+        });
+        
+        // Load voices when available
+        if ('speechSynthesis' in window) {
+            speechSynthesis.addEventListener('voiceschanged', function() {
+                console.log('Verfügbare Stimmen:', speechSynthesis.getVoices().length);
+            });
+        }
+    </script>
+</body>
+</html>

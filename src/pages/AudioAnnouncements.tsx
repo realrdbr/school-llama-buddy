@@ -280,7 +280,7 @@ const AudioAnnouncements = () => {
         // For TTS, first try backend-generated audio file, then fallback to Web Speech API
         if (announcement.audio_file_path) {
           // Backend-generated audio file exists
-          const audioUrl = `/audio/${announcement.audio_file_path}`;
+          const audioUrl = `/${announcement.audio_file_path}`;
           
           try {
             const audio = new Audio(audioUrl);
