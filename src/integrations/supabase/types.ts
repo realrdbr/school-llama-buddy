@@ -434,8 +434,8 @@ export type Database = {
           full_name: string
           must_change_password: boolean
           permission_level: number
-          profile_id: string
-          user_id: string
+          profile_id: number
+          user_id: number
         }[]
       }
     }
