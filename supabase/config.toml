@@ -64,3 +64,6 @@ verify_jwt = false
 
 [functions.chat-service]
 verify_jwt = false
+
+[functions.native-tts]
+verify_jwt = false

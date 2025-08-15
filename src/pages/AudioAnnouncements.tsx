@@ -86,8 +86,8 @@ const AudioAnnouncements = () => {
     
     setLoading(true);
     try {
-      // Use Python TTS for server-side processing
-      const { data: ttsResult, error: ttsError } = await supabase.functions.invoke('python-tts', {
+      // Use Native TTS for server-side processing
+      const { data: ttsResult, error: ttsError } = await supabase.functions.invoke('native-tts', {
         body: {
           text: ttsForm.text,
           voice_id: ttsForm.voice_id,
@@ -108,7 +108,7 @@ const AudioAnnouncements = () => {
       
       toast({
         title: "Erfolg",
-        description: "TTS-Durchsage wurde erfolgreich mit E.D.U.A.R.D. erstellt"
+        description: "TTS-Durchsage wurde erfolgreich mit Native TTS erstellt"
       });
       
       // Reset form
