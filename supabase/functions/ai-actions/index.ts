@@ -183,6 +183,8 @@ serve(async (req) => {
               break;
             }
 
+            console.log(`Planning substitution for ${teacherName} on ${dateParam}`);
+
             // Parse date and weekday
             let dateValue = new Date();
             const lower = String(dateParam).toLowerCase();
@@ -194,19 +196,80 @@ serve(async (req) => {
               const parsed = new Date(dateParam);
               if (!isNaN(parsed.getTime())) dateValue = parsed;
             }
+            
             const weekday = dateValue.getDay(); // 0=Sun ... 6=Sat
             const weekdayMap: Record<number, 'monday'|'tuesday'|'wednesday'|'thursday'|'friday'> = {
               1: 'monday', 2: 'tuesday', 3: 'wednesday', 4: 'thursday', 5: 'friday'
             } as const;
+            
             if (!(weekday in weekdayMap)) {
               result = { error: 'Ausgewähltes Datum liegt am Wochenende' }
               break;
             }
             const dayKey = weekdayMap[weekday as 1|2|3|4|5];
 
+            // Load all teachers from database
+            const { data: teachersData, error: teachersError } = await supabase
+              .from('teachers')
+              .select('*');
+
+            if (teachersError) {
+              console.error('Error loading teachers:', teachersError);
+              result = { error: 'Fehler beim Laden der Lehrerdaten' };
+              break;
+            }
+
+            // Build teacher expertise map
+            const teachers = teachersData as Array<{
+              'first name': string;
+              'last name': string;
+              shortened: string;
+              subjects: string;
+              fav_rooms?: string;
+            }>;
+
+            const teacherMap: Record<string, {
+              name: string;
+              subjects: Set<string>;
+              rooms: string[];
+              shortened: string;
+            }> = {};
+
+            for (const teacher of teachers) {
+              const fullName = `${teacher['first name']} ${teacher['last name']}`;
+              const subjects = teacher.subjects ? teacher.subjects.split(',').map(s => s.trim()) : [];
+              const rooms = teacher.fav_rooms ? teacher.fav_rooms.split(',').map(r => r.trim()) : [];
+              
+              teacherMap[teacher.shortened] = {
+                name: fullName,
+                subjects: new Set(subjects),
+                rooms,
+                shortened: teacher.shortened
+              };
+            }
+
+            console.log('Loaded teachers:', Object.keys(teacherMap));
+
+            // Find the sick teacher
             const normalize = (s: string) => s.toLowerCase().replace(/\b(fr\.?|herr|frau|hr\.?|fr\.?)/g, '').trim();
             const normSick = normalize(teacherName);
+            
+            let sickTeacherShortened: string | null = null;
+            for (const [shortened, data] of Object.entries(teacherMap)) {
+              if (normalize(data.name).includes(normSick) || normalize(shortened) === normSick) {
+                sickTeacherShortened = shortened;
+                break;
+              }
+            }
 
+            if (!sickTeacherShortened) {
+              result = { error: `Lehrkraft "${teacherName}" nicht in der Datenbank gefunden` };
+              break;
+            }
+
+            console.log(`Found sick teacher: ${sickTeacherShortened} (${teacherMap[sickTeacherShortened].name})`);
+
+            // Parse schedule entries
             const parseCell = (cell?: string) => {
               if (!cell) return [] as Array<{subject: string, teacher: string, room: string}>;
               return cell.split('|').map(s => s.trim()).filter(Boolean).map(sub => {
@@ -218,83 +281,162 @@ serve(async (req) => {
               });
             };
 
-            const classTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
-            const affected: Array<{ className: string, period: number, subject: string, room: string }> = [];
-            const expertise: Record<string, Set<string>> = {};
+            // Get all schedule tables
+            const { data: tables } = await supabase.rpc('information_schema_tables') || {};
+            const classTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A']; // Known tables for now
 
+            const affected: Array<{ 
+              className: string, 
+              period: number, 
+              subject: string, 
+              room: string 
+            }> = [];
+
+            // Find affected lessons
             for (const table of classTables) {
               const { data: rows, error } = await supabase.from(table).select('*').order('Stunde');
-              if (error) { console.error('Read schedule error', table, error.message); continue; }
+              if (error) { 
+                console.error('Read schedule error', table, error.message); 
+                continue; 
+              }
+              
               for (const row of rows as any[]) {
                 const period = row['Stunde'];
                 const cell = row[dayKey] as string | undefined;
                 const entries = parseCell(cell);
-                // build expertise from all days (simple heuristic)
-                const dayKeys = ['monday','tuesday','wednesday','thursday','friday'] as const;
-                for (const dk of dayKeys) {
-                  const e2 = parseCell(row[dk]);
-                  for (const e of e2) {
-                    const n = normalize(e.teacher);
-                    if (!n) continue;
-                    if (!expertise[n]) expertise[n] = new Set<string>();
-                    if (e.subject) expertise[n].add(e.subject);
-                  }
-                }
-                for (const e of entries) {
-                  if (normalize(e.teacher) === normSick) {
-                    affected.push({ className: table.replace('Stundenplan_', ''), period, subject: e.subject || 'Unbekannt', room: e.room || 'Unbekannt' });
+                
+                for (const entry of entries) {
+                  if (entry.teacher === sickTeacherShortened) {
+                    affected.push({ 
+                      className: table.replace('Stundenplan_', '').replace('_', ' '), 
+                      period, 
+                      subject: entry.subject || 'Unbekannt', 
+                      room: entry.room || 'Unbekannt' 
+                    });
                   }
                 }
               }
             }
 
-            // Helper to check availability of a teacher at given dayKey+period
-            const isFree = async (teacherNorm: string, period: number) => {
+            console.log(`Found ${affected.length} affected lessons:`, affected);
+
+            // Helper to check if a teacher is available at a specific time
+            const isTeacherAvailable = async (teacherShortened: string, period: number): Promise<boolean> => {
               for (const table of classTables) {
-                const { data: rows } = await supabase.from(table).select('Stunde,'+dayKey).eq('Stunde', period);
-                const row = (rows as any[])[0];
-                if (!row) continue;
+                const { data: rows } = await supabase.from(table).select('Stunde,' + dayKey).eq('Stunde', period);
+                if (!rows || rows.length === 0) continue;
+                
+                const row = rows[0] as any;
                 const entries = parseCell(row[dayKey]);
-                if (entries.some(e => normalize(e.teacher) === teacherNorm)) return false;
+                
+                if (entries.some(e => e.teacher === teacherShortened)) {
+                  return false; // Teacher is busy
+                }
               }
-              return true;
+              return true; // Teacher is free
             };
 
+            // Find substitute teachers and create substitution entries
             const confirmations: string[] = [];
-            for (const a of affected) {
-              // Find candidate
-              let chosen: string | null = null;
-              const candidates = Object.keys(expertise).filter(t => t !== normSick && expertise[t].has(a.subject));
-              for (const cand of candidates) {
-                if (await isFree(cand, a.period)) { chosen = cand; break; }
+            const substitutions: Array<{
+              period: number;
+              className: string;
+              subject: string;
+              originalTeacher: string;
+              substituteTeacher: string;
+              room: string;
+            }> = [];
+
+            for (const lesson of affected) {
+              let bestSubstitute: string | null = null;
+              let bestScore = -1;
+
+              // Find the best substitute teacher
+              for (const [shortened, teacher] of Object.entries(teacherMap)) {
+                if (shortened === sickTeacherShortened) continue; // Skip sick teacher
+                
+                // Check availability
+                const isAvailable = await isTeacherAvailable(shortened, lesson.period);
+                if (!isAvailable) continue;
+
+                let score = 0;
+                
+                // Score based on subject expertise
+                if (teacher.subjects.has(lesson.subject)) {
+                  score += 10; // High priority for subject match
+                }
+                
+                // Score based on preferred rooms
+                if (teacher.rooms.includes(lesson.room)) {
+                  score += 5; // Bonus for familiar room
+                }
+                
+                // Random factor to avoid always choosing the same teacher
+                score += Math.random() * 2;
+
+                if (score > bestScore) {
+                  bestScore = score;
+                  bestSubstitute = shortened;
+                }
               }
-              const chosenDisplay = chosen ? chosen : 'Vertretung';
+
+              const substituteTeacher = bestSubstitute || 'Vertretung';
+              const substituteTeacherName = bestSubstitute ? teacherMap[bestSubstitute].name : 'Vertretung';
 
               // Insert into vertretungsplan
-              await supabase.from('vertretungsplan').insert({
+              const { error: insertError } = await supabase.from('vertretungsplan').insert({
                 date: dateValue.toISOString().split('T')[0],
-                class_name: a.className,
-                period: a.period,
-                original_teacher: teacherName,
-                original_subject: a.subject,
-                original_room: a.room,
-                substitute_teacher: chosenDisplay,
-                substitute_subject: a.subject,
-                substitute_room: a.room,
-                note: 'Automatisch geplant',
+                class_name: lesson.className,
+                period: lesson.period,
+                original_teacher: teacherMap[sickTeacherShortened].name,
+                original_subject: lesson.subject,
+                original_room: lesson.room,
+                substitute_teacher: substituteTeacherName,
+                substitute_subject: lesson.subject,
+                substitute_room: lesson.room,
+                note: bestSubstitute ? 
+                  `Automatisch geplant - ${substituteTeacherName} kann ${lesson.subject} unterrichten` : 
+                  'Automatisch geplant - Keine passende Lehrkraft verfügbar',
                 created_by: null
               });
 
-              const dateStr = dateValue.toISOString().split('T')[0];
-              confirmations.push(`${chosenDisplay} übernimmt die ${a.period}. Stunde ${a.subject} für ${teacherName} am ${dateStr}.`);
+              if (insertError) {
+                console.error('Error inserting substitution:', insertError);
+                continue;
+              }
+
+              substitutions.push({
+                period: lesson.period,
+                className: lesson.className,
+                subject: lesson.subject,
+                originalTeacher: teacherMap[sickTeacherShortened].name,
+                substituteTeacher: substituteTeacherName,
+                room: lesson.room
+              });
+
+              const dateStr = dateValue.toLocaleDateString('de-DE');
+              const confirmation = `${substituteTeacherName} übernimmt die ${lesson.period}. Stunde ${lesson.subject} in Klasse ${lesson.className} für ${teacherMap[sickTeacherShortened].name} am ${dateStr} (Raum ${lesson.room}).`;
+              confirmations.push(confirmation);
             }
 
             if (confirmations.length === 0) {
-              result = { error: 'Keine betroffenen Stunden gefunden' };
+              result = { 
+                error: `Keine Unterrichtsstunden für ${teacherMap[sickTeacherShortened]?.name || teacherName} am ${dateValue.toLocaleDateString('de-DE')} gefunden.` 
+              };
             } else {
-              result = { message: 'Vertretungen geplant', confirmations };
+              result = { 
+                message: `Vertretungsplan für ${teacherMap[sickTeacherShortened].name} erfolgreich erstellt`,
+                confirmations,
+                details: {
+                  sickTeacher: teacherMap[sickTeacherShortened].name,
+                  date: dateValue.toLocaleDateString('de-DE'),
+                  affectedLessons: affected.length,
+                  substitutions
+                }
+              };
               success = true;
             }
+
           } catch (e) {
             console.error('plan_substitution error:', e);
             result = { error: e.message || 'Fehler bei der Vertretungsplanung' };
