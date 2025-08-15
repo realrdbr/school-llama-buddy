@@ -47,10 +47,11 @@ serve(async (req) => {
 
     console.log('User profile lookup:', { userProfile })
 
-    // Create TTS announcement record with proper created_by
+    // Create TTS announcement record with proper created_by and explicit UUID
     const { data: announcement, error: insertError } = await supabase
       .from('audio_announcements')
       .insert({
+        id: crypto.randomUUID(), // Explicitly generate UUID to avoid Postgres type errors
         title: title || 'TTS Durchsage',
         description: description || `Text-to-Speech Durchsage erstellt von ${user_id}`,
         is_tts: true,

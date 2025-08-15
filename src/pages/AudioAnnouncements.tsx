@@ -90,6 +90,7 @@ const AudioAnnouncements = () => {
       const { error } = await supabase
         .from('audio_announcements')
         .insert({
+          id: crypto.randomUUID(), // Explicitly generate UUID to avoid Postgres type errors
           title: ttsForm.title,
           description: ttsForm.description || `TTS-Durchsage erstellt von ${profile?.username}`,
           is_tts: true,
@@ -152,6 +153,7 @@ const AudioAnnouncements = () => {
       const { error: insertError } = await supabase
         .from('audio_announcements')
         .insert({
+          id: crypto.randomUUID(), // Explicitly generate UUID to avoid Postgres type errors
           title: audioForm.title,
           description: audioForm.description,
           is_tts: false,

@@ -15,8 +15,11 @@ serve(async (req) => {
   try {
     const requestBody = await req.json()
 
+    // Get Ollama API URL from environment variable with fallback
+    const ollamaApiUrl = Deno.env.get('OLLAMA_API_URL') || 'http://127.0.0.1:11434/api/chat'
+
     // Forward request to local Ollama instance
-    const ollamaResponse = await fetch('http://127.0.0.1:11434/api/chat', {
+    const ollamaResponse = await fetch(ollamaApiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -43,7 +46,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         error: error.message || 'Internal server error',
-        details: 'Stelle sicher, dass Ollama auf 127.0.0.1:11434 läuft und das Modell llama3.1:8b installiert ist.'
+        details: `Stelle sicher, dass Ollama läuft und erreichbar ist über: ${Deno.env.get('OLLAMA_API_URL') || 'http://127.0.0.1:11434'} und das Modell llama3.1:8b installiert ist.`
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
