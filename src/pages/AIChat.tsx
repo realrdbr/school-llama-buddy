@@ -315,9 +315,9 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
                   break;
                 }
                 case 'get_schedule': {
-                  const table = res.textTable as string | undefined;
-                  if (table) {
-                    details = `\n\n${table}`;
+                  const htmlTable = res.htmlTable as string | undefined;
+                  if (htmlTable) {
+                    details = `\n\n<div style="overflow-x:auto;">${htmlTable}</div>`;
                   } else {
                     const rows = (res.schedule || []) as Array<any>;
                     if (rows.length && 'entry' in rows[0]) {
@@ -475,7 +475,14 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
                             : 'bg-muted mr-8'
                         }`}
                       >
-                        <p className="whitespace-pre-wrap">{message.content}</p>
+                         <div 
+                           className="prose prose-sm max-w-none dark:prose-invert"
+                           dangerouslySetInnerHTML={{ 
+                             __html: message.content
+                               .replace(/\n/g, '<br>')
+                               .replace(/```([^`]+)```/g, '<pre style="background:#f5f5f5;padding:8px;border-radius:4px;overflow-x:auto;"><code>$1</code></pre>')
+                           }}
+                         />
                       </div>
                     ))}
                      {isLoading && (

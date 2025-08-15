@@ -523,37 +523,89 @@ serve(async (req) => {
             };
           });
 
-          // Build human friendly strings
-          const formatEntry = (s?: string) => {
-            const entries = parseCell(s);
-            if (entries.length === 0) return '';
-            return entries.map(e => `${e.subject}${e.teacher?` (${e.teacher}`:''}${e.room?`${e.teacher?`, `:''}${e.room}`:''}${e.teacher?`)`:''}`).join(' | ');
+          // Build HTML table like on the Stundenplan page
+          const parseEntry = (cell?: string) => {
+            if (!cell) return [];
+            return cell.split('|').map(s => s.trim()).filter(Boolean).map(sub => {
+              const parts = sub.split(/\s+/);
+              if (parts.length >= 3) {
+                return { subject: parts[0], teacher: parts[1], room: parts[2] };
+              }
+              return { subject: sub, teacher: '', room: '' };
+            });
           };
 
-          // Create ASCII table similar to UI
-          const pad = (str: string, len: number) => (str || '').padEnd(len, ' ');
-          const colWidths = { Stunde: 6, Mo: 18, Di: 18, Mi: 18, Do: 18, Fr: 18 };
-          const header = `${pad('Stunde', colWidths.Stunde)} | ${pad('Montag', colWidths.Mo)} | ${pad('Dienstag', colWidths.Di)} | ${pad('Mittwoch', colWidths.Mi)} | ${pad('Donnerstag', colWidths.Do)} | ${pad('Freitag', colWidths.Fr)}`;
-          const sep = `${'-'.repeat(colWidths.Stunde)}-+-${'-'.repeat(colWidths.Mo)}-+-${'-'.repeat(colWidths.Di)}-+-${'-'.repeat(colWidths.Mi)}-+-${'-'.repeat(colWidths.Do)}-+-${'-'.repeat(colWidths.Fr)}`;
-          const lines: string[] = [header, sep];
-
-          for (const r of schedule) {
-            if (dayKey) {
-              const entry = formatEntry((r as any)[dayKey]);
-              lines.push(`${pad(String(r.period), colWidths.Stunde)} | ${pad(entry, colWidths.Mo)}${' '.repeat(colWidths.Di+colWidths.Mi+colWidths.Do+colWidths.Fr + 13)}`);
+          const formatCellHTML = (entry?: string) => {
+            const entries = parseEntry(entry);
+            if (entries.length === 0) return '<div style="text-align:center; color:#666;">-</div>';
+            
+            if (entries.length > 1) {
+              return `<div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">${entries.map(e => 
+                `<div style="padding:4px; background:#f5f5f5; border-radius:4px; font-size:12px; border:1px solid #ddd;">
+                  <div style="font-weight:500;">${e.subject}</div>
+                  <div style="color:#666;">${e.teacher}</div>
+                  <div style="color:#666;">${e.room}</div>
+                </div>`
+              ).join('')}</div>`;
             } else {
-              lines.push(`${pad(String(r.period), colWidths.Stunde)} | ${pad(formatEntry(r.monday), colWidths.Mo)} | ${pad(formatEntry(r.tuesday), colWidths.Di)} | ${pad(formatEntry(r.wednesday), colWidths.Mi)} | ${pad(formatEntry(r.thursday), colWidths.Do)} | ${pad(formatEntry(r.friday), colWidths.Fr)}`);
+              const e = entries[0];
+              return `<div style="padding:4px; background:#f5f5f5; border-radius:4px; font-size:14px;">
+                <div style="font-weight:500;">${e.subject}</div>
+                <div style="color:#666;">${e.teacher}</div>
+                <div style="color:#666;">${e.room}</div>
+              </div>`;
             }
-          }
+          };
 
-          const textTable = lines.join('\n');
+          let htmlTable = '';
+          if (dayKey) {
+            // Single day view
+            htmlTable = `<table style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
+              <thead>
+                <tr style="background:#f5f5f5;">
+                  <th style="border:1px solid #ddd; padding:8px; text-align:left;">Stunde</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:left;">${dayParam.charAt(0).toUpperCase() + dayParam.slice(1)}</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${schedule.map(r => `<tr style="border:1px solid #ddd;">
+                  <td style="border:1px solid #ddd; padding:8px; font-weight:500;">${r.period}. Stunde</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML((r as any)[dayKey])}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>`;
+          } else {
+            // Full week view
+            htmlTable = `<table style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
+              <thead>
+                <tr style="background:#f5f5f5;">
+                  <th style="border:1px solid #ddd; padding:8px; text-align:left;">Stunde</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:left;">Montag</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:left;">Dienstag</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:left;">Mittwoch</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:left;">Donnerstag</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:left;">Freitag</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${schedule.map(r => `<tr style="border:1px solid #ddd;">
+                  <td style="border:1px solid #ddd; padding:8px; font-weight:500;">${r.period}. Stunde</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.monday)}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.tuesday)}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.wednesday)}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.thursday)}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.friday)}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>`;
+          }
 
           result = {
             message: dayKey
               ? `Stundenplan für Klasse ${className.toUpperCase()} am ${dayParam.charAt(0).toUpperCase() + dayParam.slice(1)}`
               : `Stundenplan (Woche) für Klasse ${className.toUpperCase()}`,
             schedule,
-            textTable,
+            htmlTable,
           };
           success = true;
         } catch (e: any) {
