@@ -40,25 +40,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setLoading(true);
       
-      // Use Supabase client instead of direct HTTP requests
-      const { data: users, error } = await supabase
-        .from('permissions')
-        .select('*')
-        .eq('username', username)
-        .eq('password', password);
+      // Use the verify_user_login function instead of direct password check
+      const { data, error } = await supabase.rpc('verify_user_login', {
+        username_input: username,
+        password_input: password
+      });
 
-      if (error || !users || users.length === 0) {
+      if (error || !data || data.length === 0) {
         setLoading(false);
         return { error: { message: 'Ungültiger Benutzername oder Passwort' } };
       }
 
-      const userData = users[0] as any;
+      const userData = data[0];
 
       // Create a dummy user for internal auth
       const dummyUser: User = {
-        id: userData.username,
+        id: username,
         app_metadata: {},
-        user_metadata: { username, full_name: userData.name },
+        user_metadata: { username, full_name: userData.full_name },
         aud: 'authenticated',
         created_at: new Date().toISOString(),
         email: `${username}@internal.school`
@@ -67,13 +66,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Set user and profile state
       setUser(dummyUser);
       setProfile({
-        id: userData.id,
-        user_id: userData.id.toString(), // Use numeric ID as string to avoid UUID conflicts
-        username: userData.username,
-        name: userData.name,
-        permission_lvl: userData.permission_lvl,
-        password: userData.password,
-        created_at: userData.created_at,
+        id: userData.user_id,
+        user_id: userData.user_id.toString(),
+        username: username,
+        name: userData.full_name,
+        permission_lvl: userData.permission_level,
+        password: 'encrypted',
+        created_at: new Date().toISOString(),
         must_change_password: userData.must_change_password || false
       });
       
@@ -92,29 +91,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (!user || !profile) return { error: { message: 'Nicht angemeldet' } };
 
     try {
-      // For first login, skip old password verification
-      if (oldPassword !== 'dummy' && profile.password !== oldPassword) {
-        return { error: { message: 'Falsches aktuelles Passwort' } };
-      }
-
-      // Update password and remove must_change_password flag
-      const { error } = await supabase
-        .from('permissions')
-        .update({ 
-          password: newPassword,
-          must_change_password: false 
-        } as any)
-        .eq('username', profile.username);
+      const { data, error } = await supabase.rpc('change_user_password', {
+        user_id_input: profile.id,
+        old_password: oldPassword,
+        new_password: newPassword
+      });
 
       if (error) {
-        console.error('Update error:', error);
-        return { error: { message: 'Fehler beim Aktualisieren des Passworts: ' + error.message } };
+        console.error('Password change error:', error);
+        return { error: { message: 'Fehler beim Ändern des Passworts' } };
       }
 
-      // Update local profile state
-      setProfile({ ...profile, password: newPassword, must_change_password: false });
-
-      return { error: null };
+      if ((data as any)?.success) {
+        // Update local profile state
+        setProfile({ ...profile, must_change_password: false });
+        return { error: null };
+      } else {
+        return { error: { message: (data as any)?.error || 'Passwort konnte nicht geändert werden' } };
+      }
     } catch (error) {
       console.error('Change password error:', error);
       return { error };
@@ -130,33 +124,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     try {
-      // Check if username already exists
-      const { data: existingUsers } = await supabase
-        .from('permissions')
-        .select('id')
-        .eq('username', username);
+      const { data, error } = await supabase.rpc('create_school_user', {
+        username_input: username,
+        password_input: password,
+        full_name_input: fullName,
+        permission_level_input: permissionLevel,
+        creator_user_id: profile.id
+      });
 
-      if (existingUsers && existingUsers.length > 0) {
-        return { error: { message: 'Benutzername bereits vergeben' } };
+      if (error) {
+        console.error('Create user error:', error);
+        return { error: { message: error.message } };
       }
 
-      // Create new user using Supabase client with must_change_password = true
-      const { error: insertError } = await supabase
-        .from('permissions')
-        .insert([{
-          username,
-          password,
-          name: fullName,
-          permission_lvl: permissionLevel,
-          must_change_password: true
-        } as any]);
-
-      if (insertError) {
-        console.error('Insert error:', insertError);
-        return { error: { message: 'Fehler beim Erstellen des Benutzers: ' + insertError.message } };
+      if ((data as any)?.success) {
+        return { error: null };
+      } else {
+        return { error: { message: (data as any)?.error || 'Benutzer konnte nicht erstellt werden' } };
       }
-
-      return { error: null };
     } catch (error) {
       console.error('Create user error:', error);
       return { error };

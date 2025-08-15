@@ -238,56 +238,6 @@ export type Database = {
         }
         Relationships: []
       }
-      profiles: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          email: string | null
-          full_name: string | null
-          id: string
-          must_change_password: boolean | null
-          password_hash: string | null
-          permission_id: number | null
-          updated_at: string
-          user_id: string
-          username: string | null
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          email?: string | null
-          full_name?: string | null
-          id?: string
-          must_change_password?: boolean | null
-          password_hash?: string | null
-          permission_id?: number | null
-          updated_at?: string
-          user_id: string
-          username?: string | null
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          email?: string | null
-          full_name?: string | null
-          id?: string
-          must_change_password?: boolean | null
-          password_hash?: string | null
-          permission_id?: number | null
-          updated_at?: string
-          user_id?: string
-          username?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_permission_id_fkey"
-            columns: ["permission_id"]
-            isOneToOne: false
-            referencedRelation: "permissions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       Stundenplan_10b_A: {
         Row: {
           friday: string | null
@@ -402,7 +352,7 @@ export type Database = {
         Args: {
           new_password: string
           old_password: string
-          user_id_input: string
+          user_id_input: number
         }
         Returns: Json
       }
@@ -412,7 +362,7 @@ export type Database = {
       }
       create_school_user: {
         Args: {
-          creator_user_id: string
+          creator_user_id: number
           full_name_input: string
           password_input: string
           permission_level_input: number

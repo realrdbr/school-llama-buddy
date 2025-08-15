@@ -76,8 +76,7 @@ const AIChat = () => {
 
     try {
       // First, check if user has auth session and get the real user_id
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || profile.id.toString();
+      const userId = profile?.id?.toString() || 'anonymous';
       
       const { data, error } = await supabase
         .from('chat_conversations')
@@ -268,7 +267,7 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
                 action: actionName.toLowerCase(),
                 parameters,
                 userProfile: {
-                  user_id: profile?.user_id,
+                  user_id: profile?.id,
                   name: profile?.username || profile?.name,
                   permission_lvl: profile?.permission_lvl
                 }

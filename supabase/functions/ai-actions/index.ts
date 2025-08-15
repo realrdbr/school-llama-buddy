@@ -26,25 +26,20 @@ serve(async (req) => {
     switch (action) {
       case 'create_user':
         if (userProfile.permission_lvl >= 10) {
-          const { data, error } = await supabase.auth.admin.createUser({
-            email: parameters.email,
-            password: parameters.password,
-            email_confirm: true,
-          })
+          // Use the create_school_user function
+          const { data, error } = await supabase.rpc('create_school_user', {
+            username_input: parameters.username,
+            password_input: parameters.password,
+            full_name_input: parameters.fullName,
+            permission_level_input: parameters.permissionLevel,
+            creator_user_id: userProfile.user_id
+          });
           
-          if (!error && data.user) {
-            // Create profile
-            await supabase.from('profiles').insert({
-              user_id: data.user.id,
-              username: parameters.username,
-              full_name: parameters.fullName,
-              permission_id: parameters.permissionLevel
-            })
-            
+          if (!error && (data as any)?.success) {
             result = { message: `Benutzer ${parameters.username} wurde erfolgreich erstellt.` }
             success = true
           } else {
-            result = { error: error?.message || 'Fehler beim Erstellen des Benutzers' }
+            result = { error: (data as any)?.error || error?.message || 'Fehler beim Erstellen des Benutzers' }
           }
         } else {
           result = { error: 'Keine Berechtigung zum Erstellen von Benutzern' }
@@ -119,7 +114,7 @@ serve(async (req) => {
               priority: parameters.priority || 'normal',
               target_class: parameters.targetClass,
               target_permission_level: parameters.targetPermissionLevel,
-              created_by: null  // Set to null since we're using username-based auth
+              created_by: userProfile.user_id?.toString() || null
             })
           
           if (!error) {
@@ -144,7 +139,7 @@ serve(async (req) => {
               tts_text: parameters.text,
               voice_id: 'alloy',
               is_active: true,
-              created_by: null
+              created_by: userProfile.user_id?.toString() || null
             })
           
           if (!error) {

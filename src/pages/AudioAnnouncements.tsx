@@ -97,7 +97,7 @@ const AudioAnnouncements = () => {
           voice_id: ttsForm.voice_id,
           schedule_date: ttsForm.schedule_date || null,
           is_active: true,
-          created_by: profile?.user_id || profile?.id?.toString(),
+          created_by: profile?.id?.toString(),
           duration_seconds: Math.ceil(ttsForm.text.length / 15) // Grobe Schätzung
         });
       
@@ -158,7 +158,7 @@ const AudioAnnouncements = () => {
           audio_file_path: fileName,
           schedule_date: audioForm.schedule_date || null,
           is_active: true,
-          created_by: profile?.user_id || profile?.id?.toString()
+          created_by: profile?.id?.toString()
         });
 
       if (insertError) throw insertError;
