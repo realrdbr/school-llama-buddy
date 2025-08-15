@@ -70,7 +70,7 @@ const ChangePasswordModal = ({ isOpen, onClose, isFirstLogin = false }: ChangePa
 
     setIsLoading(true);
     const { error } = await changePassword(
-      isFirstLogin ? 'dummy' : formData.oldPassword, 
+      isFirstLogin ? '' : formData.oldPassword, 
       formData.newPassword
     );
 
