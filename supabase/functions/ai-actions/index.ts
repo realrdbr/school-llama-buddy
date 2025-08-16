@@ -224,27 +224,46 @@ serve(async (req) => {
       case 'plan_substitution':
         if (userProfile.permission_lvl >= 9) {
           try {
-            const teacherName = parameters.teacherName || parameters.teacher || parameters.name;
-            const dateParam = parameters.date || parameters.datum || 'today';
+            const teacherName = parameters?.teacherName || parameters?.teacher || parameters?.name;
+            const dateParam = parameters?.date || parameters?.datum || 'today';
 
             if (!teacherName) {
               result = { error: 'Lehrkraft-Name fehlt (teacherName)' }
               break;
             }
 
-            console.log(`E.D.U.A.R.D. planning substitution for ${teacherName} on ${dateParam}`);
+            console.log(`E.D.U.A.R.D. planning substitution for "${teacherName}" on "${dateParam}"`);
+
+            // Helper: normalize subject (simple canonicalization for MA/DE/EN etc.)
+            const normalizeSubject = (s?: string) => {
+              if (!s) return '';
+              const upper = s.toString().trim().toUpperCase().replace(/\./g, '');
+              // simple DE->code mapping
+              const map: Record<string, string> = {
+                'MATHE': 'MA',
+                'MATHEMATIK': 'MA',
+                'DEUTSCH': 'DE',
+                'ENGLISCH': 'EN',
+                'BIOLOGIE': 'BI',
+                'CHEMIE': 'CH',
+                'PHYSIK': 'PH',
+                'GESCHICHTE': 'GE',
+                'ERDKUNDE': 'EK',
+                'GEOGRAPHIE': 'EK',
+                'INFORMATIK': 'IF',
+              };
+              return map[upper] || upper;
+            };
 
             // Parse date using Berlin timezone and improved weekday handling
             let dateValue = getBerlinDate();
             const lower = String(dateParam).toLowerCase().trim();
-            
-            // Use the new weekday normalization function
             const weekdayNum = normalizeWeekday(lower);
             if (weekdayNum) {
               const today = getBerlinDate();
               const todayWeekday = today.getDay() === 0 ? 7 : today.getDay();
               let diff = weekdayNum - todayWeekday;
-              if (diff <= 0) diff += 7; // Next occurrence of this weekday
+              if (diff <= 0) diff += 7; 
               dateValue.setDate(today.getDate() + diff);
             } else if (lower === 'morgen' || lower === 'tomorrow') {
               dateValue.setDate(dateValue.getDate() + 1);
@@ -255,16 +274,18 @@ serve(async (req) => {
               if (!isNaN(parsed.getTime())) dateValue = parsed;
             }
             
-            const weekday = getWeekdayFromDate(dateValue.toISOString().split('T')[0]);
-            
+            const weekday = ((): number => {
+              const ymd = dateValue.toISOString().split('T')[0];
+              return getWeekdayFromDate(ymd);
+            })();
+
             if (weekday < 1 || weekday > 5) {
               result = { error: 'E.D.U.A.R.D.: Ausgewähltes Datum liegt am Wochenende' }
               break;
             }
-            
             const dayKey = WEEKDAY_COLUMNS[weekday];
 
-            // Load all teachers from database
+            // Load all teachers from database (DB-only candidates)
             const { data: teachersData, error: teachersError } = await supabase
               .from('teachers')
               .select('*');
@@ -275,8 +296,8 @@ serve(async (req) => {
               break;
             }
 
-            // Build teacher expertise map
-            const teachers = teachersData as Array<{
+            // Build teacher expertise map (subjects canonicalized)
+            const teachers = (teachersData || []) as Array<{
               'first name': string;
               'last name': string;
               shortened: string;
@@ -293,53 +314,38 @@ serve(async (req) => {
 
             for (const teacher of teachers) {
               const fullName = `${teacher['first name']} ${teacher['last name']}`;
-              const subjects = teacher.subjects ? teacher.subjects.split(',').map(s => s.trim()) : [];
+              const subjectList = teacher.subjects
+                ? teacher.subjects.split(',').map(s => normalizeSubject(s))
+                : [];
               const rooms = teacher.fav_rooms ? teacher.fav_rooms.split(',').map(r => r.trim()) : [];
               
               teacherMap[teacher.shortened] = {
                 name: fullName,
-                subjects: new Set(subjects),
+                subjects: new Set(subjectList.filter(Boolean)),
                 rooms,
                 shortened: teacher.shortened
               };
             }
 
-            console.log('Loaded teachers:', Object.keys(teacherMap));
+            console.log('Loaded teachers (shortened codes):', Object.keys(teacherMap));
 
-            // Find the sick teacher with improved matching
+            // Find the sick teacher with improved matching (no hallucination)
             const normalize = (s: string) => s.toLowerCase().replace(/\b(fr\.?|herr|frau|hr\.?|fr\.?)/g, '').trim();
             const normSick = normalize(teacherName);
             
             let sickTeacherShortened: string | null = null;
             let possibleMatches: Array<{shortened: string, name: string, score: number}> = [];
             
-            // Exact and fuzzy matching
             for (const [shortened, data] of Object.entries(teacherMap)) {
               let score = 0;
-              
-              // Exact match on shortened name
-              if (normalize(shortened) === normSick) {
-                score = 100;
-              }
-              // Full name contains input
-              else if (normalize(data.name).includes(normSick)) {
-                score = 90;
-              }
-              // Partial matches
+              if (normalize(shortened) === normSick) score = 100;
+              else if (normalize(data.name).includes(normSick)) score = 90;
               else if (normSick.length >= 3) {
-                if (normalize(data.name).includes(normSick.substring(0, 3))) {
-                  score = 60;
-                } else if (normalize(shortened).includes(normSick.substring(0, 3))) {
-                  score = 70;
-                }
+                if (normalize(data.name).includes(normSick.substring(0, 3))) score = 60;
+                else if (normalize(shortened).includes(normSick.substring(0, 3))) score = 70;
               }
-              
-              if (score > 0) {
-                possibleMatches.push({shortened, name: data.name, score});
-              }
+              if (score > 0) possibleMatches.push({shortened, name: data.name, score});
             }
-            
-            // Sort by score and take best match
             possibleMatches.sort((a, b) => b.score - a.score);
             
             if (possibleMatches.length === 0) {
@@ -349,8 +355,6 @@ serve(async (req) => {
               };
               break;
             }
-            
-            // Use best match if score is high enough, otherwise ask for clarification
             if (possibleMatches[0].score >= 80) {
               sickTeacherShortened = possibleMatches[0].shortened;
             } else {
@@ -361,9 +365,9 @@ serve(async (req) => {
               break;
             }
 
-            console.log(`E.D.U.A.R.D. found sick teacher: ${sickTeacherShortened} (${teacherMap[sickTeacherShortened].name})`);
+            console.log(`Sick teacher resolved: ${sickTeacherShortened} (${teacherMap[sickTeacherShortened].name})`);
 
-            // Parse schedule entries
+            // Parse schedule cell
             const parseCell = (cell?: string) => {
               if (!cell) return [] as Array<{subject: string, teacher: string, room: string}>;
               return cell.split('|').map(s => s.trim()).filter(Boolean).map(sub => {
@@ -375,7 +379,7 @@ serve(async (req) => {
               });
             };
 
-            // Dynamically discover all schedule tables
+            // Discover schedule tables (fallback updated to new names)
             const { data: allTables, error: tablesError } = await supabase.rpc('sql', {
               query: `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'Stundenplan_%'`
             });
@@ -383,7 +387,7 @@ serve(async (req) => {
             let classTables: string[];
             if (tablesError) {
               console.log('Using fallback schedule tables discovery');
-              classTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A']; // Fallback
+              classTables = ['Stundenplan_10b', 'Stundenplan_10c']; // Updated fallback
             } else {
               classTables = (allTables || [])
                 .map((t: any) => t.table_name)
@@ -397,7 +401,7 @@ serve(async (req) => {
               room: string 
             }> = [];
 
-            // Find affected lessons
+            // Find affected lessons for that weekday
             for (const table of classTables) {
               const { data: rows, error } = await supabase.from(table).select('*').order('Stunde');
               if (error) { 
@@ -413,9 +417,9 @@ serve(async (req) => {
                 for (const entry of entries) {
                   if (entry.teacher === sickTeacherShortened) {
                     affected.push({ 
-                      className: table.replace('Stundenplan_', '').replace('_', ' '), 
+                      className: table.replace('Stundenplan_', ''), 
                       period, 
-                      subject: entry.subject || 'Unbekannt', 
+                      subject: normalizeSubject(entry.subject) || 'UNBEKANNT', 
                       room: entry.room || 'Unbekannt' 
                     });
                   }
@@ -423,25 +427,22 @@ serve(async (req) => {
               }
             }
 
-            console.log(`Found ${affected.length} affected lessons:`, affected);
+            console.log(`Affected lessons: ${affected.length}`, affected);
 
-            // Helper to check if a teacher is available at a specific time
+            // Availability check
             const isTeacherAvailable = async (teacherShortened: string, period: number): Promise<boolean> => {
               for (const table of classTables) {
                 const { data: rows } = await supabase.from(table).select('Stunde,' + dayKey).eq('Stunde', period);
                 if (!rows || rows.length === 0) continue;
-                
                 const row = rows[0] as any;
                 const entries = parseCell(row[dayKey]);
-                
                 if (entries.some(e => e.teacher === teacherShortened)) {
-                  return false; // Teacher is busy
+                  return false;
                 }
               }
-              return true; // Teacher is free
+              return true;
             };
 
-            // Find substitute teachers and create substitution entries
             const confirmations: string[] = [];
             const substitutions: Array<{
               period: number;
@@ -456,19 +457,15 @@ serve(async (req) => {
               let bestSubstitute: string | null = null;
               let bestScore = -1;
 
-              // Find the best substitute teacher (STRICT subject match required)
               for (const [shortened, teacher] of Object.entries(teacherMap)) {
-                if (shortened === sickTeacherShortened) continue; // Skip sick teacher
-                
-                // Enforce subject expertise strictly
+                if (shortened === sickTeacherShortened) continue;
+                // STRICT subject match on normalized subjects
                 if (!teacher.subjects.has(lesson.subject)) continue;
-                
-                // Check availability
+
                 const isAvailable = await isTeacherAvailable(shortened, lesson.period);
                 if (!isAvailable) continue;
 
                 let score = 0;
-                // Bonus for preferred room
                 if (teacher.rooms.includes(lesson.room)) score += 5;
 
                 if (score > bestScore) {
@@ -480,7 +477,7 @@ serve(async (req) => {
               if (!bestSubstitute) {
                 const dateStr = dateValue.toLocaleDateString('de-DE');
                 confirmations.push(`Keine freie Lehrkraft mit Fach ${lesson.subject} für Klasse ${lesson.className}, ${lesson.period}. Stunde am ${dateStr} (Raum ${lesson.room}). Optionen: Klassen zusammenlegen / Raumwechsel / Stunde entfallen lassen.`);
-                continue; // Skip creating substitution without valid subject match
+                continue;
               }
 
               const substituteTeacherName = teacherMap[bestSubstitute].name;
@@ -505,7 +502,7 @@ serve(async (req) => {
               };
             } else {
               result = { 
-                message: `Vertretungsplan für ${teacherMap[sickTeacherShortened].name} erfolgreich erstellt`,
+                message: `Vertretungsvorschlag für ${teacherMap[sickTeacherShortened].name} erstellt`,
                 confirmations,
                 details: {
                   sickTeacher: teacherMap[sickTeacherShortened].name,
@@ -525,7 +522,7 @@ serve(async (req) => {
           result = { error: 'Keine Berechtigung für automatische Vertretungsplanung - Level 9 erforderlich' }
         }
         break
-      
+
       case 'get_teachers': {
         try {
           const { data, error } = await supabase.from('teachers').select('*').order('last name');
@@ -612,36 +609,46 @@ serve(async (req) => {
 
       case 'get_schedule': {
         try {
-          const className = (parameters.className || parameters.klasse || '10b').toString().trim().toLowerCase();
+          const className = (parameters.className || parameters.klasse || '10b').toString().trim();
           const dayParam = (parameters.day || parameters.tag || '').toString().trim().toLowerCase();
-          
-          // Dynamically discover all schedule tables and build class mapping
+
+          // Discover all schedule tables
           const { data: tableResult, error: tableErr } = await supabase.rpc('sql', {
             query: `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'Stundenplan_%'`
           });
           
           const availableTables = (tableErr || !tableResult)
-            ? ['Stundenplan_10b_A', 'Stundenplan_10c_A']
+            ? ['Stundenplan_10b', 'Stundenplan_10c'] // Updated fallback
             : (tableResult as any[])
                 .map((t: any) => t.table_name)
                 .filter((name: string) => name.startsWith('Stundenplan_'));
-            
-          // Extract class names and build mapping
+          
+          // Build class mapping (robust normalization)
           const tableMap: Record<string, string> = {};
           const availableClasses: string[] = [];
           
           for (const tableName of availableTables) {
-            const raw = tableName.replace('Stundenplan_', '');
-            const keySimple = raw.toLowerCase().replace(/_/g, ''); // e.g., 10ba
-            const keyNoSection = keySimple.replace(/[a-z]$/, '');   // e.g., 10b
-            const display = raw.replace('_', ' ');
-            tableMap[keySimple] = tableName;
-            tableMap[keyNoSection] = tableName;
-            availableClasses.push(display);
+            const raw = tableName.replace('Stundenplan_', ''); // e.g., '10b'
+            const rawLower = raw.toLowerCase();
+            const keyVariants = new Set<string>([
+              rawLower,
+              rawLower.replace(/[_\s]/g, ''), // remove underscores/spaces
+            ]);
+            keyVariants.forEach(k => tableMap[k] = tableName);
+            availableClasses.push(raw); // display without 'Stundenplan_'
           }
-          
-          const normalizedInput = className.toLowerCase().replace(/\s+/g, '');
-          const table = tableMap[normalizedInput];
+
+          const normalizedInput = className.toLowerCase().replace(/[_\s]/g, '');
+          let table = tableMap[normalizedInput];
+
+          if (!table) {
+            // Fallback: try partial matching safely
+            const entry = Object.entries(tableMap).find(([k]) => 
+              k === normalizedInput || k.startsWith(normalizedInput) || normalizedInput.startsWith(k)
+            );
+            if (entry) table = entry[1];
+          }
+
           if (!table) {
             result = { 
               error: `E.D.U.A.R.D.: Stundenplan für Klasse "${className}" nicht gefunden. Verfügbare Klassen: ${availableClasses.join(', ')}` 
@@ -799,7 +806,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in ai-actions:', error)
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: (error as any).message }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500 
