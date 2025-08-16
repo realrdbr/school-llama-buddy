@@ -6,6 +6,48 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Deterministic weekday mapping (Europe/Berlin timezone)
+const WEEKDAY_MAP: Record<string, number> = {
+  // German names
+  'montag': 1, 'mo': 1, 'mon': 1,
+  'dienstag': 2, 'di': 2, 'die': 2, 'tue': 2, 'tuesday': 2,
+  'mittwoch': 3, 'mi': 3, 'mit': 3, 'wed': 3, 'wednesday': 3,
+  'donnerstag': 4, 'do': 4, 'don': 4, 'thu': 4, 'thursday': 4,
+  'freitag': 5, 'fr': 5, 'fre': 5, 'fri': 5, 'friday': 5,
+  'samstag': 6, 'sa': 6, 'sam': 6, 'sat': 6, 'saturday': 6,
+  'sonntag': 7, 'so': 7, 'son': 7, 'sun': 7, 'sunday': 7,
+  // English names
+  'monday': 1,
+}
+
+// Canonical weekday column mapping for database
+const WEEKDAY_COLUMNS: Record<number, string> = {
+  1: 'monday',
+  2: 'tuesday', 
+  3: 'wednesday',
+  4: 'thursday',
+  5: 'friday'
+}
+
+// Helper to get current time in Europe/Berlin timezone
+const getBerlinDate = (): Date => {
+  return new Date(new Date().toLocaleString("en-US", {timeZone: "Europe/Berlin"}))
+}
+
+// Helper to normalize weekday input
+const normalizeWeekday = (input: string): number | null => {
+  const normalized = input.toLowerCase().trim()
+  return WEEKDAY_MAP[normalized] || null
+}
+
+// Helper to get weekday from date string using Berlin timezone
+const getWeekdayFromDate = (dateStr: string): number => {
+  const date = new Date(dateStr + 'T12:00:00')
+  const berlinDate = new Date(date.toLocaleString("en-US", {timeZone: "Europe/Berlin"}))
+  const day = berlinDate.getDay()
+  return day === 0 ? 7 : day // Convert Sunday from 0 to 7
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -50,17 +92,24 @@ serve(async (req) => {
         if (userProfile.permission_lvl >= 10) {
           console.log('Raw parameters received:', parameters)
           
-          // Convert date parameter to proper date format
-          let dateValue = new Date();
+          // Convert date parameter using Berlin timezone
+          let dateValue = getBerlinDate();
           if (parameters.date) {
-            const dateParam = parameters.date.toLowerCase();
-            if (dateParam === 'morgen' || dateParam === 'tomorrow') {
-              dateValue = new Date();
+            const dateParam = parameters.date.toLowerCase().trim();
+            
+            // Handle German weekday names
+            const weekdayNum = normalizeWeekday(dateParam);
+            if (weekdayNum) {
+              const today = getBerlinDate();
+              const todayWeekday = today.getDay() === 0 ? 7 : today.getDay();
+              let diff = weekdayNum - todayWeekday;
+              if (diff <= 0) diff += 7; // Next occurrence of this weekday
+              dateValue.setDate(today.getDate() + diff);
+            } else if (dateParam === 'morgen' || dateParam === 'tomorrow') {
               dateValue.setDate(dateValue.getDate() + 1);
             } else if (dateParam === 'heute' || dateParam === 'today') {
-              dateValue = new Date();
+              // dateValue is already today in Berlin timezone
             } else if (dateParam === 'übermorgen') {
-              dateValue = new Date();
               dateValue.setDate(dateValue.getDate() + 2);
             } else {
               // Try to parse as date
@@ -185,38 +234,35 @@ serve(async (req) => {
 
             console.log(`E.D.U.A.R.D. planning substitution for ${teacherName} on ${dateParam}`);
 
-            // Parse date including German weekday words
-            let dateValue = new Date();
-            const lower = String(dateParam).toLowerCase();
-            const weekdayMap: Record<string, number> = { montag:1, dienstag:2, mittwoch:3, donnerstag:4, freitag:5 };
-            if (lower === 'morgen' || lower === 'tomorrow') {
+            // Parse date using Berlin timezone and improved weekday handling
+            let dateValue = getBerlinDate();
+            const lower = String(dateParam).toLowerCase().trim();
+            
+            // Use the new weekday normalization function
+            const weekdayNum = normalizeWeekday(lower);
+            if (weekdayNum) {
+              const today = getBerlinDate();
+              const todayWeekday = today.getDay() === 0 ? 7 : today.getDay();
+              let diff = weekdayNum - todayWeekday;
+              if (diff <= 0) diff += 7; // Next occurrence of this weekday
+              dateValue.setDate(today.getDate() + diff);
+            } else if (lower === 'morgen' || lower === 'tomorrow') {
               dateValue.setDate(dateValue.getDate() + 1);
             } else if (lower === 'übermorgen') {
               dateValue.setDate(dateValue.getDate() + 2);
             } else if (lower !== 'heute' && lower !== 'today') {
-              if (weekdayMap[lower]) {
-                const today = new Date();
-                const todayDow = today.getDay() === 0 ? 7 : today.getDay(); // 1..7
-                let diff = weekdayMap[lower] - todayDow;
-                if (diff < 0) diff += 7;
-                if (diff === 0) diff = 7; // same day → next week
-                dateValue.setDate(today.getDate() + diff);
-              } else {
-                const parsed = new Date(dateParam);
-                if (!isNaN(parsed.getTime())) dateValue = parsed;
-              }
+              const parsed = new Date(dateParam);
+              if (!isNaN(parsed.getTime())) dateValue = parsed;
             }
             
-            const weekday = dateValue.getDay(); // 0=Sun ... 6=Sat
-            const weekdayKeyMap: Record<number, 'monday'|'tuesday'|'wednesday'|'thursday'|'friday'> = {
-              1: 'monday', 2: 'tuesday', 3: 'wednesday', 4: 'thursday', 5: 'friday'
-            } as const;
+            const weekday = getWeekdayFromDate(dateValue.toISOString().split('T')[0]);
             
-            if (!(weekday in weekdayKeyMap)) {
+            if (weekday < 1 || weekday > 5) {
               result = { error: 'E.D.U.A.R.D.: Ausgewähltes Datum liegt am Wochenende' }
               break;
             }
-            const dayKey = weekdayKeyMap[weekday as 1|2|3|4|5];
+            
+            const dayKey = WEEKDAY_COLUMNS[weekday];
 
             // Load all teachers from database
             const { data: teachersData, error: teachersError } = await supabase
@@ -260,20 +306,58 @@ serve(async (req) => {
 
             console.log('Loaded teachers:', Object.keys(teacherMap));
 
-            // Find the sick teacher
+            // Find the sick teacher with improved matching
             const normalize = (s: string) => s.toLowerCase().replace(/\b(fr\.?|herr|frau|hr\.?|fr\.?)/g, '').trim();
             const normSick = normalize(teacherName);
             
             let sickTeacherShortened: string | null = null;
+            let possibleMatches: Array<{shortened: string, name: string, score: number}> = [];
+            
+            // Exact and fuzzy matching
             for (const [shortened, data] of Object.entries(teacherMap)) {
-              if (normalize(data.name).includes(normSick) || normalize(shortened) === normSick) {
-                sickTeacherShortened = shortened;
-                break;
+              let score = 0;
+              
+              // Exact match on shortened name
+              if (normalize(shortened) === normSick) {
+                score = 100;
+              }
+              // Full name contains input
+              else if (normalize(data.name).includes(normSick)) {
+                score = 90;
+              }
+              // Partial matches
+              else if (normSick.length >= 3) {
+                if (normalize(data.name).includes(normSick.substring(0, 3))) {
+                  score = 60;
+                } else if (normalize(shortened).includes(normSick.substring(0, 3))) {
+                  score = 70;
+                }
+              }
+              
+              if (score > 0) {
+                possibleMatches.push({shortened, name: data.name, score});
               }
             }
-
-            if (!sickTeacherShortened) {
-              result = { error: `E.D.U.A.R.D.: Lehrkraft "${teacherName}" nicht in der Datenbank gefunden` };
+            
+            // Sort by score and take best match
+            possibleMatches.sort((a, b) => b.score - a.score);
+            
+            if (possibleMatches.length === 0) {
+              const teachersList = Object.values(teacherMap).map(t => `${t.name} [${t.shortened}]`).slice(0, 5).join(', ');
+              result = { 
+                error: `E.D.U.A.R.D.: Lehrkraft "${teacherName}" nicht in der Datenbank gefunden. Verfügbare Lehrkräfte: ${teachersList}` 
+              };
+              break;
+            }
+            
+            // Use best match if score is high enough, otherwise ask for clarification
+            if (possibleMatches[0].score >= 80) {
+              sickTeacherShortened = possibleMatches[0].shortened;
+            } else {
+              const suggestions = possibleMatches.slice(0, 3).map(m => `${m.name} [${m.shortened}]`).join(', ');
+              result = { 
+                error: `E.D.U.A.R.D.: Mehrere Lehrkräfte gefunden für "${teacherName}". Bitte präzisieren Sie: ${suggestions}` 
+              };
               break;
             }
 
@@ -291,9 +375,20 @@ serve(async (req) => {
               });
             };
 
-            // Get all schedule tables
-            const { data: tables } = await supabase.rpc('information_schema_tables') || {};
-            const classTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A']; // Known tables for now
+            // Dynamically discover all schedule tables
+            const { data: allTables, error: tablesError } = await supabase.rpc('sql', {
+              query: `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'Stundenplan_%'`
+            });
+            
+            let classTables: string[];
+            if (tablesError) {
+              console.log('Using fallback schedule tables discovery');
+              classTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A']; // Fallback
+            } else {
+              classTables = (allTables || [])
+                .map((t: any) => t.table_name)
+                .filter((name: string) => name.startsWith('Stundenplan_'));
+            }
 
             const affected: Array<{ 
               className: string, 
@@ -393,27 +488,7 @@ serve(async (req) => {
               const substituteTeacher = bestSubstitute || 'Vertretung';
               const substituteTeacherName = bestSubstitute ? teacherMap[bestSubstitute].name : 'Vertretung';
 
-              // Insert into vertretungsplan
-              const { error: insertError } = await supabase.from('vertretungsplan').insert({
-                date: dateValue.toISOString().split('T')[0],
-                class_name: lesson.className,
-                period: lesson.period,
-                original_teacher: teacherMap[sickTeacherShortened].name,
-                original_subject: lesson.subject,
-                original_room: lesson.room,
-                substitute_teacher: substituteTeacherName,
-                substitute_subject: lesson.subject,
-                substitute_room: lesson.room,
-                note: bestSubstitute ? 
-                  `E.D.U.A.R.D.: ${substituteTeacherName} kann ${lesson.subject} unterrichten` : 
-                  'E.D.U.A.R.D.: Keine passende Lehrkraft verfügbar',
-                created_by: null
-              });
-
-              if (insertError) {
-                console.error('Error inserting substitution:', insertError);
-                continue;
-              }
+              // Don't insert directly - return proposal for user confirmation
 
               substitutions.push({
                 period: lesson.period,
@@ -478,19 +553,112 @@ serve(async (req) => {
         break
       }
 
+      case 'confirm_substitution':
+        if (userProfile.permission_lvl >= 9) {
+          try {
+            const { substitutions, sickTeacher, date } = parameters;
+            
+            if (!substitutions || !Array.isArray(substitutions)) {
+              result = { error: 'Keine Vertretungsdaten zum Bestätigen erhalten' };
+              break;
+            }
+            
+            const confirmed: string[] = [];
+            const failed: string[] = [];
+            
+            // Process each substitution with atomic transactions
+            for (const sub of substitutions) {
+              try {
+                const { error: insertError } = await supabase.from('vertretungsplan').insert({
+                  date: date,
+                  class_name: sub.className,
+                  period: sub.period,
+                  original_teacher: sub.originalTeacher,
+                  original_subject: sub.subject,
+                  original_room: sub.room,
+                  substitute_teacher: sub.substituteTeacher,
+                  substitute_subject: sub.subject,
+                  substitute_room: sub.room,
+                  note: `E.D.U.A.R.D.: Automatische Vertretung für ${sickTeacher}`,
+                  created_by: null
+                });
+                
+                if (insertError) {
+                  console.error('Substitution insert error:', insertError);
+                  failed.push(`${sub.className}, ${sub.period}. Stunde: ${insertError.message}`);
+                } else {
+                  confirmed.push(`${sub.substituteTeacher} übernimmt ${sub.className}, ${sub.period}. Stunde ${sub.subject}`);
+                }
+              } catch (e) {
+                console.error('Substitution processing error:', e);
+                failed.push(`${sub.className}, ${sub.period}. Stunde: ${e.message}`);
+              }
+            }
+            
+            if (confirmed.length > 0) {
+              result = {
+                message: `Vertretungsplan erfolgreich erstellt für ${sickTeacher}`,
+                confirmed: confirmed,
+                failed: failed.length > 0 ? failed : undefined
+              };
+              success = true;
+            } else {
+              result = { error: 'Keine Vertretungen konnten erstellt werden', failed };
+            }
+            
+          } catch (e) {
+            console.error('confirm_substitution error:', e);
+            result = { error: e.message || 'Fehler beim Bestätigen der Vertretungen' };
+          }
+        } else {
+          result = { error: 'Keine Berechtigung zum Bestätigen von Vertretungen - Level 9 erforderlich' };
+        }
+        break
+
       case 'get_schedule': {
         try {
           const className = (parameters.className || parameters.klasse || '10b').toString().trim().toLowerCase();
           const dayParam = (parameters.day || parameters.tag || '').toString().trim().toLowerCase();
-          const tableMap: Record<string, string> = { '10b': 'Stundenplan_10b_A', '10c': 'Stundenplan_10c_A' };
-          const table = tableMap[className];
+          
+          // Dynamically discover all schedule tables and build class mapping
+          const { data: allTables } = await supabase
+            .from('information_schema.tables')
+            .select('table_name')
+            .eq('table_schema', 'public')
+            .like('table_name', 'Stundenplan_%') || { data: [] };
+            
+          const availableTables = (allTables || [])
+            .map((t: any) => t.table_name)
+            .filter((name: string) => name.startsWith('Stundenplan_'));
+            
+          // Extract class names and build mapping
+          const tableMap: Record<string, string> = {};
+          const availableClasses: string[] = [];
+          
+          for (const tableName of availableTables) {
+            const classKey = tableName.replace('Stundenplan_', '').replace('_', '').toLowerCase();
+            const classDisplay = tableName.replace('Stundenplan_', '').replace('_', ' ');
+            tableMap[classKey] = tableName;
+            availableClasses.push(classDisplay);
+          }
+          
+          const table = tableMap[className.replace(/\s+/g, '')];
           if (!table) {
-            result = { error: `Unbekannte Klasse: ${className}` };
+            result = { 
+              error: `E.D.U.A.R.D.: Stundenplan für Klasse "${className}" nicht gefunden. Verfügbare Klassen: ${availableClasses.join(', ')}` 
+            };
             break;
           }
 
           const { data: rows, error } = await supabase.from(table).select('*').order('Stunde');
           if (error) throw error;
+          
+          if (!rows || rows.length === 0) {
+            result = { 
+              error: `E.D.U.A.R.D.: Keine Einträge für Klasse "${className}" gefunden. Bitte überprüfen Sie die Stundenplandaten.` 
+            };
+            break;
+          }
 
           const normalizeDay = (d: string) => {
             const map: Record<string, string> = { montag:'monday', dienstag:'tuesday', mittwoch:'wednesday', donnerstag:'thursday', freitag:'friday' };

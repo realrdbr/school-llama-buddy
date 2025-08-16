@@ -25,6 +25,67 @@ const AIChat = () => {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Global functions for substitution confirmation buttons
+  useEffect(() => {
+    (window as any).confirmSubstitution = async (data: any) => {
+      try {
+        const { data: actionResult, error } = await supabase.functions.invoke('ai-actions', {
+          body: {
+            action: 'confirm_substitution',
+            parameters: data,
+            userProfile: {
+              user_id: profile?.id,
+              name: profile?.username || profile?.name,
+              permission_lvl: profile?.permission_lvl
+            }
+          }
+        });
+
+        if (error) throw error;
+
+        const confirmationMessage = {
+          role: 'assistant' as const,
+          content: actionResult?.success ? 
+            `✅ ${actionResult.result?.message || 'Vertretungsplan erfolgreich erstellt!'}\n${(actionResult.result?.confirmed || []).map((c: string) => `- ${c}`).join('\n')}` :
+            `❌ ${actionResult?.result?.error || 'Fehler beim Erstellen des Vertretungsplans'}`
+        };
+
+        setConversation(prev => [...prev, confirmationMessage]);
+
+        // Save confirmation message
+        if (currentConversationId) {
+          await saveMessage(confirmationMessage, currentConversationId);
+        }
+
+        toast({
+          title: actionResult?.success ? "Erfolg" : "Fehler",
+          description: actionResult?.success ? "Vertretungsplan wurde erstellt" : "Fehler beim Erstellen",
+          variant: actionResult?.success ? "default" : "destructive"
+        });
+      } catch (error) {
+        console.error('Confirmation error:', error);
+        toast({
+          title: "Fehler",
+          description: "Fehler beim Bestätigen der Vertretung",
+          variant: "destructive"
+        });
+      }
+    };
+
+    (window as any).cancelSubstitution = () => {
+      const cancelMessage = {
+        role: 'assistant' as const,
+        content: 'Vertretungsplanung abgebrochen.'
+      };
+      setConversation(prev => [...prev, cancelMessage]);
+    };
+
+    return () => {
+      delete (window as any).confirmSubstitution;
+      delete (window as any).cancelSubstitution;
+    };
+  }, [profile, currentConversationId]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -332,7 +393,26 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
                 }
                 case 'plan_substitution': {
                   const conf = (res.confirmations || []) as Array<string>;
-                  if (conf.length) details = `\n\nBestätigungen:\n- ${conf.join('\n- ')}`;
+                  const subs = res.details?.substitutions;
+                  if (conf.length) {
+                    details = `\n\nVertretungsplan vorgeschlagen:\n- ${conf.join('\n- ')}`;
+                    
+                    // Add confirmation buttons for substitution planning
+                    if (subs && Array.isArray(subs)) {
+                      details += `\n\n<div style="margin-top: 16px;">
+                        <button 
+                          onclick="window.confirmSubstitution({substitutions: ${JSON.stringify(subs).replace(/"/g, '&quot;')}, sickTeacher: '${res.details?.sickTeacher}', date: '${res.details?.date}'})" 
+                          style="background: #22c55e; color: white; padding: 8px 16px; border: none; border-radius: 4px; margin-right: 8px; cursor: pointer;">
+                          Vertretungsplan erstellen
+                        </button>
+                        <button 
+                          onclick="window.cancelSubstitution()" 
+                          style="background: #ef4444; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">
+                          Abbrechen
+                        </button>
+                      </div>`;
+                    }
+                  }
                   break;
                 }
                 default: {
