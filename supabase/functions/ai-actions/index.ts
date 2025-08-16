@@ -387,7 +387,7 @@ serve(async (req) => {
             let classTables: string[];
             if (tablesError) {
               console.log('Using fallback schedule tables discovery');
-              classTables = ['Stundenplan_10b', 'Stundenplan_10c']; // Updated fallback
+              classTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A']; // Updated fallback
             } else {
               classTables = (allTables || [])
                 .map((t: any) => t.table_name)
@@ -618,7 +618,7 @@ serve(async (req) => {
           });
           
           const availableTables = (tableErr || !tableResult)
-            ? ['Stundenplan_10b', 'Stundenplan_10c'] // Updated fallback
+            ? ['Stundenplan_10b_A', 'Stundenplan_10c_A'] // Updated fallback
             : (tableResult as any[])
                 .map((t: any) => t.table_name)
                 .filter((name: string) => name.startsWith('Stundenplan_'));

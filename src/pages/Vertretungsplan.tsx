@@ -137,8 +137,8 @@ const Vertretungsplan = () => {
 
   const fetchSchedules = async () => {
     try {
-      const { data: schedule10b } = await supabase.from('Stundenplan_10b').select('*');
-      const { data: schedule10c } = await supabase.from('Stundenplan_10c').select('*');
+      const { data: schedule10b } = await supabase.from('Stundenplan_10b_A').select('*');
+      const { data: schedule10c } = await supabase.from('Stundenplan_10c_A').select('*');
       
       // Transform data to match ScheduleEntry interface
       const transform = (data: any[]) => data.map(item => ({
