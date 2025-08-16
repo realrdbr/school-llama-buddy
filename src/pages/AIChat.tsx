@@ -433,6 +433,31 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
         }
       }
       
+      // Fallback: Lehrerlisten-Anfrage ohne Aktion -> DB-gestützt laden
+      if (/lehrerliste|liste.*lehr|alle\s+lehrer/i.test(currentInput)) {
+        try {
+          const { data: actionResult } = await supabase.functions.invoke('ai-actions', {
+            body: {
+              action: 'get_teachers',
+              parameters: {},
+              userProfile: {
+                user_id: profile?.id,
+                name: profile?.username || profile?.name,
+                permission_lvl: profile?.permission_lvl
+              }
+            }
+          });
+          if (actionResult?.success) {
+            const res = actionResult.result || {};
+            const textList = res.textList as string | undefined;
+            const details = textList ? `\n\nLehrkräfte:\n${textList}` : '';
+            assistantContent = `\n\n✅ ${res.message || 'Lehrerliste geladen.'}${details}`;
+          }
+        } catch (e) {
+          console.error('Fallback get_teachers error:', e);
+        }
+      }
+      
       const assistantResponse = {
         role: 'assistant' as const,
         content: assistantContent

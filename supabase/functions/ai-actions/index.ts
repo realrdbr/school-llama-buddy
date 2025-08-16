@@ -379,20 +379,8 @@ serve(async (req) => {
               });
             };
 
-            // Discover schedule tables (fallback updated to new names)
-            const { data: allTables, error: tablesError } = await supabase.rpc('sql', {
-              query: `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'Stundenplan_%'`
-            });
-            
-            let classTables: string[];
-            if (tablesError) {
-              console.log('Using fallback schedule tables discovery');
-              classTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A']; // Updated fallback
-            } else {
-              classTables = (allTables || [])
-                .map((t: any) => t.table_name)
-                .filter((name: string) => name.startsWith('Stundenplan_'));
-            }
+            // Discover schedule tables (static list to avoid raw SQL in edge functions)
+            const classTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
 
             const affected: Array<{ 
               className: string, 
@@ -525,16 +513,18 @@ serve(async (req) => {
 
       case 'get_teachers': {
         try {
-          const { data, error } = await supabase.from('teachers').select('*').order('last name');
+          const { data, error } = await supabase.from('teachers').select('*');
           if (error) throw error;
           const teachersRaw = (data || []) as any[];
-          const teachers = teachersRaw.map((t: any) => ({
-            firstName: t['first name'],
-            lastName: t['last name'],
-            shortened: t['shortened'],
-            subjects: t['subjects'],
-            fav_rooms: t['fav_rooms'] || null,
-          }));
+          const teachers = teachersRaw
+            .map((t: any) => ({
+              firstName: t['first name'],
+              lastName: t['last name'],
+              shortened: t['shortened'],
+              subjects: t['subjects'],
+              fav_rooms: t['fav_rooms'] || null,
+            }))
+            .sort((a: any, b: any) => String(a.lastName || '').localeCompare(String(b.lastName || ''), 'de'));
           const textList = teachers.map(t => `- ${t.lastName}, ${t.firstName} [${t.shortened}] — ${t.subjects}`).join('\n');
           result = { message: `Es wurden ${teachers.length} Lehrkräfte geladen.`, teachers, textList };
           success = true;
@@ -612,16 +602,8 @@ serve(async (req) => {
           const className = (parameters.className || parameters.klasse || '10b').toString().trim();
           const dayParam = (parameters.day || parameters.tag || '').toString().trim().toLowerCase();
 
-          // Discover all schedule tables
-          const { data: tableResult, error: tableErr } = await supabase.rpc('sql', {
-            query: `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'Stundenplan_%'`
-          });
-          
-          const availableTables = (tableErr || !tableResult)
-            ? ['Stundenplan_10b_A', 'Stundenplan_10c_A'] // Updated fallback
-            : (tableResult as any[])
-                .map((t: any) => t.table_name)
-                .filter((name: string) => name.startsWith('Stundenplan_'));
+          // Use static table list to avoid raw SQL in edge functions
+          const availableTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
           
           // Build class mapping (robust normalization)
           const tableMap: Record<string, string> = {};
