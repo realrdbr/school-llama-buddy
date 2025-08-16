@@ -456,28 +456,20 @@ serve(async (req) => {
               let bestSubstitute: string | null = null;
               let bestScore = -1;
 
-              // Find the best substitute teacher
+              // Find the best substitute teacher (STRICT subject match required)
               for (const [shortened, teacher] of Object.entries(teacherMap)) {
                 if (shortened === sickTeacherShortened) continue; // Skip sick teacher
+                
+                // Enforce subject expertise strictly
+                if (!teacher.subjects.has(lesson.subject)) continue;
                 
                 // Check availability
                 const isAvailable = await isTeacherAvailable(shortened, lesson.period);
                 if (!isAvailable) continue;
 
                 let score = 0;
-                
-                // Score based on subject expertise
-                if (teacher.subjects.has(lesson.subject)) {
-                  score += 10; // High priority for subject match
-                }
-                
-                // Score based on preferred rooms
-                if (teacher.rooms.includes(lesson.room)) {
-                  score += 5; // Bonus for familiar room
-                }
-                
-                // Random factor to avoid always choosing the same teacher
-                score += Math.random() * 2;
+                // Bonus for preferred room
+                if (teacher.rooms.includes(lesson.room)) score += 5;
 
                 if (score > bestScore) {
                   bestScore = score;
@@ -485,10 +477,13 @@ serve(async (req) => {
                 }
               }
 
-              const substituteTeacher = bestSubstitute || 'Vertretung';
-              const substituteTeacherName = bestSubstitute ? teacherMap[bestSubstitute].name : 'Vertretung';
+              if (!bestSubstitute) {
+                const dateStr = dateValue.toLocaleDateString('de-DE');
+                confirmations.push(`Keine freie Lehrkraft mit Fach ${lesson.subject} für Klasse ${lesson.className}, ${lesson.period}. Stunde am ${dateStr} (Raum ${lesson.room}). Optionen: Klassen zusammenlegen / Raumwechsel / Stunde entfallen lassen.`);
+                continue; // Skip creating substitution without valid subject match
+              }
 
-              // Don't insert directly - return proposal for user confirmation
+              const substituteTeacherName = teacherMap[bestSubstitute].name;
 
               substitutions.push({
                 period: lesson.period,
@@ -621,28 +616,32 @@ serve(async (req) => {
           const dayParam = (parameters.day || parameters.tag || '').toString().trim().toLowerCase();
           
           // Dynamically discover all schedule tables and build class mapping
-          const { data: allTables } = await supabase
-            .from('information_schema.tables')
-            .select('table_name')
-            .eq('table_schema', 'public')
-            .like('table_name', 'Stundenplan_%') || { data: [] };
-            
-          const availableTables = (allTables || [])
-            .map((t: any) => t.table_name)
-            .filter((name: string) => name.startsWith('Stundenplan_'));
+          const { data: tableResult, error: tableErr } = await supabase.rpc('sql', {
+            query: `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'Stundenplan_%'`
+          });
+          
+          const availableTables = (tableErr || !tableResult)
+            ? ['Stundenplan_10b_A', 'Stundenplan_10c_A']
+            : (tableResult as any[])
+                .map((t: any) => t.table_name)
+                .filter((name: string) => name.startsWith('Stundenplan_'));
             
           // Extract class names and build mapping
           const tableMap: Record<string, string> = {};
           const availableClasses: string[] = [];
           
           for (const tableName of availableTables) {
-            const classKey = tableName.replace('Stundenplan_', '').replace('_', '').toLowerCase();
-            const classDisplay = tableName.replace('Stundenplan_', '').replace('_', ' ');
-            tableMap[classKey] = tableName;
-            availableClasses.push(classDisplay);
+            const raw = tableName.replace('Stundenplan_', '');
+            const keySimple = raw.toLowerCase().replace(/_/g, ''); // e.g., 10ba
+            const keyNoSection = keySimple.replace(/[a-z]$/, '');   // e.g., 10b
+            const display = raw.replace('_', ' ');
+            tableMap[keySimple] = tableName;
+            tableMap[keyNoSection] = tableName;
+            availableClasses.push(display);
           }
           
-          const table = tableMap[className.replace(/\s+/g, '')];
+          const normalizedInput = className.toLowerCase().replace(/\s+/g, '');
+          const table = tableMap[normalizedInput];
           if (!table) {
             result = { 
               error: `E.D.U.A.R.D.: Stundenplan für Klasse "${className}" nicht gefunden. Verfügbare Klassen: ${availableClasses.join(', ')}` 
@@ -660,11 +659,13 @@ serve(async (req) => {
             break;
           }
 
-          const normalizeDay = (d: string) => {
-            const map: Record<string, string> = { montag:'monday', dienstag:'tuesday', mittwoch:'wednesday', donnerstag:'thursday', freitag:'friday' };
-            return map[d] || d;
+          const normalizeDayToColumn = (d: string) => {
+            const key = d.toLowerCase();
+            const num = WEEKDAY_MAP[key];
+            if (!num) return '';
+            return WEEKDAY_COLUMNS[num] || '';
           };
-          const dayKey = dayParam ? normalizeDay(dayParam) : '';
+          const dayKey = dayParam ? normalizeDayToColumn(dayParam) : '';
 
           // Parse helper like used in substitution planning
           const parseCell = (cell?: string) => {
