@@ -216,7 +216,8 @@ const AIVertretungsGenerator = ({ onGenerated }: AIVertretungsGeneratorProps) =>
         body: {
           action: 'confirm_substitution',
           parameters: {
-            teacherName: proposedPlan.teacher,
+            substitutions: proposedPlan.affectedLessons,
+            sickTeacher: proposedPlan.teacher,
             date: proposedPlan.date
           },
           userProfile: {
