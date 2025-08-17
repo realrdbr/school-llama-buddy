@@ -506,6 +506,7 @@ serve(async (req) => {
                 details: {
                   sickTeacher: teacherMap[sickTeacherShortened].name,
                   date: dateValue.toLocaleDateString('de-DE'),
+                  dateISO: dateValue.toISOString().split('T')[0],
                   affectedLessons: affected.length,
                   substitutions
                 }
@@ -590,11 +591,27 @@ serve(async (req) => {
             const failed: string[] = [];
             
             // Process each substitution with atomic transactions
+            // Parse incoming date to ISO once (supports 'YYYY-MM-DD' and 'DD.MM.YYYY')
+            const parseDateToISO = (d: string): string => {
+              if (!d) return new Date().toISOString().split('T')[0];
+              if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+              const m = d.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+              if (m) {
+                const dd = parseInt(m[1], 10);
+                const mm = parseInt(m[2], 10) - 1;
+                const yyyy = parseInt(m[3], 10);
+                const dt = new Date(Date.UTC(yyyy, mm, dd, 12, 0, 0));
+                return dt.toISOString().split('T')[0];
+              }
+              const t = new Date(d);
+              if (!isNaN(t.getTime())) return t.toISOString().split('T')[0];
+              console.warn('Unrecognized date format for substitution confirmation, defaulting to today:', d);
+              return new Date().toISOString().split('T')[0];
+            };
+            const isoDate = parseDateToISO(date);
+
             for (const sub of substitutions) {
               try {
-                // Ensure date is in ISO format (YYYY-MM-DD)
-                const isoDate = new Date(date).toISOString().split('T')[0];
-                
                 const { error: insertError } = await supabase.from('vertretungsplan').insert({
                   date: isoDate,
                   class_name: sub.className,
@@ -614,6 +631,7 @@ serve(async (req) => {
                   failed.push(`${sub.className}, ${sub.period}. Stunde: ${insertError.message}`);
                 } else {
                   confirmed.push(`${sub.substituteTeacher} übernimmt ${sub.className}, ${sub.period}. Stunde ${sub.subject}`);
+                  console.log('Substitution inserted:', { date: isoDate, class_name: sub.className, period: sub.period, subject: sub.subject, substitute: sub.substituteTeacher });
                 }
               } catch (e) {
                 console.error('Substitution processing error:', e);

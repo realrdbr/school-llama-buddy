@@ -356,6 +356,16 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
           if (parameters.teacherName) {
             parameters.teacherName = parameters.teacherName.replace(/\b(fr\.?|herr|frau|hr\.?)\s+/i, '').trim();
           }
+
+          // Ensure weekly schedule when user didn't ask for a specific day
+          if (actionName.toLowerCase() === 'get_schedule') {
+            const inputLower = currentInput.toLowerCase();
+            const wantsWeek = /(ganze?n?\s*woche|der\s*woche|woche|alle\s*tage)/i.test(inputLower);
+            const mentionsDay = /(montag|dienstag|mittwoch|donnerstag|freitag|\bmo\b|\bdi\b|\bmi\b|\bdo\b|\bfr\b)/i.test(inputLower);
+            if (wantsWeek || !mentionsDay) {
+              delete parameters.day;
+            }
+          }
           
           try {
             // Call ai-actions edge function
@@ -416,7 +426,7 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
                     if (subs && Array.isArray(subs)) {
                       details += `\n\n<div style="margin-top: 16px;">
                         <button 
-                          onclick="window.confirmSubstitution({substitutions: ${JSON.stringify(subs).replace(/"/g, '&quot;')}, sickTeacher: '${res.details?.sickTeacher}', date: '${res.details?.date}'})" 
+                          onclick="window.confirmSubstitution({substitutions: ${JSON.stringify(subs).replace(/"/g, '&quot;')}, sickTeacher: '${res.details?.sickTeacher}', date: '${res.details?.dateISO || res.details?.date}'})" 
                           style="background: #22c55e; color: white; padding: 8px 16px; border: none; border-radius: 4px; margin-right: 8px; cursor: pointer;">
                           Vertretungsplan erstellen
                         </button>
