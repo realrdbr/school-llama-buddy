@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -46,6 +47,13 @@ const getWeekdayFromDate = (dateStr: string): number => {
   const berlinDate = new Date(date.toLocaleString("en-US", {timeZone: "Europe/Berlin"}))
   const day = berlinDate.getDay()
   return day === 0 ? 7 : day // Convert Sunday from 0 to 7
+}
+
+// Helper to normalize teacher names (remove honorifics)
+const normalizeTeacherName = (name: string): string => {
+  return name.toLowerCase()
+    .replace(/\b(fr\.?|herr|frau|hr\.?|fr\.?)\s+/g, '')
+    .trim()
 }
 
 serve(async (req) => {
@@ -330,19 +338,21 @@ serve(async (req) => {
             console.log('Loaded teachers (shortened codes):', Object.keys(teacherMap));
 
             // Find the sick teacher with improved matching (no hallucination)
-            const normalize = (s: string) => s.toLowerCase().replace(/\b(fr\.?|herr|frau|hr\.?|fr\.?)/g, '').trim();
-            const normSick = normalize(teacherName);
+            const normSick = normalizeTeacherName(teacherName);
             
             let sickTeacherShortened: string | null = null;
             let possibleMatches: Array<{shortened: string, name: string, score: number}> = [];
             
             for (const [shortened, data] of Object.entries(teacherMap)) {
               let score = 0;
-              if (normalize(shortened) === normSick) score = 100;
-              else if (normalize(data.name).includes(normSick)) score = 90;
+              const normTeacherName = normalizeTeacherName(data.name);
+              const normShortened = normalizeTeacherName(shortened);
+              
+              if (normShortened === normSick) score = 100;
+              else if (normTeacherName.includes(normSick)) score = 90;
               else if (normSick.length >= 3) {
-                if (normalize(data.name).includes(normSick.substring(0, 3))) score = 60;
-                else if (normalize(shortened).includes(normSick.substring(0, 3))) score = 70;
+                if (normTeacherName.includes(normSick.substring(0, 3))) score = 60;
+                else if (normShortened.includes(normSick.substring(0, 3))) score = 70;
               }
               if (score > 0) possibleMatches.push({shortened, name: data.name, score});
             }
@@ -379,7 +389,7 @@ serve(async (req) => {
               });
             };
 
-            // Discover schedule tables (static list to avoid raw SQL in edge functions)
+            // Use all available schedule tables (supporting all classes)
             const classTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
 
             const affected: Array<{ 
@@ -389,7 +399,7 @@ serve(async (req) => {
               room: string 
             }> = [];
 
-            // Find affected lessons for that weekday
+            // Find affected lessons for that weekday (all classes)
             for (const table of classTables) {
               const { data: rows, error } = await supabase.from(table).select('*').order('Stunde');
               if (error) { 
@@ -404,8 +414,9 @@ serve(async (req) => {
                 
                 for (const entry of entries) {
                   if (entry.teacher === sickTeacherShortened) {
+                    const className = table.replace('Stundenplan_', '').replace('_A', '');
                     affected.push({ 
-                      className: table.replace('Stundenplan_', ''), 
+                      className, 
                       period, 
                       subject: normalizeSubject(entry.subject) || 'UNBEKANNT', 
                       room: entry.room || 'Unbekannt' 
@@ -417,7 +428,7 @@ serve(async (req) => {
 
             console.log(`Affected lessons: ${affected.length}`, affected);
 
-            // Availability check
+            // Availability check (improved to check all classes)
             const isTeacherAvailable = async (teacherShortened: string, period: number): Promise<boolean> => {
               for (const table of classTables) {
                 const { data: rows } = await supabase.from(table).select('Stunde,' + dayKey).eq('Stunde', period);
@@ -525,8 +536,38 @@ serve(async (req) => {
               fav_rooms: t['fav_rooms'] || null,
             }))
             .sort((a: any, b: any) => String(a.lastName || '').localeCompare(String(b.lastName || ''), 'de'));
+          
+          // Format as HTML table instead of plain text
+          const htmlTable = `
+            <table style="width:100%; border-collapse:collapse; border:1px solid #ddd; margin-top:10px;">
+              <thead>
+                <tr style="background:#f5f5f5;">
+                  <th style="border:1px solid #ddd; padding:8px; text-align:left;">Name</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:left;">Kürzel</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:left;">Fächer</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:left;">Räume</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${teachers.map(t => `
+                  <tr>
+                    <td style="border:1px solid #ddd; padding:8px;">${t.lastName}, ${t.firstName}</td>
+                    <td style="border:1px solid #ddd; padding:8px; font-weight:bold;">${t.shortened}</td>
+                    <td style="border:1px solid #ddd; padding:8px;">${t.subjects}</td>
+                    <td style="border:1px solid #ddd; padding:8px;">${t.fav_rooms || '-'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `;
+          
           const textList = teachers.map(t => `- ${t.lastName}, ${t.firstName} [${t.shortened}] — ${t.subjects}`).join('\n');
-          result = { message: `Es wurden ${teachers.length} Lehrkräfte geladen.`, teachers, textList };
+          result = { 
+            message: `Es wurden ${teachers.length} Lehrkräfte geladen.`, 
+            teachers, 
+            textList,
+            htmlTable
+          };
           success = true;
         } catch (e: any) {
           console.error('get_teachers error:', e);
@@ -605,12 +646,12 @@ serve(async (req) => {
           // Use static table list to avoid raw SQL in edge functions
           const availableTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
           
-          // Build class mapping (robust normalization)
+          // Build class mapping (robust normalization) - improved to handle all classes
           const tableMap: Record<string, string> = {};
           const availableClasses: string[] = [];
           
           for (const tableName of availableTables) {
-            const raw = tableName.replace('Stundenplan_', ''); // e.g., '10b'
+            const raw = tableName.replace('Stundenplan_', '').replace('_A', ''); // e.g., '10b'
             const rawLower = raw.toLowerCase();
             const keyVariants = new Set<string>([
               rawLower,

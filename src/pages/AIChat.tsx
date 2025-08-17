@@ -298,12 +298,16 @@ WICHTIGE REGELN:
 1. Du kannst ECHTE AKTIONEN ausführen! Wenn ein Benutzer eine Aktion anfordert, führe sie aus.
 2. Wenn du eine Aktion ausführen sollst, antworte mit: "AKTION:[ACTION_NAME]|PARAMETER1:wert1|PARAMETER2:wert2|..."
 3. Verstehe umgangssprachliche Anfragen intelligent und flexibel!
+4. Verstehe Lehrernamen mit und ohne Anrede (Herr/Frau): "Herr Müller" = "Müller"
+5. Verstehe alle verfügbaren Klassen (10B, 10C, etc.)
+6. Verstehe deutsche Wochentage korrekt: Montag, Dienstag, Mittwoch, Donnerstag, Freitag
 
 BEISPIELE FÜR VERTRETUNGSPLAN-ÄNDERUNGEN:
 - "morgen fällt die erste stunde aus" → AKTION:UPDATE_VERTRETUNGSPLAN|date:morgen|period:1|substituteTeacher:Entfall
 - "herr könig wird in der 10b vertreten" → AKTION:UPDATE_VERTRETUNGSPLAN|className:10b|originalTeacher:König|substituteTeacher:Vertretung
-- "raum 201 wird zu 204 gewechselt" → AKTION:UPDATE_VERTRETUNGSPLAN|originalRoom:201|substituteRoom:204
-- "frau müller übernimmt die mathe stunde" → AKTION:UPDATE_VERTRETUNGSPLAN|substituteTeacher:Müller|substituteSubject:Mathe
+- "Herr Müller ist morgen krank" → AKTION:PLAN_SUBSTITUTION|teacherName:Müller|date:morgen
+- "Frau Schmidt braucht Vertretung am Mittwoch" → AKTION:PLAN_SUBSTITUTION|teacherName:Schmidt|date:Mittwoch
+- "Zeig mir den Stundenplan der 10c am Montag" → AKTION:GET_SCHEDULE|className:10c|day:Montag
 
 4. Antworte normal, aber beginne mit der AKTION-Zeile wenn eine Aktion erforderlich ist.
 5. Bei unvollständigen Angaben verwende sinnvolle Standardwerte.
@@ -365,13 +369,14 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
               let details = '';
               switch (actionName.toLowerCase()) {
                 case 'get_teachers': {
-                  const textList = res.textList as string | undefined;
-                  if (textList) {
-                    details = `\n\nLehrkräfte:\n${textList}`;
+                  const htmlTable = res.htmlTable as string | undefined;
+                  if (htmlTable) {
+                    details = `\n\n<div style="overflow-x:auto;">${htmlTable}</div>`;
                   } else {
-                    const list = (res.teachers || []) as Array<any>;
-                    const lines = list.map((t: any) => `- ${t.firstName} ${t.lastName} (${t.subjects}) [${t.shortened}]`).join('\n');
-                    details = `\n\nLehrkräfte (${list.length}):\n${lines || '- Keine Daten -'}`;
+                    const textList = res.textList as string | undefined;
+                    if (textList) {
+                      details = `\n\nLehrkräfte:\n${textList}`;
+                    }
                   }
                   break;
                 }
@@ -449,8 +454,8 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
           });
           if (actionResult?.success) {
             const res = actionResult.result || {};
-            const textList = res.textList as string | undefined;
-            const details = textList ? `\n\nLehrkräfte:\n${textList}` : '';
+            const htmlTable = res.htmlTable as string | undefined;
+            const details = htmlTable ? `\n\n<div style="overflow-x:auto;">${htmlTable}</div>` : '';
             assistantContent = `\n\n✅ ${res.message || 'Lehrerliste geladen.'}${details}`;
           }
         } catch (e) {
