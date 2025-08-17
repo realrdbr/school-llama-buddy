@@ -467,16 +467,6 @@ const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >
                 </Button>
               </div>
               <div>
-                <Label htmlFor="date">Datum</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-40"
-                />
-              </div>
-              <div>
                 <Label htmlFor="class">Klasse</Label>
                 <Select value={selectedClass} onValueChange={setSelectedClass}>
                   <SelectTrigger className="w-32">

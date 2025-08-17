@@ -56,6 +56,74 @@ const normalizeTeacherName = (name: string): string => {
     .trim()
 }
 
+// Robust date text parser for German inputs, always returning a school day (Mon-Fri)
+const parseDateTextToBerlinSchoolDay = (raw?: string): Date => {
+  const now = getBerlinDate();
+  if (!raw || typeof raw !== 'string') return adjustWeekend(now);
+  let text = raw.toLowerCase().trim();
+
+  // Qualifiers influence next/over-next week
+  let weekOffset = 0;
+  if (/übernächste?n?/.test(text)) weekOffset = 2;
+  else if (/nächste?n?|kommende?n?/.test(text)) weekOffset = 1;
+
+  // Remove filler words
+  text = text.replace(/\b(am|den|diesen|kommenden|kommende|nächsten|nächster|nächste|übernächsten|übernächste)\b/g, '').trim();
+
+  const today = getBerlinDate();
+  const todayW = today.getDay() === 0 ? 7 : today.getDay();
+
+  const moveToNextOccurrence = (targetW: number) => {
+    let diff = targetW - todayW;
+    if (diff <= 0) diff += 7;
+    const d = new Date(today);
+    d.setDate(d.getDate() + diff + weekOffset * 7);
+    return adjustWeekend(d);
+  };
+
+  // Common relative cases
+  if (text === 'heute' || text === 'today') return adjustWeekend(today);
+  if (text === 'morgen' || text === 'tomorrow') return adjustWeekend(new Date(today.setDate(today.getDate() + 1)));
+  if (text === 'übermorgen') return adjustWeekend(new Date(now.setDate(now.getDate() + 2)));
+
+  // Weekday names contained anywhere in the string
+  for (const [k, v] of Object.entries(WEEKDAY_MAP)) {
+    if (v >= 1 && v <= 7 && text.includes(k)) {
+      return moveToNextOccurrence(v);
+    }
+  }
+
+  // Try DD.MM.YYYY
+  const m = text.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (m) {
+    const dd = parseInt(m[1], 10);
+    const mm = parseInt(m[2], 10) - 1;
+    const yyyy = parseInt(m[3], 10);
+    const dt = new Date(Date.UTC(yyyy, mm, dd, 12, 0, 0));
+    return adjustWeekend(new Date(dt.toLocaleString('en-US', { timeZone: 'Europe/Berlin' })));
+  }
+
+  // Try native Date
+  const parsed = new Date(raw);
+  if (!isNaN(parsed.getTime())) return adjustWeekend(parsed);
+
+  // Fallback: next Monday
+  const d = getBerlinDate();
+  const w = d.getDay() === 0 ? 7 : d.getDay();
+  const toMonday = w === 7 ? 1 : (8 - w);
+  d.setDate(d.getDate() + toMonday);
+  return d;
+}
+
+// Ensure Mon-Fri; if Sat/Sun, push to next Monday
+const adjustWeekend = (date: Date): Date => {
+  const d = new Date(date);
+  const w = d.getDay() === 0 ? 7 : d.getDay();
+  if (w === 6) d.setDate(d.getDate() + 2);
+  if (w === 7) d.setDate(d.getDate() + 1);
+  return d;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -100,37 +168,12 @@ serve(async (req) => {
         if (userProfile.permission_lvl >= 10) {
           console.log('Raw parameters received:', parameters)
           
-          // Convert date parameter using Berlin timezone
-          let dateValue = getBerlinDate();
-          if (parameters.date) {
-            const dateParam = parameters.date.toLowerCase().trim();
-            
-            // Handle German weekday names
-            const weekdayNum = normalizeWeekday(dateParam);
-            if (weekdayNum) {
-              const today = getBerlinDate();
-              const todayWeekday = today.getDay() === 0 ? 7 : today.getDay();
-              let diff = weekdayNum - todayWeekday;
-              if (diff <= 0) diff += 7; // Next occurrence of this weekday
-              dateValue.setDate(today.getDate() + diff);
-            } else if (dateParam === 'morgen' || dateParam === 'tomorrow') {
-              dateValue.setDate(dateValue.getDate() + 1);
-            } else if (dateParam === 'heute' || dateParam === 'today') {
-              // dateValue is already today in Berlin timezone
-            } else if (dateParam === 'übermorgen') {
-              dateValue.setDate(dateValue.getDate() + 2);
-            } else {
-              // Try to parse as date
-              const parsedDate = new Date(parameters.date);
-              if (!isNaN(parsedDate.getTime())) {
-                dateValue = parsedDate;
-              }
-            }
-          }
+          // Parse date using robust German parser and ensure school day
+          const dateValue = parseDateTextToBerlinSchoolDay(parameters?.date || parameters?.datum || 'today');
           
           // Ensure all required fields are present with fallbacks
           const insertData = {
-            date: dateValue.toISOString().split('T')[0], // Format as YYYY-MM-DD
+            date: dateValue.toISOString().split('T')[0],
             class_name: parameters.className || parameters.class_name || 'Unbekannte Klasse',
             period: parseInt(parameters.period) || 1,
             original_teacher: parameters.originalTeacher || parameters.original_teacher || 'Unbekannt',
@@ -153,6 +196,20 @@ serve(async (req) => {
           
           if (!error) {
             console.log('update_vertretungsplan inserted:', data);
+            // Create announcement automatically for visibility across the app
+            const dateStrDE = new Date(insertData.date + 'T12:00:00').toLocaleDateString('de-DE');
+            const announcement = {
+              title: `Vertretungsplan aktualisiert – ${insertData.class_name}`,
+              content: `${dateStrDE}, ${insertData.period}. Stunde: ${insertData.original_subject} bei ${insertData.original_teacher} wird vertreten durch ${insertData.substitute_teacher} (Raum: ${insertData.substitute_room}).`,
+              author: 'E.D.U.A.R.D.',
+              priority: 'high',
+              target_class: insertData.class_name,
+              target_permission_level: 1,
+              created_by: null,
+            };
+            const { error: annErr } = await supabase.from('announcements').insert(announcement);
+            if (annErr) console.error('Announcement insert error:', annErr);
+
             result = { message: 'Vertretungsplan wurde erfolgreich aktualisiert.', inserted: data }
             success = true
           } else {
@@ -267,34 +324,14 @@ serve(async (req) => {
               return map[upper] || upper;
             };
 
-            // Parse date using Berlin timezone and improved weekday handling
-            let dateValue = getBerlinDate();
-            const lower = String(dateParam).toLowerCase().trim();
-            const weekdayNum = normalizeWeekday(lower);
-            if (weekdayNum) {
-              const today = getBerlinDate();
-              const todayWeekday = today.getDay() === 0 ? 7 : today.getDay();
-              let diff = weekdayNum - todayWeekday;
-              if (diff <= 0) diff += 7; 
-              dateValue.setDate(today.getDate() + diff);
-            } else if (lower === 'morgen' || lower === 'tomorrow') {
-              dateValue.setDate(dateValue.getDate() + 1);
-            } else if (lower === 'übermorgen') {
-              dateValue.setDate(dateValue.getDate() + 2);
-            } else if (lower !== 'heute' && lower !== 'today') {
-              const parsed = new Date(dateParam);
-              if (!isNaN(parsed.getTime())) dateValue = parsed;
-            }
+            // Parse date using robust parser and force to school day
+            let dateValue = parseDateTextToBerlinSchoolDay(dateParam?.toString() || 'today');
             
             const weekday = ((): number => {
               const ymd = dateValue.toISOString().split('T')[0];
               return getWeekdayFromDate(ymd);
             })();
-
-            if (weekday < 1 || weekday > 5) {
-              result = { error: 'E.D.U.A.R.D.: Ausgewähltes Datum liegt am Wochenende' }
-              break;
-            }
+            
             const dayKey = WEEKDAY_COLUMNS[weekday];
 
             // Load all teachers from database (DB-only candidates)
@@ -647,6 +684,25 @@ serve(async (req) => {
             
             if (confirmed.length > 0) {
               console.log('confirm_substitution inserted rows:', inserted.map(r => r?.id));
+
+              // Create announcements for each inserted substitution
+              try {
+                const dateStrDE = new Date(isoDate + 'T12:00:00').toLocaleDateString('de-DE');
+                const ann = inserted.map((r: any) => ({
+                  title: `Vertretungsplan aktualisiert – ${r.class_name}`,
+                  content: `${dateStrDE}, ${r.period}. Stunde: ${r.original_subject} bei ${r.original_teacher} wird vertreten durch ${r.substitute_teacher} (Raum: ${r.substitute_room}).`,
+                  author: 'E.D.U.A.R.D.',
+                  priority: 'high',
+                  target_class: r.class_name,
+                  target_permission_level: 1,
+                  created_by: null,
+                }));
+                const { error: annErr } = await supabase.from('announcements').insert(ann);
+                if (annErr) console.error('Announcement insert error:', annErr);
+              } catch (e) {
+                console.error('Announcement creation failed:', e);
+              }
+
               result = {
                 message: `Vertretungsplan erfolgreich erstellt für ${sickTeacher}`,
                 confirmed: confirmed,
