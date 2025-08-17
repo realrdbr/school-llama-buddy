@@ -450,21 +450,23 @@ const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >
                 </div>
               </div>
             </div>
-<div className="flex items-center gap-4">
-              <div className="hidden md:block">
-                <Label>Woche</Label>
-                <div className="text-sm text-muted-foreground">{formatWeekRange(__weekStart)}</div>
-              </div>
-              <div className="flex items-end gap-2">
-                <Button variant="outline" size="sm" onClick={handlePrevWeek}>
-                  <ChevronLeft className="h-4 w-4 mr-1" /> Vorherige Woche
-                </Button>
-                <Button variant="secondary" size="sm" onClick={handleThisWeek}>
-                  Diese Woche
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleNextWeek}>
-                  Nächste Woche <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="hidden md:block">
+                  <Label>Woche</Label>
+                  <div className="text-sm text-muted-foreground">{formatWeekRange(__weekStart)}</div>
+                </div>
+                <div className="flex items-end gap-2">
+                  <Button variant="outline" size="sm" onClick={handlePrevWeek}>
+                    <ChevronLeft className="h-4 w-4 mr-1" /> Vorherige Woche
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={handleThisWeek}>
+                    Diese Woche
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleNextWeek}>
+                    Nächste Woche <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
               </div>
               <div>
                 <Label htmlFor="class">Klasse</Label>
