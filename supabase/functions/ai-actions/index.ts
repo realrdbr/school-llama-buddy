@@ -474,8 +474,8 @@ serve(async (req) => {
               }
 
               if (!bestSubstitute) {
-                const dateStr = dateValue.toLocaleDateString('de-DE');
-                confirmations.push(`Keine freie Lehrkraft mit Fach ${lesson.subject} für Klasse ${lesson.className}, ${lesson.period}. Stunde am ${dateStr} (Raum ${lesson.room}). Optionen: Klassen zusammenlegen / Raumwechsel / Stunde entfallen lassen.`);
+              const dateStr = dateValue.toLocaleDateString('de-DE');
+              confirmations.push(`Keine freie Lehrkraft mit Fach ${lesson.subject} für Klasse ${lesson.className}, ${lesson.period}. Stunde am ${dateStr} (Raum ${lesson.room}). Optionen: Klassen zusammenlegen / Raumwechsel / Stunde entfallen lassen.`);
                 continue;
               }
 
@@ -592,8 +592,11 @@ serve(async (req) => {
             // Process each substitution with atomic transactions
             for (const sub of substitutions) {
               try {
+                // Ensure date is in ISO format (YYYY-MM-DD)
+                const isoDate = new Date(date).toISOString().split('T')[0];
+                
                 const { error: insertError } = await supabase.from('vertretungsplan').insert({
-                  date: date,
+                  date: isoDate,
                   class_name: sub.className,
                   period: sub.period,
                   original_teacher: sub.originalTeacher,

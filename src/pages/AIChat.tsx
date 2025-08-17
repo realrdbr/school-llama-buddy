@@ -307,7 +307,12 @@ BEISPIELE FÜR VERTRETUNGSPLAN-ÄNDERUNGEN:
 - "herr könig wird in der 10b vertreten" → AKTION:UPDATE_VERTRETUNGSPLAN|className:10b|originalTeacher:König|substituteTeacher:Vertretung
 - "Herr Müller ist morgen krank" → AKTION:PLAN_SUBSTITUTION|teacherName:Müller|date:morgen
 - "Frau Schmidt braucht Vertretung am Mittwoch" → AKTION:PLAN_SUBSTITUTION|teacherName:Schmidt|date:Mittwoch
-- "Zeig mir den Stundenplan der 10c am Montag" → AKTION:GET_SCHEDULE|className:10c|day:Montag
+
+BEISPIELE FÜR STUNDENPLAN-ANFRAGEN:
+- "Zeig mir den Stundenplan der 10c am Montag" → AKTION:GET_SCHEDULE|className:10c|day:Montag (nur Montag)
+- "Stundenplan der 10c" → AKTION:GET_SCHEDULE|className:10c (ganze Woche)
+- "Zeig mir den Stundenplan der 10b für die ganze Woche" → AKTION:GET_SCHEDULE|className:10b (ganze Woche)
+- "Stundenplan 10c Mittwoch" → AKTION:GET_SCHEDULE|className:10c|day:Mittwoch (nur Mittwoch)
 
 4. Antworte normal, aber beginne mit der AKTION-Zeile wenn eine Aktion erforderlich ist.
 5. Bei unvollständigen Angaben verwende sinnvolle Standardwerte.
