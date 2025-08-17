@@ -30,7 +30,13 @@ const ChatSidebar = ({ currentConversationId, onConversationSelect, onNewChat }:
     if (!profile?.id) return;
 
     try {
-      const userId = profile.id.toString();
+      const getProfileUUID = () => {
+        const num = Number(profile?.id);
+        if (!num || Number.isNaN(num)) return '00000000-0000-0000-0000-000000000000';
+        const tail = num.toString(16).padStart(12, '0');
+        return `00000000-0000-0000-0000-${tail}`;
+      };
+      const userId = getProfileUUID();
       
       // Hole Konversationen über Edge Function (um RLS-Probleme zu vermeiden)
       const { data, error } = await supabase.functions.invoke('chat-service', {
@@ -58,7 +64,13 @@ const ChatSidebar = ({ currentConversationId, onConversationSelect, onNewChat }:
     e.stopPropagation();
     
     try {
-      const userId = profile?.id?.toString();
+      const getProfileUUID = () => {
+        const num = Number(profile?.id);
+        if (!num || Number.isNaN(num)) return '00000000-0000-0000-0000-000000000000';
+        const tail = num.toString(16).padStart(12, '0');
+        return `00000000-0000-0000-0000-${tail}`;
+      };
+      const userId = getProfileUUID();
       const { data, error } = await supabase.functions.invoke('chat-service', {
         body: {
           action: 'delete_conversation',
@@ -93,7 +105,13 @@ const ChatSidebar = ({ currentConversationId, onConversationSelect, onNewChat }:
     if (!profile?.id) return;
 
     try {
-      const userId = profile.id.toString();
+      const getProfileUUID = () => {
+        const num = Number(profile?.id);
+        if (!num || Number.isNaN(num)) return '00000000-0000-0000-0000-000000000000';
+        const tail = num.toString(16).padStart(12, '0');
+        return `00000000-0000-0000-0000-${tail}`;
+      };
+      const userId = getProfileUUID();
       
       const { data, error } = await supabase.functions.invoke('chat-service', {
         body: {

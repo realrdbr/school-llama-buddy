@@ -17,7 +17,7 @@ interface ClassAssignmentModalProps {
 }
 
 const ClassAssignmentModal = ({ isOpen, onClose, user }: ClassAssignmentModalProps) => {
-  const [selectedClass, setSelectedClass] = useState<string>(user.user_class || '');
+  const [selectedClass, setSelectedClass] = useState<string>(user.user_class || 'none');
   const [loading, setLoading] = useState(false);
 
   const handleSave = async () => {
@@ -25,7 +25,7 @@ const ClassAssignmentModal = ({ isOpen, onClose, user }: ClassAssignmentModalPro
     try {
       const { error } = await supabase
         .from('permissions')
-        .update({ user_class: selectedClass || null })
+        .update({ user_class: selectedClass === 'none' ? null : selectedClass })
         .eq('id', user.id);
 
       if (error) throw error;
@@ -65,7 +65,7 @@ const ClassAssignmentModal = ({ isOpen, onClose, user }: ClassAssignmentModalPro
                 <SelectValue placeholder="Keine Klasse zugewiesen" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Keine Klasse</SelectItem>
+                <SelectItem value="none">Keine Klasse</SelectItem>
                 <SelectItem value="10b">10b</SelectItem>
                 <SelectItem value="10c">10c</SelectItem>
               </SelectContent>

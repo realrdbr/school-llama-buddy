@@ -19,7 +19,7 @@ interface EditUserModalProps {
 }
 
 const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
-  const [selectedClass, setSelectedClass] = useState<string>(user.user_class || '');
+  const [selectedClass, setSelectedClass] = useState<string>(user.user_class || 'none');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -47,7 +47,7 @@ const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
       // Update class
       const { error: classErr } = await supabase
         .from('permissions')
-        .update({ user_class: selectedClass || null })
+        .update({ user_class: selectedClass === 'none' ? null : selectedClass })
         .eq('id', user.id);
       if (classErr) throw classErr;
 
@@ -89,7 +89,7 @@ const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
                 <SelectValue placeholder="Keine Klasse zugewiesen" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Keine Klasse</SelectItem>
+                <SelectItem value="none">Keine Klasse</SelectItem>
                 <SelectItem value="10b">10b</SelectItem>
                 <SelectItem value="10c">10c</SelectItem>
               </SelectContent>

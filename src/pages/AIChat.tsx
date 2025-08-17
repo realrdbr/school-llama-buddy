@@ -94,10 +94,18 @@ const AIChat = () => {
     scrollToBottom();
   }, [conversation]);
 
+  // Deterministically map numeric permission profile id to a valid UUID string
+  const getProfileUUID = () => {
+    const num = Number(profile?.id);
+    if (!num || Number.isNaN(num)) return '00000000-0000-0000-0000-000000000000';
+    const tail = num.toString(16).padStart(12, '0');
+    return `00000000-0000-0000-0000-${tail}`;
+  };
+
   // Load conversation when selected
   const loadConversation = async (conversationId: string) => {
-    try {
-      const userId = profile?.id?.toString();
+  try {
+      const userId = getProfileUUID();
       const { data, error } = await supabase.functions.invoke('chat-service', {
         body: {
           action: 'list_messages',
@@ -123,7 +131,7 @@ const AIChat = () => {
   // Save message to database
   const saveMessage = async (message: ChatMessage, conversationId: string) => {
     try {
-      const userId = profile?.id?.toString();
+      const userId = getProfileUUID();
       const { data, error } = await supabase.functions.invoke('chat-service', {
         body: {
           action: 'add_message',
@@ -145,7 +153,7 @@ const AIChat = () => {
 
     try {
       // First, check if user has auth session and get the real user_id
-      const userId = profile?.id?.toString() || 'anonymous';
+      const userId = getProfileUUID();
       
       const { data, error } = await supabase.functions.invoke('chat-service', {
         body: {
@@ -376,6 +384,7 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
                 userProfile: {
                   user_id: profile?.id,
                   name: profile?.username || profile?.name,
+                  username: profile?.username,
                   permission_lvl: profile?.permission_lvl
                 }
               }
