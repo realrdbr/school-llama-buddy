@@ -248,35 +248,41 @@ serve(async (req) => {
 
       case 'create_tts':
         if (userProfile.permission_lvl >= 10) {
-          const title = parameters.title || 'TTS Durchsage';
-          const text = parameters.text;
-          
-          if (!text) {
-            result = { error: 'Text für TTS-Durchsage fehlt' };
-            break;
-          }
+          try {
+            const title = parameters.title || 'TTS Durchsage';
+            const text = parameters.text;
+            const voice_id = parameters.voice_id || 'Aria';
 
-          const { data, error } = await supabase
-            .from('audio_announcements')
-            .insert({
-              title: title,
-              description: `Text-to-Speech Durchsage erstellt von ${userProfile.name}`,
-              is_tts: true,
-              tts_text: text,
-              voice_id: 'alloy',
-              is_active: true,
-              created_by: userProfile.user_id?.toString() || null
-            })
-          
-          if (!error) {
-            result = { 
-              message: `TTS-Durchsage "${title}" wurde erfolgreich erstellt! Der Text wird als Sprachausgabe wiedergegeben.`,
-              tts_text: text,
-              title: title
+            if (!text) {
+              result = { error: 'Text für TTS-Durchsage fehlt' };
+              break;
             }
-            success = true
-          } else {
-            result = { error: error.message }
+
+            // Invoke native-tts edge function to actually generate audio
+            // Pass the username for permission check compatibility
+            const { data: ttsData, error: ttsError } = await supabase.functions.invoke('native-tts', {
+              body: {
+                text,
+                voice_id,
+                title,
+                user_id: userProfile?.name || userProfile?.username || 'admin'
+              }
+            });
+
+            if (ttsError) {
+              console.error('native-tts invoke error:', ttsError);
+              result = { error: ttsError.message || 'Fehler bei TTS-Erstellung' };
+              break;
+            }
+
+            result = {
+              message: `TTS-Durchsage "${title}" wurde erstellt` ,
+              tts: ttsData || null,
+            };
+            success = true;
+          } catch (e: any) {
+            console.error('create_tts error:', e);
+            result = { error: e?.message || 'Unerwarteter Fehler bei TTS' };
           }
         } else {
           result = { error: 'Keine Berechtigung für TTS-Durchsagen - Level 10 erforderlich' }

@@ -5,10 +5,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Users, UserPlus, Edit, Trash2, GraduationCap } from 'lucide-react';
+import { ArrowLeft, Users, UserPlus, Edit, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import CreateUserModal from '@/components/CreateUserModal';
-import ClassAssignmentModal from '@/components/ClassAssignmentModal';
+import EditUserModal from '@/components/EditUserModal';
 
 interface User {
   id: number;
@@ -24,9 +24,9 @@ const UserManagement = () => {
   const { user, profile } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showClassModal, setShowClassModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+const [showCreateModal, setShowCreateModal] = useState(false);
+const [showEditModal, setShowEditModal] = useState(false);
+const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -73,16 +73,16 @@ const UserManagement = () => {
     fetchUsers(); // Refresh the user list
   };
 
-  const handleClassAssignment = (user: User) => {
-    setSelectedUser(user);
-    setShowClassModal(true);
-  };
+const handleEditUser = (user: User) => {
+  setSelectedUser(user);
+  setShowEditModal(true);
+};
 
-  const handleClassModalClose = () => {
-    setShowClassModal(false);
-    setSelectedUser(null);
-    fetchUsers(); // Refresh the user list
-  };
+const handleEditModalClose = () => {
+  setShowEditModal(false);
+  setSelectedUser(null);
+  fetchUsers(); // Refresh the user list
+};
 
   const getPermissionBadge = (level: number) => {
     if (level >= 10) return { text: "Schulleitung", variant: "default" as const };
@@ -237,22 +237,19 @@ const UserManagement = () => {
                             {formatDate(userItem.created_at)}
                           </td>
                           <td className="p-4">
-                            <div className="flex gap-2">
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => handleClassAssignment(userItem)}
-                                title="Klasse zuweisen"
-                              >
-                                <GraduationCap className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" className="text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
+<div className="flex gap-2">
+  <Button 
+    variant="ghost" 
+    size="sm"
+    onClick={() => handleEditUser(userItem)}
+    title="Benutzer bearbeiten"
+  >
+    <Edit className="h-4 w-4" />
+  </Button>
+  <Button variant="ghost" size="sm" className="text-destructive" title="Benutzer löschen">
+    <Trash2 className="h-4 w-4" />
+  </Button>
+</div>
                           </td>
                         </tr>
                       );
@@ -277,13 +274,13 @@ const UserManagement = () => {
         onClose={handleUserCreated}
       />
 
-      {selectedUser && (
-        <ClassAssignmentModal
-          isOpen={showClassModal}
-          onClose={handleClassModalClose}
-          user={selectedUser}
-        />
-      )}
+{selectedUser && (
+  <EditUserModal
+    isOpen={showEditModal}
+    onClose={handleEditModalClose}
+    user={selectedUser}
+  />
+)}
     </div>
   );
 };
