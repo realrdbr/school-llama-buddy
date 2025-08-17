@@ -21,14 +21,15 @@ interface Announcement {
 
 const Announcements = () => {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newAnnouncement, setNewAnnouncement] = useState({
-    title: '',
-    content: '',
-    priority: 'normal' as 'low' | 'normal' | 'high' | 'urgent'
-  });
+const { user, profile } = useAuth();
+const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+const [showCreateForm, setShowCreateForm] = useState(false);
+const [newAnnouncement, setNewAnnouncement] = useState({
+  title: '',
+  content: '',
+  priority: 'normal' as 'low' | 'normal' | 'high' | 'urgent'
+});
+const [userClass, setUserClass] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -38,89 +39,102 @@ const Announcements = () => {
     fetchAnnouncements();
   }, [user, navigate]);
 
-  const fetchAnnouncements = async () => {
-    try {
-      // Get user's class and permission level
-      const { data: userData, error: userError } = await supabase
-        .from('permissions')
-        .select('user_class, permission_lvl')
-        .eq('id', profile?.id)
-        .single();
+const fetchAnnouncements = async () => {
+  try {
+    // Get user's class and permission level
+    const { data: userData, error: userError } = await supabase
+      .from('permissions')
+      .select('user_class, permission_lvl')
+      .eq('id', profile?.id)
+      .single();
 
-      if (userError && userError.code !== 'PGRST116') {
-        console.error('Error fetching user data:', userError);
+    if (userError && userError.code !== 'PGRST116') {
+      console.error('Error fetching user data:', userError);
+    }
+
+    const uClass = userData?.user_class || null;
+    const permissionLevel = userData?.permission_lvl ?? profile?.permission_lvl ?? 1;
+    setUserClass(uClass);
+
+    let query = supabase
+      .from('announcements')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    // Filter announcements strictly per class (admins see all)
+    if (permissionLevel < 10) {
+      if (uClass) {
+        query = query.or(`target_class.eq.${uClass},target_class.is.null`);
+      } else {
+        query = query.is('target_class', null);
       }
+      query = query.or(`target_permission_level.is.null,target_permission_level.lte.${permissionLevel}`);
+    }
 
-      const userClass = userData?.user_class;
-      const permissionLevel = profile?.permission_lvl || 1;
+    const { data, error } = await query;
 
-      let query = supabase
-        .from('announcements')
-        .select('*')
-        .order('created_at', { ascending: false });
+    if (error) throw error;
 
-      // Filter announcements based on permission level and class
-      if (permissionLevel < 10) {
-        // Level 10 sees all announcements, others see filtered ones
-        query = query.or(`target_class.is.null,target_class.eq.${userClass || 'no_class'},target_permission_level.lte.${permissionLevel},target_permission_level.is.null`);
+    const announcementData = (data || []).map((ann: any) => ({
+      id: ann.id,
+      title: ann.title,
+      content: ann.content,
+      author: ann.author,
+      created_at: ann.created_at,
+      priority: (ann.priority as 'low' | 'normal' | 'high' | 'urgent') || 'normal'
+    }));
+
+    setAnnouncements(announcementData);
+  } catch (error) {
+    console.error('Error fetching announcements:', error);
+  }
+};
+
+const handleCreateAnnouncement = async () => {
+  if (!newAnnouncement.title || !newAnnouncement.content) {
+    toast({
+      variant: "destructive",
+      title: "Fehler",
+      description: "Bitte füllen Sie alle Felder aus."
+    });
+    return;
+  }
+
+  try {
+    const { data: resp, error } = await supabase.functions.invoke('ai-actions', {
+      body: {
+        action: 'create_announcement',
+        parameters: {
+          title: newAnnouncement.title,
+          content: newAnnouncement.content,
+          priority: newAnnouncement.priority,
+          targetClass: userClass || null,
+          targetPermissionLevel: 1,
+        },
+        userProfile: {
+          permission_lvl: profile?.permission_lvl || 1,
+          name: (profile as any)?.name || (profile as any)?.username || 'Unbekannt',
+        }
       }
+    });
 
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      const announcementData = (data || []).map(ann => ({
-        id: ann.id,
-        title: ann.title,
-        content: ann.content,
-        author: ann.author,
-        created_at: ann.created_at,
-        priority: (ann.priority as 'low' | 'normal' | 'high' | 'urgent') || 'normal'
-      }));
-
-      setAnnouncements(announcementData);
-    } catch (error) {
-      console.error('Error fetching announcements:', error);
-    }
-  };
-
-  const handleCreateAnnouncement = async () => {
-    if (!newAnnouncement.title || !newAnnouncement.content) {
-      toast({
-        variant: "destructive",
-        title: "Fehler",
-        description: "Bitte füllen Sie alle Felder aus."
-      });
-      return;
+    if (error || (resp && resp.success === false)) {
+      throw new Error((resp as any)?.result?.error || error?.message || 'Unbekannter Fehler');
     }
 
-    try {
-      const { error } = await supabase.from('announcements').insert({
-        title: newAnnouncement.title,
-        content: newAnnouncement.content,
-        author: profile?.name || 'Unbekannt',
-        priority: newAnnouncement.priority
-      });
-
-      if (error) throw error;
-
-      await fetchAnnouncements();
-      setNewAnnouncement({ title: '', content: '', priority: 'normal' });
-      setShowCreateForm(false);
-      
-      toast({
-        title: "Ankündigung erstellt",
-        description: "Die Ankündigung wurde erfolgreich veröffentlicht."
-      });
-    } catch (error) {
-      console.error('Error creating announcement:', error);
-      toast({
-        variant: "destructive",
-        title: "Fehler",
-        description: "Ankündigung konnte nicht erstellt werden."
-      });
-    }
-  };
+    await fetchAnnouncements();
+    setNewAnnouncement({ title: '', content: '', priority: 'normal' });
+    setShowCreateForm(false);
+    toast({ title: "Ankündigung erstellt", description: "Die Ankündigung wurde erfolgreich veröffentlicht." });
+  } catch (error) {
+    console.error('Error creating announcement:', error);
+    toast({
+      variant: "destructive",
+      title: "Fehler",
+      description: "Ankündigung konnte nicht erstellt werden."
+    });
+  }
+};
 
   const handleDeleteAnnouncement = async (id: string) => {
     try {

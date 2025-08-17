@@ -9,7 +9,7 @@ import { ArrowLeft, Users, UserPlus, Edit, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import CreateUserModal from '@/components/CreateUserModal';
 import EditUserModal from '@/components/EditUserModal';
-
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 interface User {
   id: number;
   username: string;
@@ -27,7 +27,9 @@ const UserManagement = () => {
 const [showCreateModal, setShowCreateModal] = useState(false);
 const [showEditModal, setShowEditModal] = useState(false);
 const [selectedUser, setSelectedUser] = useState<User | null>(null);
-
+const [confirmDeleteOpen1, setConfirmDeleteOpen1] = useState(false);
+const [confirmDeleteOpen2, setConfirmDeleteOpen2] = useState(false);
+const [deleting, setDeleting] = useState(false);
   useEffect(() => {
     if (!user) {
       navigate('/auth');
@@ -84,6 +86,37 @@ const handleEditModalClose = () => {
   fetchUsers(); // Refresh the user list
 };
 
+const requestDeleteUser = (u: User) => {
+  setSelectedUser(u);
+  setConfirmDeleteOpen1(true);
+};
+
+const handleConfirmStep1 = () => {
+  setConfirmDeleteOpen1(false);
+  setConfirmDeleteOpen2(true);
+};
+
+const handleDeleteUser = async () => {
+  if (!selectedUser) return;
+  setDeleting(true);
+  try {
+    const { error } = await supabase
+      .from('permissions')
+      .delete()
+      .eq('id', selectedUser.id);
+    if (error) throw error;
+
+    toast({ title: 'Benutzer gelöscht', description: `${selectedUser.name} wurde entfernt.` });
+    setUsers((prev) => prev.filter((u) => u.id !== selectedUser.id));
+  } catch (err) {
+    console.error('Error deleting user:', err);
+    toast({ title: 'Fehler', description: 'Benutzer konnte nicht gelöscht werden.', variant: 'destructive' });
+  } finally {
+    setDeleting(false);
+    setConfirmDeleteOpen2(false);
+    setSelectedUser(null);
+  }
+};
   const getPermissionBadge = (level: number) => {
     if (level >= 10) return { text: "Schulleitung", variant: "default" as const };
     if (level >= 8) return { text: "Administrator", variant: "secondary" as const };
@@ -246,7 +279,7 @@ const handleEditModalClose = () => {
   >
     <Edit className="h-4 w-4" />
   </Button>
-  <Button variant="ghost" size="sm" className="text-destructive" title="Benutzer löschen">
+  <Button variant="ghost" size="sm" className="text-destructive" title="Benutzer löschen" onClick={() => requestDeleteUser(userItem)}>
     <Trash2 className="h-4 w-4" />
   </Button>
 </div>
@@ -281,6 +314,39 @@ const handleEditModalClose = () => {
     user={selectedUser}
   />
 )}
+
+{/* Double confirmation dialogs for safe deletion */}
+<AlertDialog open={confirmDeleteOpen1} onOpenChange={setConfirmDeleteOpen1}>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Benutzer wirklich löschen?</AlertDialogTitle>
+      <AlertDialogDescription>
+        Diese Aktion kann nicht rückgängig gemacht werden. Möchten Sie fortfahren?
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+      <AlertDialogAction onClick={handleConfirmStep1}>Ja, weiter</AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
+
+<AlertDialog open={confirmDeleteOpen2} onOpenChange={setConfirmDeleteOpen2}>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Letzte Bestätigung</AlertDialogTitle>
+      <AlertDialogDescription>
+        Bitte bestätigen Sie erneut, dass {selectedUser?.name} endgültig gelöscht werden soll.
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel disabled={deleting}>Abbrechen</AlertDialogCancel>
+      <AlertDialogAction onClick={handleDeleteUser} disabled={deleting}>
+        {deleting ? 'Löschen...' : 'Ja, endgültig löschen'}
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
     </div>
   );
 };
