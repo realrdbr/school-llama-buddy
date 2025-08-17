@@ -28,7 +28,8 @@ interface SubstitutionPlan {
     period: number;
     subject: string;
     room: string;
-    substitute?: string;
+    originalTeacher?: string;
+    substituteTeacher?: string;
   }>;
 }
 
@@ -185,7 +186,7 @@ const AIVertretungsGenerator = ({ onGenerated }: AIVertretungsGeneratorProps) =>
         setProposedPlan({
           date: targetDate,
           teacher: selectedTeacher,
-          affectedLessons: result.affectedLessons || []
+          affectedLessons: (result?.details?.substitutions as any[]) || []
         });
         
         setShowConfirmation(true);
@@ -365,9 +366,9 @@ const AIVertretungsGenerator = ({ onGenerated }: AIVertretungsGeneratorProps) =>
                             {lesson.period}. Stunde - {lesson.subject} (Raum {lesson.room})
                           </span>
                         </div>
-                        {lesson.substitute && (
+                        {lesson.substituteTeacher && (
                           <Badge variant="secondary">
-                            Vertretung: {lesson.substitute}
+                            Vertretung: {lesson.substituteTeacher}
                           </Badge>
                         )}
                       </div>
