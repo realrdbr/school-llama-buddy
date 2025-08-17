@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Calendar, Plus, Edit, Trash2, Clock, Bot } from 'lucide-react';
+import { ArrowLeft, Calendar, Plus, Edit, Trash2, Clock, Bot, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import RoleBasedLayout from '@/components/RoleBasedLayout';
@@ -49,6 +49,28 @@ const toISODateLocal = (d: Date) => {
   return `${y}-${m}-${day}`;
 };
 
+const startOfWeekLocal = (d: Date) => {
+  const day = d.getDay(); // 0 Sun, 1 Mon, ...
+  const daysToMonday = day === 0 ? 6 : day - 1;
+  const s = new Date(d);
+  s.setHours(0, 0, 0, 0);
+  s.setDate(s.getDate() - daysToMonday);
+  return s;
+};
+
+const endOfWeekLocal = (start: Date) => {
+  const e = new Date(start);
+  e.setDate(e.getDate() + 4); // Monday + 4 = Friday
+  return e;
+};
+
+const formatWeekRange = (start: Date) => {
+  const end = endOfWeekLocal(start);
+  const startStr = start.toLocaleDateString('de-DE', { day: 'numeric', month: 'short' });
+  const endStr = end.toLocaleDateString('de-DE', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${startStr} – ${endStr}`;
+};
+
 const Vertretungsplan = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
@@ -68,8 +90,26 @@ const Vertretungsplan = () => {
     substituteRoom: '',
     note: ''
   });
-  const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
+const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
   const [selectedClass, setSelectedClass] = useState('10b');
+
+  const handlePrevWeek = () => {
+    const cur = new Date(selectedDate + 'T00:00:00');
+    const s = startOfWeekLocal(cur);
+    s.setDate(s.getDate() - 7);
+    setSelectedDate(toISODateLocal(s));
+  };
+
+  const handleNextWeek = () => {
+    const cur = new Date(selectedDate + 'T00:00:00');
+    const s = startOfWeekLocal(cur);
+    s.setDate(s.getDate() + 7);
+    setSelectedDate(toISODateLocal(s));
+  };
+
+  const handleThisWeek = () => {
+    setSelectedDate(toISODateLocal(new Date()));
+  };
 
   useEffect(() => {
     if (!user) {
@@ -383,7 +423,11 @@ const Vertretungsplan = () => {
     });
   };
 
-  const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >= 10;
+const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >= 10;
+
+  // Compute week range info for UI
+  const __selectedDateObj = new Date(selectedDate + 'T00:00:00');
+  const __weekStart = startOfWeekLocal(__selectedDateObj);
 
   return (
     <div className="min-h-screen bg-background">
@@ -406,7 +450,22 @@ const Vertretungsplan = () => {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+<div className="flex items-center gap-4">
+              <div className="hidden md:block">
+                <Label>Woche</Label>
+                <div className="text-sm text-muted-foreground">{formatWeekRange(__weekStart)}</div>
+              </div>
+              <div className="flex items-end gap-2">
+                <Button variant="outline" size="sm" onClick={handlePrevWeek}>
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Vorherige Woche
+                </Button>
+                <Button variant="secondary" size="sm" onClick={handleThisWeek}>
+                  Diese Woche
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleNextWeek}>
+                  Nächste Woche <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
               <div>
                 <Label htmlFor="date">Datum</Label>
                 <Input
@@ -447,7 +506,7 @@ const Vertretungsplan = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="h-5 w-5" />
-                Stundenplan {selectedClass} - {formatDate(selectedDate)}
+Stundenplan {selectedClass} - Woche {formatWeekRange(__weekStart)}
               </CardTitle>
             </CardHeader>
             <CardContent>
