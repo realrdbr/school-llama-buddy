@@ -148,11 +148,15 @@ serve(async (req) => {
           const { data, error } = await supabase
             .from('vertretungsplan')
             .insert(insertData)
+            .select()
+            .single()
           
           if (!error) {
-            result = { message: 'Vertretungsplan wurde erfolgreich aktualisiert.' }
+            console.log('update_vertretungsplan inserted:', data);
+            result = { message: 'Vertretungsplan wurde erfolgreich aktualisiert.', inserted: data }
             success = true
           } else {
+            console.error('update_vertretungsplan error:', error);
             result = { error: error.message }
           }
         } else {
@@ -589,6 +593,7 @@ serve(async (req) => {
             
             const confirmed: string[] = [];
             const failed: string[] = [];
+            const inserted: any[] = [];
             
             // Process each substitution with atomic transactions
             // Parse incoming date to ISO once (supports 'YYYY-MM-DD' and 'DD.MM.YYYY')
@@ -612,7 +617,7 @@ serve(async (req) => {
 
             for (const sub of substitutions) {
               try {
-                const { error: insertError } = await supabase.from('vertretungsplan').insert({
+                const { data: insertedRow, error: insertError } = await supabase.from('vertretungsplan').insert({
                   date: isoDate,
                   class_name: sub.className,
                   period: sub.period,
@@ -624,14 +629,15 @@ serve(async (req) => {
                   substitute_room: sub.room,
                   note: `E.D.U.A.R.D.: Automatische Vertretung für ${sickTeacher}`,
                   created_by: null
-                });
+                }).select().single();
                 
                 if (insertError) {
                   console.error('Substitution insert error:', insertError);
                   failed.push(`${sub.className}, ${sub.period}. Stunde: ${insertError.message}`);
                 } else {
                   confirmed.push(`${sub.substituteTeacher} übernimmt ${sub.className}, ${sub.period}. Stunde ${sub.subject}`);
-                  console.log('Substitution inserted:', { date: isoDate, class_name: sub.className, period: sub.period, subject: sub.subject, substitute: sub.substituteTeacher });
+                  inserted.push(insertedRow);
+                  console.log('Substitution inserted:', { id: insertedRow?.id, date: isoDate, class_name: sub.className, period: sub.period, subject: sub.subject, substitute: sub.substituteTeacher });
                 }
               } catch (e) {
                 console.error('Substitution processing error:', e);
@@ -640,9 +646,11 @@ serve(async (req) => {
             }
             
             if (confirmed.length > 0) {
+              console.log('confirm_substitution inserted rows:', inserted.map(r => r?.id));
               result = {
                 message: `Vertretungsplan erfolgreich erstellt für ${sickTeacher}`,
                 confirmed: confirmed,
+                inserted,
                 failed: failed.length > 0 ? failed : undefined
               };
               success = true;
