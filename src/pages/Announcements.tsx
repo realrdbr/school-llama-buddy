@@ -40,14 +40,36 @@ const Announcements = () => {
 
   const fetchAnnouncements = async () => {
     try {
-      const { data, error } = await supabase
+      // Get user's class and permission level
+      const { data: userData, error: userError } = await supabase
+        .from('permissions')
+        .select('user_class, permission_lvl')
+        .eq('id', profile?.id)
+        .single();
+
+      if (userError && userError.code !== 'PGRST116') {
+        console.error('Error fetching user data:', userError);
+      }
+
+      const userClass = userData?.user_class;
+      const permissionLevel = profile?.permission_lvl || 1;
+
+      let query = supabase
         .from('announcements')
         .select('*')
         .order('created_at', { ascending: false });
 
+      // Filter announcements based on permission level and class
+      if (permissionLevel < 10) {
+        // Level 10 sees all announcements, others see filtered ones
+        query = query.or(`target_class.is.null,target_class.eq.${userClass || 'no_class'},target_permission_level.lte.${permissionLevel},target_permission_level.is.null`);
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
 
-      const announcementData = data.map(ann => ({
+      const announcementData = (data || []).map(ann => ({
         id: ann.id,
         title: ann.title,
         content: ann.content,

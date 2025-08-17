@@ -5,9 +5,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Users, UserPlus, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Users, UserPlus, Edit, Trash2, GraduationCap } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import CreateUserModal from '@/components/CreateUserModal';
+import ClassAssignmentModal from '@/components/ClassAssignmentModal';
 
 interface User {
   id: number;
@@ -15,6 +16,7 @@ interface User {
   name: string;
   permission_lvl: number;
   created_at: string;
+  user_class?: string;
 }
 
 const UserManagement = () => {
@@ -23,6 +25,8 @@ const UserManagement = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showClassModal, setShowClassModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -45,7 +49,7 @@ const UserManagement = () => {
     try {
       const { data, error } = await supabase
         .from('permissions')
-        .select('id, username, name, permission_lvl, created_at')
+        .select('id, username, name, permission_lvl, created_at, user_class')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -66,6 +70,17 @@ const UserManagement = () => {
 
   const handleUserCreated = () => {
     setShowCreateModal(false);
+    fetchUsers(); // Refresh the user list
+  };
+
+  const handleClassAssignment = (user: User) => {
+    setSelectedUser(user);
+    setShowClassModal(true);
+  };
+
+  const handleClassModalClose = () => {
+    setShowClassModal(false);
+    setSelectedUser(null);
     fetchUsers(); // Refresh the user list
   };
 
@@ -194,6 +209,7 @@ const UserManagement = () => {
                       <th className="text-left p-4 font-semibold">Benutzername</th>
                       <th className="text-left p-4 font-semibold">Name</th>
                       <th className="text-left p-4 font-semibold">Berechtigung</th>
+                      <th className="text-left p-4 font-semibold">Klasse</th>
                       <th className="text-left p-4 font-semibold">Level</th>
                       <th className="text-left p-4 font-semibold">Erstellt</th>
                       <th className="text-left p-4 font-semibold">Aktionen</th>
@@ -209,12 +225,27 @@ const UserManagement = () => {
                           <td className="p-4">
                             <Badge variant={badge.variant}>{badge.text}</Badge>
                           </td>
+                          <td className="p-4">
+                            {userItem.user_class ? (
+                              <Badge variant="outline">{userItem.user_class}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </td>
                           <td className="p-4">{userItem.permission_lvl}</td>
                           <td className="p-4 text-muted-foreground">
                             {formatDate(userItem.created_at)}
                           </td>
                           <td className="p-4">
                             <div className="flex gap-2">
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => handleClassAssignment(userItem)}
+                                title="Klasse zuweisen"
+                              >
+                                <GraduationCap className="h-4 w-4" />
+                              </Button>
                               <Button variant="ghost" size="sm">
                                 <Edit className="h-4 w-4" />
                               </Button>
@@ -245,6 +276,14 @@ const UserManagement = () => {
         isOpen={showCreateModal}
         onClose={handleUserCreated}
       />
+
+      {selectedUser && (
+        <ClassAssignmentModal
+          isOpen={showClassModal}
+          onClose={handleClassModalClose}
+          user={selectedUser}
+        />
+      )}
     </div>
   );
 };

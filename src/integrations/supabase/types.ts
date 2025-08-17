@@ -212,6 +212,7 @@ export type Database = {
           name: string
           password: string
           permission_lvl: number | null
+          user_class: string | null
           username: string
         }
         Insert: {
@@ -223,6 +224,7 @@ export type Database = {
           name: string
           password?: string
           permission_lvl?: number | null
+          user_class?: string | null
           username?: string
         }
         Update: {
@@ -234,6 +236,7 @@ export type Database = {
           name?: string
           password?: string
           permission_lvl?: number | null
+          user_class?: string | null
           username?: string
         }
         Relationships: []

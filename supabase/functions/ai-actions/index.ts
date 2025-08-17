@@ -248,13 +248,21 @@ serve(async (req) => {
 
       case 'create_tts':
         if (userProfile.permission_lvl >= 10) {
+          const title = parameters.title || 'TTS Durchsage';
+          const text = parameters.text;
+          
+          if (!text) {
+            result = { error: 'Text für TTS-Durchsage fehlt' };
+            break;
+          }
+
           const { data, error } = await supabase
             .from('audio_announcements')
             .insert({
-              title: 'TTS Durchsage',
+              title: title,
               description: `Text-to-Speech Durchsage erstellt von ${userProfile.name}`,
               is_tts: true,
-              tts_text: parameters.text,
+              tts_text: text,
               voice_id: 'alloy',
               is_active: true,
               created_by: userProfile.user_id?.toString() || null
@@ -262,8 +270,9 @@ serve(async (req) => {
           
           if (!error) {
             result = { 
-              message: 'TTS-Durchsage wurde erfolgreich erstellt!',
-              tts_text: parameters.text
+              message: `TTS-Durchsage "${title}" wurde erfolgreich erstellt! Der Text wird als Sprachausgabe wiedergegeben.`,
+              tts_text: text,
+              title: title
             }
             success = true
           } else {
