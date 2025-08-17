@@ -150,7 +150,10 @@ const AIVertretungsGenerator = ({ onGenerated }: AIVertretungsGeneratorProps) =>
       }
     }
     
-    return new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()).toISOString().split('T')[0];
+    const y = targetDate.getFullYear();
+    const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const d = String(targetDate.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   };
 
   const handleGenerate = async () => {
@@ -340,7 +343,7 @@ const AIVertretungsGenerator = ({ onGenerated }: AIVertretungsGeneratorProps) =>
                   Abwesenheit: Herr/Frau {proposedPlan.teacher}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Datum: {new Date(proposedPlan.date).toLocaleDateString('de-DE', {
+                  Datum: {new Date(proposedPlan.date + 'T00:00:00').toLocaleDateString('de-DE', {
                     weekday: 'long',
                     year: 'numeric',
                     month: 'long',
