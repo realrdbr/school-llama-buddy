@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,6 +11,13 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface AIVertretungsGeneratorProps {
   onGenerated?: () => void;
+}
+
+interface Teacher {
+  shortened: string;
+  'first name': string;
+  'last name': string;
+  subjects: string;
 }
 
 interface SubstitutionPlan {
@@ -28,15 +35,44 @@ interface SubstitutionPlan {
 const AIVertretungsGenerator = ({ onGenerated }: AIVertretungsGeneratorProps) => {
   const { profile } = useAuth();
   const { toast } = useToast();
-  const [selectedTeacher, setSelectedTeacher] = useState('König');
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [selectedTeacher, setSelectedTeacher] = useState('');
   const [selectedDate, setSelectedDate] = useState('morgen');
   const [loading, setLoading] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [proposedPlan, setProposedPlan] = useState<SubstitutionPlan | null>(null);
 
-  const teacherOptions = [
-    'König', 'Müller', 'Schmidt', 'Weber', 'Hansen', 'Fischer', 'Meyer', 'Wagner'
-  ];
+  useEffect(() => {
+    fetchTeachers();
+  }, []);
+
+  const fetchTeachers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('teachers')
+        .select('shortened, "first name", "last name", subjects')
+        .order('"last name"');
+
+      if (error) throw error;
+      
+      setTeachers(data || []);
+      
+      // Set default to König if available
+      const konigTeacher = data?.find(t => t['last name']?.toLowerCase().includes('könig'));
+      if (konigTeacher) {
+        setSelectedTeacher(konigTeacher['last name']);
+      } else if (data && data.length > 0) {
+        setSelectedTeacher(data[0]['last name']);
+      }
+    } catch (error) {
+      console.error('Error fetching teachers:', error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Lehrkräfte konnten nicht geladen werden."
+      });
+    }
+  };
 
   const dateOptions = [
     { value: 'heute', label: 'Heute' },
@@ -53,22 +89,65 @@ const AIVertretungsGenerator = ({ onGenerated }: AIVertretungsGeneratorProps) =>
     const now = new Date();
     let targetDate = new Date(now);
     
+    // Ensure we're working with school days (Mon-Fri)
+    const isWeekend = (date: Date) => {
+      const day = date.getDay();
+      return day === 0 || day === 6; // Sunday or Saturday
+    };
+    
+    const getNextSchoolDay = (date: Date) => {
+      const next = new Date(date);
+      do {
+        next.setDate(next.getDate() + 1);
+      } while (isWeekend(next));
+      return next;
+    };
+    
     if (dateOption === 'heute') {
-      // heute
+      // If today is weekend, move to next Monday
+      if (isWeekend(targetDate)) {
+        targetDate = getNextSchoolDay(targetDate);
+      }
     } else if (dateOption === 'morgen') {
       targetDate.setDate(targetDate.getDate() + 1);
+      // If tomorrow is weekend, move to next Monday
+      if (isWeekend(targetDate)) {
+        targetDate = getNextSchoolDay(targetDate);
+      }
     } else if (dateOption === 'übermorgen') {
       targetDate.setDate(targetDate.getDate() + 2);
+      // If day after tomorrow is weekend, move to next Monday
+      if (isWeekend(targetDate)) {
+        targetDate = getNextSchoolDay(targetDate);
+      }
     } else {
-      const map: Record<string, number> = { montag: 1, dienstag: 2, mittwoch: 3, donnerstag: 4, freitag: 5 };
-      const targetDow = map[dateOption];
-      const todayDow = targetDate.getDay(); // 0..6
-      const todayMap: Record<number, number> = { 0: 7, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6 };
-      const cur = todayMap[todayDow];
-      let diff = targetDow - cur;
-      if (diff < 0) diff += 7;
-      if (diff === 0) diff = 7; // wenn gleicher Tag genannt, nimm nächste Woche
-      targetDate.setDate(targetDate.getDate() + diff);
+      // Handle specific weekdays (montag, dienstag, etc.)
+      const weekdayMap: Record<string, number> = { 
+        montag: 1, dienstag: 2, mittwoch: 3, donnerstag: 4, freitag: 5 
+      };
+      const targetDow = weekdayMap[dateOption];
+      
+      if (targetDow) {
+        const currentDow = targetDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        
+        // Calculate days until target weekday
+        let daysUntilTarget;
+        if (currentDow === 0) { // Sunday
+          daysUntilTarget = targetDow; // Monday = 1, Tuesday = 2, etc.
+        } else if (currentDow <= targetDow) {
+          // Same week, but check if it's later today or next week
+          if (currentDow === targetDow) {
+            daysUntilTarget = 7; // Next week same day
+          } else {
+            daysUntilTarget = targetDow - currentDow; // Later this week
+          }
+        } else {
+          // Next week
+          daysUntilTarget = 7 - currentDow + targetDow;
+        }
+        
+        targetDate.setDate(targetDate.getDate() + daysUntilTarget);
+      }
     }
     
     return new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()).toISOString().split('T')[0];
@@ -191,9 +270,9 @@ const AIVertretungsGenerator = ({ onGenerated }: AIVertretungsGeneratorProps) =>
                   <SelectValue placeholder="Lehrkraft auswählen" />
                 </SelectTrigger>
                 <SelectContent>
-                  {teacherOptions.map((teacher) => (
-                    <SelectItem key={teacher} value={teacher}>
-                      Herr/Frau {teacher}
+                  {teachers.map((teacher) => (
+                    <SelectItem key={teacher.shortened} value={teacher['last name']}>
+                      {teacher['first name']} {teacher['last name']} ({teacher.shortened})
                     </SelectItem>
                   ))}
                 </SelectContent>
