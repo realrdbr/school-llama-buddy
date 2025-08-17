@@ -72,6 +72,22 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Permission check via custom permissions (by username) and use level, not UUID
+    if (!user_id) {
+      throw new Error('Nicht authentifiziert - user_id fehlt');
+    }
+    const { data: profile, error: permErr } = await supabase
+      .from('permissions')
+      .select('permission_lvl')
+      .eq('username', user_id)
+      .maybeSingle();
+    if (permErr) {
+      console.error('Permission lookup error:', permErr);
+    }
+    if (!profile || profile.permission_lvl < 10) {
+      throw new Error('Keine Berechtigung für Audio-Ankündigungen - Level 10 erforderlich');
+    }
+
     const { data, error } = await supabase
       .from('audio_announcements')
       .insert({
@@ -81,7 +97,7 @@ serve(async (req) => {
         tts_text: text,
         voice_id: voice_id,
         is_active: true,
-        created_by: user_id,
+        created_by: null,
         duration_seconds: Math.ceil(text.length / 15), // Rough estimation
       })
       .select()

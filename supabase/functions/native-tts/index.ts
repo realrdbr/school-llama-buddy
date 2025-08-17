@@ -127,7 +127,8 @@ serve(async (req) => {
         voice_id,
         audio_file_path: audioFilePath,
         schedule_date: schedule_date ? new Date(schedule_date).toISOString() : null,
-        is_active: true
+        is_active: true,
+        created_by: null
       })
       .select()
       .maybeSingle()
