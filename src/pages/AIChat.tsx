@@ -330,21 +330,26 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
       
       // Check if AI wants to perform an action
       if (assistantContent.includes('AKTION:')) {
-        const actionMatch = assistantContent.match(/AKTION:([^|]+)(\|[^|]+:[^|]+)*/);
-        if (actionMatch) {
-          const actionName = actionMatch[1].trim();
-          const paramString = actionMatch[2] || '';
-          
-          // Parse parameters
+        // Robustly parse the first AKTION line and all key:value pairs
+        const actionLineMatch = assistantContent.match(/AKTION:[^\n\r]+/i);
+        if (actionLineMatch) {
+          const actionLine = actionLineMatch[0];
+          const parts = actionLine.split('|').map(p => p.trim()).filter(Boolean);
+          const actionName = parts.shift()!.replace(/^AKTION:/i, '').trim();
+
+          // Parse parameters (support values containing colons)
           const parameters: any = {};
-          if (paramString) {
-            const paramPairs = paramString.split('|').filter(p => p.includes(':'));
-            paramPairs.forEach(pair => {
-              const [key, value] = pair.split(':');
-              if (key && value) {
-                parameters[key.trim()] = value.trim();
-              }
-            });
+          for (const part of parts) {
+            const [rawKey, ...rawValParts] = part.split(':');
+            if (!rawKey || rawValParts.length === 0) continue;
+            const key = rawKey.trim();
+            const value = rawValParts.join(':').trim();
+            if (key) parameters[key] = value;
+          }
+
+          // Normalize teacher honorifics early (edge function also normalizes)
+          if (parameters.teacherName) {
+            parameters.teacherName = parameters.teacherName.replace(/\b(fr\.?|herr|frau|hr\.?)\s+/i, '').trim();
           }
           
           try {
@@ -588,9 +593,12 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
                          <div 
                            className="prose prose-sm max-w-none dark:prose-invert"
                            dangerouslySetInnerHTML={{ 
-                             __html: message.content
-                               .replace(/\n/g, '<br>')
-                               .replace(/```([^`]+)```/g, '<pre style="background:#f5f5f5;padding:8px;border-radius:4px;overflow-x:auto;"><code>$1</code></pre>')
+                             __html: (() => {
+                               const raw = message.content;
+                               const hasHTML = /<[^>]+>/i.test(raw);
+                               const withLineBreaks = hasHTML ? raw : raw.replace(/\n/g, '<br>');
+                               return withLineBreaks.replace(/```([^`]+)```/g, '<pre style="background:#f5f5f5;padding:8px;border-radius:4px;overflow-x:auto;"><code>$1</code></pre>');
+                             })()
                            }}
                          />
                       </div>
