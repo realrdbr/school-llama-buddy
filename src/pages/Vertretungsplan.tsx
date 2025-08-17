@@ -42,6 +42,13 @@ interface ParsedScheduleEntry {
   room: string;
 }
 
+const toISODateLocal = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
 const Vertretungsplan = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
@@ -61,7 +68,7 @@ const Vertretungsplan = () => {
     substituteRoom: '',
     note: ''
   });
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
   const [selectedClass, setSelectedClass] = useState('10b');
 
   useEffect(() => {
@@ -94,12 +101,12 @@ const Vertretungsplan = () => {
       const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // If Sunday, go back 6 days
       startOfWeek.setDate(startOfWeek.getDate() - daysToMonday);
       
-      // Calculate end of week (Friday)
-      const endOfWeek = new Date(startOfWeek);
-      endOfWeek.setDate(endOfWeek.getDate() + 4); // Monday + 4 = Friday
+      // Calculate end of range (next Monday, inclusive) to catch cross-week "tomorrow" cases
+      const endOfRange = new Date(startOfWeek);
+      endOfRange.setDate(endOfRange.getDate() + 7);
       
-      const startDateString = startOfWeek.toISOString().split('T')[0];
-      const endDateString = endOfWeek.toISOString().split('T')[0];
+      const startDateString = toISODateLocal(startOfWeek);
+      const endDateString = toISODateLocal(endOfRange);
 
       console.log('Fetching substitutions for date range:', startDateString, 'to', endDateString);
 
@@ -212,7 +219,7 @@ const Vertretungsplan = () => {
     const dayMapping = { 'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 'friday': 4 };
     const targetDay = new Date(startOfWeek);
     targetDay.setDate(targetDay.getDate() + dayMapping[day as keyof typeof dayMapping]);
-    const targetDateString = targetDay.toISOString().split('T')[0];
+    const targetDateString = toISODateLocal(targetDay);
     
     return substitutions.some(sub => 
       sub.class === classname && 
@@ -232,7 +239,7 @@ const Vertretungsplan = () => {
     const dayMapping = { 'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 'friday': 4 };
     const targetDay = new Date(startOfWeek);
     targetDay.setDate(targetDay.getDate() + dayMapping[day as keyof typeof dayMapping]);
-    const targetDateString = targetDay.toISOString().split('T')[0];
+    const targetDateString = toISODateLocal(targetDay);
     
     return substitutions.find(sub => 
       sub.class === classname && 
@@ -252,7 +259,7 @@ const Vertretungsplan = () => {
     const dayMapping = { 'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 'friday': 4 };
     const targetDay = new Date(startOfWeek);
     targetDay.setDate(targetDay.getDate() + dayMapping[day as keyof typeof dayMapping]);
-    const targetDateString = targetDay.toISOString().split('T')[0];
+    const targetDateString = toISODateLocal(targetDay);
     
     // Only allow editing if there's no existing substitution for this specific date/class/period
     if (hasSubstitution(classname, day, period)) {
@@ -484,7 +491,7 @@ const Vertretungsplan = () => {
                                   // Check if there's a substitution for this specific date/class/period
                                   const specificSubstitution = substitutions.find(sub => 
                                     sub.class === selectedClass && 
-                                    sub.date === targetDay.toISOString().split('T')[0] && 
+                                    sub.date === toISODateLocal(targetDay) && 
                                     sub.period === entry.period
                                   );
                                   
@@ -551,7 +558,7 @@ const Vertretungsplan = () => {
                     .map((substitution) => {
                       const subDate = new Date(substitution.date);
                       const dayName = subDate.toLocaleDateString('de-DE', { weekday: 'long' });
-                      const isToday = substitution.date === new Date().toISOString().split('T')[0];
+                      const isToday = substitution.date === toISODateLocal(new Date());
                       
                       return (
                         <div key={substitution.id} className="flex items-center justify-between p-3 bg-destructive/10 border border-destructive/20 rounded-md">
