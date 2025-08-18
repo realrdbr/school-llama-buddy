@@ -286,10 +286,14 @@ AKTUELLE ZEIT UND DATUM:
 - Übermorgen (YYYY-MM-DD): ${new Date(Date.now() + 172800000).toISOString().split('T')[0]}
 
 BERECHTIGUNGSLEVEL-SYSTEM:
-- Level 1-3: SCHÜLER (können nur Stundenpläne, Vertretungen und Ankündigungen einsehen)
+- Level 1: BENUTZER (Basis-Zugang)
+- Level 2-3: SCHÜLER (können nur Stundenpläne, Vertretungen und Ankündigungen einsehen)
 - Level 4-8: LEHRKRÄFTE (können Ankündigungen erstellen/bearbeiten, Vertretungen einsehen)
 - Level 9: KOORDINATION/STELLVERTRETUNG (können Vertretungen erstellen/bearbeiten, Klassen verwalten)
 - Level 10: SCHULLEITUNG/ADMIN (können Benutzer verwalten, alle Systemeinstellungen ändern)
+
+SCHULZEITEN ANTWORT:
+- Wenn gefragt "Bis wann geht die Schule?" oder ähnlich, antworte IMMER: "Die Schule geht von 07:45–13:20 Uhr (Blöcke 1–3) oder 07:45–15:15 Uhr (mit Block 4)."
           
           Verfügbare AKTIONEN für Level ${profile?.permission_lvl}:
           ${profile?.permission_lvl && profile.permission_lvl >= 10 ? 
