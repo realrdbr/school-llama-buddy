@@ -102,4 +102,26 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Mobile responsiveness improvements */
+  @media (max-width: 768px) {
+    .container {
+      @apply px-2;
+    }
+    
+    .overflow-x-auto table {
+      font-size: 0.875rem;
+    }
+    
+    .overflow-x-auto td, 
+    .overflow-x-auto th {
+      @apply px-2 py-3;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .grid-cols-1.md\\:grid-cols-4 {
+      @apply grid-cols-2;
+    }
+  }
 }

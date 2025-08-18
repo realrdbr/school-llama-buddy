@@ -121,6 +121,7 @@ const handleDeleteUser = async () => {
     if (level >= 10) return { text: "Schulleitung", variant: "default" as const };
     if (level >= 8) return { text: "Administrator", variant: "secondary" as const };
     if (level >= 5) return { text: "Lehrkraft", variant: "outline" as const };
+    if (level === 1) return { text: "Visitor", variant: "outline" as const };
     return { text: "Schüler", variant: "outline" as const };
   };
 

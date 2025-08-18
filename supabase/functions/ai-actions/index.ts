@@ -124,6 +124,53 @@ const adjustWeekend = (date: Date): Date => {
   return d;
 };
 
+// Block times for the school system
+const BLOCK_TIMES = {
+  1: { start: '07:45', end: '09:15', periods: [1, 2] },
+  2: { start: '09:35', end: '11:05', periods: [3, 4] },
+  3: { start: '11:50', end: '13:20', periods: [5, 6] },
+  4: { start: '13:45', end: '15:15', periods: [7, 8] }
+}
+
+// Helper to get next lesson for a user in a specific subject
+const getNextLesson = async (supabase: any, userClass: string, subject: string) => {
+  const today = getBerlinDate()
+  const currentDay = today.getDay() === 0 ? 7 : today.getDay()
+  
+  // Get schedule for the user's class
+  const tableName = `Stundenplan_${userClass}_A`
+  const { data: schedule } = await supabase.from(tableName).select('*')
+  
+  if (!schedule || schedule.length === 0) return null
+  
+  // Find next occurrence of the subject
+  for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+    const checkDay = ((currentDay - 1 + dayOffset) % 7) + 1
+    const dayColumn = WEEKDAY_COLUMNS[checkDay]
+    
+    if (!dayColumn) continue
+    
+    for (const row of schedule) {
+      if (row[dayColumn] && row[dayColumn].toLowerCase().includes(subject.toLowerCase())) {
+        const [subjectCode, teacher, room] = row[dayColumn].split(' ')
+        const block = Math.ceil(row.Stunde / 2)
+        
+        return {
+          day: Object.keys(WEEKDAY_MAP).find(k => WEEKDAY_MAP[k] === checkDay),
+          date: new Date(today.getTime() + dayOffset * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE'),
+          period: row.Stunde,
+          block: block,
+          blockTime: BLOCK_TIMES[block],
+          subject: subjectCode,
+          teacher: teacher,
+          room: room
+        }
+      }
+    }
+  }
+  return null
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -287,6 +334,63 @@ serve(async (req) => {
         } else {
           result = { error: 'Keine Berechtigung für TTS-Durchsagen - Level 10 erforderlich' }
         }
+        break
+
+      case 'show_substitution_plan':
+        // Show current substitution plan
+        const targetDate = parseDateTextToBerlinSchoolDay(parameters?.date || 'heute')
+        const dateStr = targetDate.toISOString().split('T')[0]
+        
+        const { data: substitutions } = await supabase
+          .from('vertretungsplan')
+          .select('*')
+          .eq('date', dateStr)
+          .order('class_name, period')
+        
+        if (!substitutions || substitutions.length === 0) {
+          result = { 
+            message: `Keine Vertretungen für ${targetDate.toLocaleDateString('de-DE')} gefunden.`,
+            date: targetDate.toLocaleDateString('de-DE')
+          }
+        } else {
+          const formattedSubs = substitutions.map(sub => {
+            const block = Math.ceil(sub.period / 2)
+            const blockTime = BLOCK_TIMES[block]
+            return `${sub.class_name}, ${sub.period}. Stunde (Block ${block}: ${blockTime.start}-${blockTime.end}): ${sub.original_subject} bei ${sub.original_teacher} → ${sub.substitute_subject} bei ${sub.substitute_teacher} (Raum: ${sub.substitute_room})`
+          }).join('\n')
+          
+          result = {
+            message: `Vertretungsplan für ${targetDate.toLocaleDateString('de-DE')}:\n\n${formattedSubs}`,
+            date: targetDate.toLocaleDateString('de-DE'),
+            substitutions: substitutions
+          }
+        }
+        success = true
+        break
+
+      case 'get_block_times':
+        result = {
+          message: 'Unterrichtszeiten:\n\nBlock 1: 07:45 – 09:15 (1. und 2. Stunde)\nBlock 2: 09:35 – 11:05 (3. und 4. Stunde)\nBlock 3: 11:50 – 13:20 (5. und 6. Stunde)\nBlock 4: 13:45 – 15:15 (7. und 8. Stunde)',
+          blocks: BLOCK_TIMES
+        }
+        success = true
+        break
+
+      case 'next_lesson':
+        if (userProfile.user_class && parameters?.subject) {
+          const nextLesson = await getNextLesson(supabase, userProfile.user_class, parameters.subject)
+          if (nextLesson) {
+            result = {
+              message: `Nächste ${parameters.subject}-Stunde: ${nextLesson.day}, ${nextLesson.date}, ${nextLesson.period}. Stunde (Block ${nextLesson.block}: ${nextLesson.blockTime.start}-${nextLesson.blockTime.end}) bei ${nextLesson.teacher} in Raum ${nextLesson.room}`,
+              lesson: nextLesson
+            }
+          } else {
+            result = { message: `Keine ${parameters.subject}-Stunde in den nächsten 7 Tagen gefunden.` }
+          }
+        } else {
+          result = { message: 'Klasse oder Fach nicht angegeben. Bitte geben Sie beide Parameter an.' }
+        }
+        success = true
         break
 
       case 'generate_vertretungsplan':

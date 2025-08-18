@@ -33,6 +33,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Check for stored login data in cookies
+    const storedProfile = localStorage.getItem('school_profile');
+    if (storedProfile) {
+      try {
+        const profile = JSON.parse(storedProfile);
+        setProfile(profile);
+        setUser({
+          id: profile.username,
+          app_metadata: {},
+          user_metadata: { username: profile.username, full_name: profile.name },
+          aud: 'authenticated',
+          created_at: new Date().toISOString(),
+          email: `${profile.username}@internal.school`
+        });
+      } catch (error) {
+        console.error('Error loading stored profile:', error);
+        localStorage.removeItem('school_profile');
+      }
+    }
     setLoading(false);
   }, []);
 
@@ -63,9 +82,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         email: `${username}@internal.school`
       };
 
-      // Set user and profile state
-      setUser(dummyUser);
-      setProfile({
+      const profileData = {
         id: userData.user_id,
         user_id: userData.user_id.toString(),
         username: username,
@@ -74,7 +91,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         password: 'encrypted',
         created_at: new Date().toISOString(),
         must_change_password: userData.must_change_password || false
-      });
+      };
+
+      // Set user and profile state
+      setUser(dummyUser);
+      setProfile(profileData);
+      
+      // Store login data in localStorage for persistence
+      localStorage.setItem('school_profile', JSON.stringify(profileData));
       
       setLoading(false);
       return { 
@@ -152,6 +176,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(null);
     setSession(null);
     setProfile(null);
+    // Clear stored login data
+    localStorage.removeItem('school_profile');
   };
 
   return (

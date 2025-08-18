@@ -128,7 +128,7 @@ const CreateUserModal = ({ isOpen, onClose }: CreateUserModalProps) => {
                   <SelectValue placeholder="Berechtigung wählen" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">Level 1 - Schüler</SelectItem>
+                  <SelectItem value="1">Level 1 - Visitor</SelectItem>
                   <SelectItem value="2">Level 2 - Schüler</SelectItem>
                   <SelectItem value="3">Level 3 - Schüler</SelectItem>
                   <SelectItem value="4">Level 4 - Schüler</SelectItem>
