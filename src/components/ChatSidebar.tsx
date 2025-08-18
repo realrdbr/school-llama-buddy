@@ -158,11 +158,15 @@ const ChatSidebar = ({ currentConversationId, onConversationSelect, onNewChat }:
 
   return (
     <div className="w-full h-full border-r bg-card flex flex-col">
-      <div className="p-2 sm:p-4 border-b space-y-2">
-        <Button onClick={onNewChat} className="w-full text-sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Neuer Chat
-        </Button>
+      {/* Header with proper spacing for close button */}
+      <div className="p-2 sm:p-4 border-b space-y-2 relative">
+        {/* Leave space for close button on mobile */}
+        <div className="pr-8 lg:pr-0">
+          <Button onClick={onNewChat} className="w-full text-sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Neuer Chat
+          </Button>
+        </div>
         {conversations.length > 0 && (
           <Button 
             onClick={deleteAllConversations} 

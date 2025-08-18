@@ -5,10 +5,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Users, UserPlus, Edit, Trash2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, Users, UserPlus, Edit, Trash2, Settings } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import CreateUserModal from '@/components/CreateUserModal';
 import EditUserModal from '@/components/EditUserModal';
+import PermissionManager from '@/components/PermissionManager';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 interface User {
   id: number;
@@ -172,7 +174,20 @@ const handleDeleteUser = async () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
-        <div className="space-y-4 sm:space-y-6">
+        <Tabs defaultValue="users" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="users" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Benutzerverwaltung
+            </TabsTrigger>
+            <TabsTrigger value="permissions" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Berechtigungen
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="users">
+            <div className="space-y-4 sm:space-y-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <Card>
@@ -310,7 +325,13 @@ const handleDeleteUser = async () => {
             </CardContent>
           </Card>
         </div>
-      </main>
+      </TabsContent>
+
+      <TabsContent value="permissions">
+        <PermissionManager />
+      </TabsContent>
+    </Tabs>
+  </main>
 
       <CreateUserModal 
         isOpen={showCreateModal}
