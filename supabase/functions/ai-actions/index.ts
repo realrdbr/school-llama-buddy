@@ -495,7 +495,7 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
           console.error('get_schedule error:', e);
           result = { error: e.message || 'Fehler beim Laden des Stundenplans' };
         }
-        break
+        break;
       }
 
       default:
