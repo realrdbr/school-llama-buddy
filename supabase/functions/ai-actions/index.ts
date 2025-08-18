@@ -496,7 +496,6 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
           result = { error: e.message || 'Fehler beim Laden des Stundenplans' };
         }
         break;
-      }
 
       default:
         result = { error: 'Unbekannte Aktion' };
