@@ -106,7 +106,12 @@ All colors MUST be HSL.
   /* Mobile responsiveness improvements */
   @media (max-width: 768px) {
     .container {
-      @apply px-2;
+      @apply px-2 max-w-full;
+    }
+    
+    * {
+      max-width: 100%;
+      box-sizing: border-box;
     }
     
     .overflow-x-auto table {
@@ -116,6 +121,24 @@ All colors MUST be HSL.
     .overflow-x-auto td, 
     .overflow-x-auto th {
       @apply px-2 py-3;
+    }
+    
+    /* Chat layout fixes */
+    .chat-container {
+      flex-direction: column;
+      height: 100vh;
+    }
+    
+    .chat-sidebar {
+      width: 100% !important;
+      max-height: 200px;
+      order: 2;
+    }
+    
+    .chat-main {
+      flex: 1;
+      order: 1;
+      min-height: 0;
     }
   }
 

@@ -210,7 +210,7 @@ const ChatSidebar = ({ currentConversationId, onConversationSelect, onNewChat }:
                   <Button
                     variant="ghost"
                     size="sm"
-                    className={`opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 ${
+                    className={`opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 flex-shrink-0 ${
                       currentConversationId === conversation.id 
                         ? 'hover:bg-primary-foreground/20' 
                         : 'hover:bg-destructive hover:text-destructive-foreground'
