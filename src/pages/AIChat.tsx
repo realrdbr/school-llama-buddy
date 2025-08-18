@@ -560,28 +560,31 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
   }, [location.state?.initialMessage, currentConversationId, input]);
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Sidebar */}
-      <ChatSidebar
-        currentConversationId={currentConversationId}
-        onConversationSelect={handleConversationSelect}
-        onNewChat={handleNewChat}
-      />
+    <div className="min-h-screen bg-background">
+      <div className="flex h-screen flex-col lg:flex-row">
+        {/* Sidebar */}
+        <div className="lg:w-80 w-full lg:h-full h-auto lg:order-1 order-2">
+          <ChatSidebar
+            currentConversationId={currentConversationId}
+            onConversationSelect={handleConversationSelect}
+            onNewChat={handleNewChat}
+          />
+        </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col lg:order-2 order-1 min-h-0">
         {/* Header */}
         <header className="border-b bg-card">
-          <div className="px-4 py-4">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Zurück
+          <div className="px-2 sm:px-4 py-3 sm:py-4">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="flex-shrink-0">
+                <ArrowLeft className="h-4 w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Zurück</span>
               </Button>
-              <div className="flex items-center gap-2">
-                <Bot className="h-5 w-5 text-primary" />
-                <h1 className="text-2xl font-bold text-foreground">E.D.U.A.R.D.</h1>
-                <p className="text-sm text-muted-foreground">Education, Data, Utility & Automation for Resource Distribution</p>
+              <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+                <Bot className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
+                <h1 className="text-lg sm:text-2xl font-bold text-foreground truncate">E.D.U.A.R.D.</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground hidden md:block truncate">Education, Data, Utility & Automation for Resource Distribution</p>
               </div>
             </div>
           </div>
@@ -715,6 +718,7 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
             </Card>
           </div>
         </main>
+        </div>
       </div>
     </div>
   );

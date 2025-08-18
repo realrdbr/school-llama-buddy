@@ -69,7 +69,7 @@ const Dashboard = () => {
   ];
 
   const renderFeatureCards = (features: any[]) => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
       {features.map((feature, index) => (
         <Card 
           key={index} 
@@ -96,42 +96,46 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">E.D.U.A.R.D.</h1>
-              <p className="text-muted-foreground">Education, Data, Utility & Automation for Resource Distribution</p>
+        <div className="container mx-auto px-2 sm:px-4 py-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">E.D.U.A.R.D.</h1>
+              <p className="text-sm sm:text-base text-muted-foreground">Education, Data, Utility & Automation for Resource Distribution</p>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="font-medium text-foreground">{profile?.name || user?.email}</p>
-                <div className="flex items-center gap-2">
-                  <Badge variant={getPermissionBadgeVariant(profile?.permission_lvl || 1)}>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
+              <div className="flex flex-col sm:text-right">
+                <p className="font-medium text-foreground text-sm sm:text-base">{profile?.name || user?.email}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant={getPermissionBadgeVariant(profile?.permission_lvl || 1)} className="text-xs">
                     {profile?.permission_lvl >= 10 ? "Schulleitung" : profile?.permission_lvl >= 8 ? "Verwaltung" : profile?.permission_lvl >= 5 ? "Lehrkraft" : profile?.permission_lvl > 1 ? "Schüler" : "Besucher"}
                   </Badge>
-                  <span className={`text-sm ${getPermissionColor(profile?.permission_lvl || 1)}`}>
+                  <span className={`text-xs sm:text-sm ${getPermissionColor(profile?.permission_lvl || 1)}`}>
                     Level {profile?.permission_lvl || 1}
                   </span>
                 </div>
               </div>
-              {profile?.permission_lvl && profile.permission_lvl >= 10 && (
-                <Button variant="outline" size="sm" onClick={() => setShowCreateUser(true)}>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Benutzer erstellen
+              <div className="flex gap-2 w-full sm:w-auto">
+                {profile?.permission_lvl && profile.permission_lvl >= 10 && (
+                  <Button variant="outline" size="sm" onClick={() => setShowCreateUser(true)} className="flex-1 sm:flex-none text-xs sm:text-sm">
+                    <UserPlus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Benutzer erstellen</span>
+                    <span className="sm:hidden">Erstellen</span>
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={handleSignOut} className="flex-1 sm:flex-none text-xs sm:text-sm">
+                  <LogOut className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Abmelden</span>
+                  <span className="sm:hidden">Aus</span>
                 </Button>
-              )}
-              <Button variant="outline" size="sm" onClick={handleSignOut}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Abmelden
-              </Button>
+              </div>
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        <div className="space-y-8">
+      <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+        <div className="space-y-4 sm:space-y-8">
           {/* Welcome Section */}
           <Card>
             <CardHeader>

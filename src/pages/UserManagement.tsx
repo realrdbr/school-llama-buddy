@@ -145,85 +145,87 @@ const handleDeleteUser = async () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
+        <div className="container mx-auto px-2 sm:px-4 py-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 min-w-0 flex-1">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="self-start">
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Zurück zum Dashboard
+                <span className="hidden sm:inline">Zurück zum Dashboard</span>
+                <span className="sm:hidden">Zurück</span>
               </Button>
               <div className="flex items-center gap-3">
-                <Users className="h-6 w-6 text-primary" />
+                <Users className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
                 <div>
-                  <h1 className="text-2xl font-bold text-foreground">Benutzerverwaltung</h1>
-                  <p className="text-muted-foreground">Benutzer und Berechtigungen verwalten</p>
+                  <h1 className="text-xl sm:text-2xl font-bold text-foreground">Benutzerverwaltung</h1>
+                  <p className="text-sm text-muted-foreground">Benutzer und Berechtigungen verwalten</p>
                 </div>
               </div>
             </div>
-            <Button onClick={() => setShowCreateModal(true)}>
+            <Button onClick={() => setShowCreateModal(true)} size="sm" className="w-full sm:w-auto">
               <UserPlus className="h-4 w-4 mr-2" />
-              Neuer Benutzer
+              <span className="hidden sm:inline">Neuer Benutzer</span>
+              <span className="sm:hidden">Neu</span>
             </Button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        <div className="space-y-6">
+      <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+        <div className="space-y-4 sm:space-y-6">
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    <Users className="h-6 w-6 text-primary" />
+              <CardContent className="p-3 sm:p-6">
+                <div className="flex items-center gap-2 sm:gap-4">
+                  <div className="p-1.5 sm:p-2 bg-primary/10 rounded-lg">
+                    <Users className="h-4 w-4 sm:h-6 sm:w-6 text-primary" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Gesamt</p>
-                    <p className="text-2xl font-bold">{users.length}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Gesamt</p>
+                    <p className="text-lg sm:text-2xl font-bold">{users.length}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
             
             <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Users className="h-6 w-6 text-blue-600" />
+              <CardContent className="p-3 sm:p-6">
+                <div className="flex items-center gap-2 sm:gap-4">
+                  <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg">
+                    <Users className="h-4 w-4 sm:h-6 sm:w-6 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Schulleitung</p>
-                    <p className="text-2xl font-bold">{users.filter(u => u.permission_lvl >= 10).length}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Schulleitung</p>
+                    <p className="text-lg sm:text-2xl font-bold">{users.filter(u => u.permission_lvl >= 10).length}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <Users className="h-6 w-6 text-green-600" />
+              <CardContent className="p-3 sm:p-6">
+                <div className="flex items-center gap-2 sm:gap-4">
+                  <div className="p-1.5 sm:p-2 bg-green-100 rounded-lg">
+                    <Users className="h-4 w-4 sm:h-6 sm:w-6 text-green-600" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Lehrkräfte</p>
-                    <p className="text-2xl font-bold">{users.filter(u => u.permission_lvl >= 5 && u.permission_lvl < 10).length}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Lehrkräfte</p>
+                    <p className="text-lg sm:text-2xl font-bold">{users.filter(u => u.permission_lvl >= 5 && u.permission_lvl < 10).length}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <Users className="h-6 w-6 text-orange-600" />
+              <CardContent className="p-3 sm:p-6">
+                <div className="flex items-center gap-2 sm:gap-4">
+                  <div className="p-1.5 sm:p-2 bg-orange-100 rounded-lg">
+                    <Users className="h-4 w-4 sm:h-6 sm:w-6 text-orange-600" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Schüler</p>
-                    <p className="text-2xl font-bold">{users.filter(u => u.permission_lvl < 5).length}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Schüler</p>
+                    <p className="text-lg sm:text-2xl font-bold">{users.filter(u => u.permission_lvl < 5).length}</p>
                   </div>
                 </div>
               </CardContent>
@@ -271,17 +273,24 @@ const handleDeleteUser = async () => {
                             {formatDate(userItem.created_at)}
                           </td>
                           <td className="p-4">
-<div className="flex gap-2">
+<div className="flex gap-1 sm:gap-2">
   <Button 
     variant="ghost" 
     size="sm"
     onClick={() => handleEditUser(userItem)}
     title="Benutzer bearbeiten"
+    className="h-8 w-8 p-0"
   >
-    <Edit className="h-4 w-4" />
+    <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
   </Button>
-  <Button variant="ghost" size="sm" className="text-destructive" title="Benutzer löschen" onClick={() => requestDeleteUser(userItem)}>
-    <Trash2 className="h-4 w-4" />
+  <Button 
+    variant="ghost" 
+    size="sm" 
+    className="text-destructive h-8 w-8 p-0" 
+    title="Benutzer löschen" 
+    onClick={() => requestDeleteUser(userItem)}
+  >
+    <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
   </Button>
 </div>
                           </td>
