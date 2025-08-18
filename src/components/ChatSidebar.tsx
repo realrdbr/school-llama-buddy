@@ -188,38 +188,38 @@ const ChatSidebar = ({ currentConversationId, onConversationSelect, onNewChat }:
             conversations.map((conversation) => (
               <div
                 key={conversation.id}
-                className={`p-3 rounded-lg cursor-pointer group transition-colors ${
+                className={`p-3 rounded-lg cursor-pointer group transition-colors flex items-center justify-between ${
                   currentConversationId === conversation.id
                     ? 'bg-primary text-primary-foreground'
                     : 'hover:bg-muted'
                 }`}
                 onClick={() => onConversationSelect(conversation.id)}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-sm truncate">
-                      {conversation.title}
-                    </h4>
-                    <p className="text-xs opacity-70 mt-1">
-                      {formatDistanceToNow(new Date(conversation.updated_at), {
-                        addSuffix: true,
-                        locale: de
-                      })}
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`opacity-70 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 flex-shrink-0 ml-2 ${
-                      currentConversationId === conversation.id 
-                        ? 'hover:bg-primary-foreground/20' 
-                        : 'hover:bg-destructive hover:text-destructive-foreground'
-                    }`}
-                    onClick={(e) => deleteConversation(conversation.id, e)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                <div className="flex-1 min-w-0 pr-2">
+                  <h4 className="font-medium text-sm truncate">
+                    {conversation.title.length > 30 
+                      ? `${conversation.title.substring(0, 30)}…` 
+                      : conversation.title}
+                  </h4>
+                  <p className="text-xs opacity-70 mt-1">
+                    {formatDistanceToNow(new Date(conversation.updated_at), {
+                      addSuffix: true,
+                      locale: de
+                    })}
+                  </p>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`h-8 w-8 p-0 flex-shrink-0 ${
+                    currentConversationId === conversation.id 
+                      ? 'hover:bg-primary-foreground/20 text-primary-foreground' 
+                      : 'hover:bg-destructive hover:text-destructive-foreground'
+                  }`}
+                  onClick={(e) => deleteConversation(conversation.id, e)}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
               </div>
             ))
           )}

@@ -41,7 +41,7 @@ WICHTIGE DEUTSCHSPRACHIGE BEGRIFFE:
 - Wenn nach "morgen" oder anderen spezifischen Tagen gefragt wird, zeige NUR die Daten für diesen Tag
 
 BERECHTIGUNGSSYSTEM:
-- Level 1: Benutzer
+- Level 1: Besucher
 - Level 2-4: Schüler  
 - Level 5-9: Lehrkraft
 - Level 10+: Schulleitung

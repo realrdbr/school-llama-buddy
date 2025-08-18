@@ -286,7 +286,7 @@ AKTUELLE ZEIT UND DATUM:
 - Übermorgen (YYYY-MM-DD): ${new Date(Date.now() + 172800000).toISOString().split('T')[0]}
 
 BERECHTIGUNGSLEVEL-SYSTEM:
-- Level 1: BENUTZER (Basis-Zugang)
+- Level 1: BESUCHER (Basis-Zugang)
 - Level 2-3: SCHÜLER (können nur Stundenpläne, Vertretungen und Ankündigungen einsehen)
 - Level 4-8: LEHRKRÄFTE (können Ankündigungen erstellen/bearbeiten, Vertretungen einsehen)
 - Level 9: KOORDINATION/STELLVERTRETUNG (können Vertretungen erstellen/bearbeiten, Klassen verwalten)
