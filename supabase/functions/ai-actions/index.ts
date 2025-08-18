@@ -499,7 +499,8 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
       }
 
       default:
-        result = { error: 'Unbekannte Aktion' }
+        result = { error: 'Unbekannte Aktion' };
+        break;
     }
 
     return new Response(
