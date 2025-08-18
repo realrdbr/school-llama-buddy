@@ -157,12 +157,11 @@ const ChatSidebar = ({ currentConversationId, onConversationSelect, onNewChat }:
   }
 
   return (
-    <div className="lg:w-80 w-full border-r bg-card flex flex-col lg:h-full h-64 lg:max-h-none max-h-64">
+    <div className="w-full h-full border-r bg-card flex flex-col">
       <div className="p-2 sm:p-4 border-b space-y-2">
         <Button onClick={onNewChat} className="w-full text-sm">
           <Plus className="h-4 w-4 mr-2" />
-          <span className="hidden sm:inline">Neuer Chat</span>
-          <span className="sm:hidden">Neu</span>
+          Neuer Chat
         </Button>
         {conversations.length > 0 && (
           <Button 
@@ -172,14 +171,13 @@ const ChatSidebar = ({ currentConversationId, onConversationSelect, onNewChat }:
             className="w-full text-destructive hover:bg-destructive hover:text-destructive-foreground text-xs sm:text-sm"
           >
             <TrashIcon className="h-4 w-4 mr-1 sm:mr-2" />
-            <span className="hidden sm:inline">Alle löschen</span>
-            <span className="sm:hidden">Löschen</span>
+            Alle löschen
           </Button>
         )}
       </div>
 
       <ScrollArea className="flex-1">
-        <div className="p-1 sm:p-2 space-y-1">
+        <div className="p-2 space-y-1">
           {conversations.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />

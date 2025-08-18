@@ -5,9 +5,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, Loader2, Bot, ArrowLeft, Upload, Paperclip, X } from 'lucide-react';
+import { Send, Loader2, Bot, ArrowLeft, Upload, Paperclip, X, Menu } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import ChatSidebar from '@/components/ChatSidebar';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -23,6 +24,7 @@ const AIChat = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Global functions for substitution confirmation buttons
@@ -533,16 +535,17 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
     if (conversationId) {
       loadConversation(conversationId);
     } else {
-      setCurrentConversationId(null);
       setConversation([]);
+      setCurrentConversationId(null);
     }
+    setSidebarOpen(false); // Close sidebar on mobile after selection
   };
 
   const handleNewChat = () => {
-    setCurrentConversationId(null);
     setConversation([]);
+    setCurrentConversationId(null);
     setInput('');
-    setUploadedFiles([]);
+    setSidebarOpen(false); // Close sidebar on mobile after creating new chat
   };
 
   // Handle initial message from location state
@@ -561,9 +564,9 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="flex h-screen flex-col lg:flex-row">
-        {/* Sidebar */}
-        <div className="lg:w-80 w-full lg:h-full h-auto lg:order-1 order-2">
+      <div className="flex h-screen">
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:block lg:w-80 lg:h-full">
           <ChatSidebar
             currentConversationId={currentConversationId}
             onConversationSelect={handleConversationSelect}
@@ -571,12 +574,32 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
           />
         </div>
 
+        {/* Mobile Sidebar Sheet */}
+        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          <SheetContent side="left" className="w-80 p-0">
+            <ChatSidebar
+              currentConversationId={currentConversationId}
+              onConversationSelect={handleConversationSelect}
+              onNewChat={handleNewChat}
+            />
+          </SheetContent>
+        </Sheet>
+
         {/* Main Content */}
-        <div className="flex-1 flex flex-col lg:order-2 order-1 min-h-0">
+        <div className="flex-1 flex flex-col min-h-0">
         {/* Header */}
         <header className="border-b bg-card">
           <div className="px-2 sm:px-4 py-3 sm:py-4">
             <div className="flex items-center gap-2 sm:gap-4">
+              {/* Mobile Hamburger Menu */}
+              <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="sm" className="lg:hidden flex-shrink-0">
+                    <Menu className="h-4 w-4" />
+                  </Button>
+                </SheetTrigger>
+              </Sheet>
+              
               <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="flex-shrink-0">
                 <ArrowLeft className="h-4 w-4 mr-1 sm:mr-2" />
                 <span className="hidden sm:inline">Zurück</span>
