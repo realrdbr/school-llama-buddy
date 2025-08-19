@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { ArrowLeft, Megaphone, Plus, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface Announcement {
   id: string;
@@ -178,7 +179,8 @@ const handleCreateAnnouncement = async () => {
     }
   };
 
-  const canCreateAnnouncements = profile?.permission_lvl && profile.permission_lvl >= 5;
+  const { can } = usePermissions();
+  const canCreateAnnouncements = can('create_announcements');
 
   return (
     <div className="min-h-screen bg-background">
