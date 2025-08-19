@@ -251,27 +251,158 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
         }
         break
 
+      case 'plan_substitution':
+        // Plan substitution for a sick teacher
+        if (userProfile.permission_lvl >= 9) {
+          try {
+            const teacherName = (parameters.teacherName || parameters.teacher || '').replace(/\b(fr\.?|herr|frau|hr\.?)\s+/i, '').trim();
+            const dateInput = parameters.date || 'heute';
+            const targetDate = parseDateTextToBerlinSchoolDay(dateInput);
+            const dateISO = targetDate.toISOString().split('T')[0];
+            
+            console.log('Planning substitution for:', teacherName, 'on', dateISO);
+            
+            // Call schedule-manager to generate substitution plan
+            const { data: scheduleResult, error: scheduleError } = await supabase.functions.invoke('schedule-manager', {
+              body: {
+                action: 'create_substitution_plan',
+                data: {
+                  teacherName: teacherName,
+                  date: dateISO
+                }
+              }
+            });
+            
+            if (scheduleError || !scheduleResult?.success) {
+              console.error('Schedule manager error:', scheduleError);
+              result = { error: `Fehler bei der Vertretungsplanung: ${scheduleError?.message || 'Unbekannter Fehler'}` };
+              break;
+            }
+            
+            const plan = scheduleResult.substitution_plan || [];
+            if (plan.length === 0) {
+              result = { message: `Keine Stunden für ${teacherName} am ${targetDate.toLocaleDateString('de-DE')} gefunden.` };
+              success = true;
+              break;
+            }
+            
+            // Format confirmations and prepare for user approval
+            const confirmations = plan.map((sub: any) => 
+              `${sub.class_name}, ${sub.period}. Stunde: ${sub.original_subject} → ${sub.substitute_teacher || 'Entfall'} (${sub.substitute_room || sub.original_room})`
+            );
+            
+            result = {
+              message: 'Vertretungsplan wurde vorgeschlagen:',
+              confirmations: confirmations,
+              details: {
+                substitutions: plan,
+                sickTeacher: teacherName,
+                date: targetDate.toLocaleDateString('de-DE'),
+                dateISO: dateISO,
+                affectedLessonsCount: plan.length
+              }
+            };
+            success = true;
+          } catch (error) {
+            console.error('Plan substitution error:', error);
+            result = { error: `Fehler bei der Vertretungsplanung: ${(error as any).message}` };
+          }
+        } else {
+          result = { error: 'Keine Berechtigung für Vertretungsplanung - Level 9 erforderlich' };
+        }
+        break
+
+      case 'confirm_substitution':
+        // Confirm and save the planned substitution
+        if (userProfile.permission_lvl >= 9) {
+          try {
+            const substitutions = parameters.substitutions || [];
+            const sickTeacher = parameters.sickTeacher;
+            const dateISO = parameters.date;
+            
+            console.log('Confirming substitutions:', substitutions);
+            
+            if (!Array.isArray(substitutions) || substitutions.length === 0) {
+              result = { error: 'Keine Vertretungen zum Bestätigen gefunden.' };
+              break;
+            }
+            
+            // Insert all substitutions into database
+            const insertPromises = substitutions.map((sub: any) => 
+              supabase.from('vertretungsplan').insert({
+                date: dateISO,
+                class_name: sub.class_name,
+                period: sub.period,
+                original_teacher: sub.original_teacher,
+                original_subject: sub.original_subject,
+                original_room: sub.original_room,
+                substitute_teacher: sub.substitute_teacher,
+                substitute_subject: sub.substitute_subject,
+                substitute_room: sub.substitute_room,
+                note: sub.note || `Vertretung für ${sickTeacher}`,
+                created_by: null
+              }).select()
+            );
+            
+            const results = await Promise.all(insertPromises);
+            const errors = results.filter(r => r.error);
+            
+            if (errors.length > 0) {
+              console.error('Insert errors:', errors);
+              result = { error: 'Fehler beim Speichern einiger Vertretungen.' };
+              break;
+            }
+            
+            // Create announcement
+            const announcement = {
+              title: `Vertretungsplan: ${sickTeacher} abwesend`,
+              content: `${new Date(dateISO).toLocaleDateString('de-DE')}: ${substitutions.length} Vertretungen für ${sickTeacher} eingetragen.`,
+              author: 'E.D.U.A.R.D.',
+              priority: 'high',
+              target_permission_level: 1,
+              created_by: null,
+            };
+            await supabase.from('announcements').insert(announcement);
+            
+            const confirmed = substitutions.map((sub: any) => 
+              `${sub.class_name}, ${sub.period}. Stunde bestätigt`
+            );
+            
+            result = {
+              message: `${substitutions.length} Vertretungen wurden erfolgreich erstellt.`,
+              confirmed: confirmed
+            };
+            success = true;
+          } catch (error) {
+            console.error('Confirm substitution error:', error);
+            result = { error: `Fehler beim Bestätigen: ${(error as any).message}` };
+          }
+        } else {
+          result = { error: 'Keine Berechtigung zum Bestätigen von Vertretungen - Level 9 erforderlich' };
+        }
+        break
+
       case 'get_current_substitution_plan':
         // Handle specific date requests (morgen, übermorgen, etc.)
-        let targetDate = null;
+        let subTargetDate = null;
         if (parameters.date) {
-          targetDate = parseDateTextToBerlinSchoolDay(parameters.date);
+          subTargetDate = parseDateTextToBerlinSchoolDay(parameters.date);
         }
         
-        let query = supabase
+        let subQuery = supabase
           .from('vertretungsplan')
           .select('*');
         
         // If specific date requested, filter by that date
-        if (targetDate) {
-          const dateStr = targetDate.toISOString().split('T')[0];
-          query = query.eq('date', dateStr);
+        if (subTargetDate) {
+          const dateStr = subTargetDate.toISOString().split('T')[0];
+          subQuery = subQuery.eq('date', dateStr);
         }
         
-        query = query.order('date', { ascending: true })
-                     .order('period', { ascending: true });
+        subQuery = subQuery.order('date', { ascending: true })
+                          .order('period', { ascending: true });
         
-        const { data: substitutions, error: subError } = await query;
+        const { data: substitutions, error: subError } = await subQuery;
         
         if (subError) {
           result = { error: subError.message }
