@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,6 +75,7 @@ const formatWeekRange = (start: Date) => {
 const Vertretungsplan = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
+  const { can } = usePermissions();
   const [substitutions, setSubstitutions] = useState<SubstitutionEntry[]>([]);
   const [schedules, setSchedules] = useState<{ [key: string]: ScheduleEntry[] }>({});
   const [showSubstitutionDialog, setShowSubstitutionDialog] = useState(false);
@@ -116,6 +118,17 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
       navigate('/auth');
       return;
     }
+    // Check permission before allowing access
+    if (!can('substitution_plan_enabled')) {
+      toast({
+        variant: "destructive",
+        title: "Zugriff verweigert",
+        description: "Sie haben keine Berechtigung für den Vertretungsplan."
+      });
+      navigate('/');
+      return;
+    }
+    
     if (profile && profile.permission_lvl < 1) {
       toast({
         variant: "destructive",
@@ -423,7 +436,7 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
     });
   };
 
-const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >= 10;
+const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >= 10 && can('substitution_plan_enabled');
 
   // Compute week range info for UI
   const __selectedDateObj = new Date(selectedDate + 'T00:00:00');
@@ -489,10 +502,10 @@ const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-6">
           
-          {/* AI Generator - nur für Schulleitung */}
-          <RoleBasedLayout requiredPermission={10}>
+          {/* AI Generator - nur für Level 10+ mit substitution_plan_enabled */}
+          {canEditSubstitutions && (
             <AIVertretungsGenerator onGenerated={fetchSubstitutions} />
-          </RoleBasedLayout>
+          )}
           {/* Schedule Table */}
           <Card>
             <CardHeader>

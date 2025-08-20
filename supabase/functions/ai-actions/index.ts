@@ -17,6 +17,20 @@ serve(async (req) => {
     const { action, parameters, userProfile } = await req.json()
     console.log('Received action:', action, 'with parameters:', parameters)
 
+    // Check permission before processing
+    if (userProfile && userProfile.permission_lvl < 10) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          result: { error: 'Insufficient permissions. Level 10+ required for AI actions.' }
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403
+        }
+      )
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''

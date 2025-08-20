@@ -129,9 +129,12 @@ serve(async (req) => {
         const targetDayColumn = dayColumns[dayOfWeek];
         
         if (!targetDayColumn) {
+          console.log(`No target day column for date ${absenceDate} (day of week: ${dayOfWeek})`);
           result = { success: true, substitution_plan: [], affected_lessons_count: 0 };
           break;
         }
+        
+        console.log(`Looking for lessons for teacher ${teacherName} on ${targetDayColumn} (${absenceDate})`);
         
         // Find all lessons for this teacher on this day across all class tables
         const allClassTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
@@ -145,7 +148,32 @@ serve(async (req) => {
           if (!scheduleError && classSchedule) {
             classSchedule.forEach(lesson => {
               const lessonContent = lesson[targetDayColumn];
-              if (lessonContent && lessonContent.toLowerCase().includes(teacherName.toLowerCase())) {
+              
+              // Try to match teacher by both full name and shortened name
+              let teacherMatch = false;
+              if (lessonContent) {
+                // First try exact shortened name match
+                teacherMatch = lessonContent.toLowerCase().includes(teacherName.toLowerCase());
+                
+                // If no match and teacherName looks like a full name, try to find corresponding shortened name
+                if (!teacherMatch && teacherName.length > 3) {
+                  // Common teacher abbreviations - could be enhanced with database lookup
+                  const commonAbbrevs: Record<string, string> = {
+                    'könig': 'kön',
+                    'kunadt': 'kun', 
+                    'schmidt': 'sch',
+                    'müller': 'mül',
+                    'weber': 'web',
+                    'meyer': 'mey'
+                  };
+                  const shortName = commonAbbrevs[teacherName.toLowerCase()];
+                  if (shortName) {
+                    teacherMatch = lessonContent.toLowerCase().includes(shortName);
+                  }
+                }
+              }
+              
+              if (teacherMatch) {
                 // Parse lesson content to extract subject and room
                 const parts = lessonContent.split(/[\s,/|]+/).filter(p => p.trim());
                 let subject = 'Unbekannt';
@@ -177,6 +205,8 @@ serve(async (req) => {
                   teacher: teacherName,
                   day_column: targetDayColumn
                 });
+                
+                console.log(`Found lesson for ${teacherName}: ${tableName} Period ${lesson.Stunde} ${targetDayColumn} - ${lessonContent}`);
               }
             });
           }
@@ -260,6 +290,8 @@ serve(async (req) => {
           })
         }
 
+        console.log(`Created substitution plan with ${teacherLessons.length} lessons for ${teacherName} on ${absenceDate}`);
+        
         result = { 
           success: true, 
           substitution_plan: substitutionPlan,
