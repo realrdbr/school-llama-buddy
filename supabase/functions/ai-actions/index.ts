@@ -17,12 +17,13 @@ serve(async (req) => {
     const { action, parameters, userProfile } = await req.json()
     console.log('Received action:', action, 'with parameters:', parameters)
 
-    // Check permission before processing
-    if (userProfile && userProfile.permission_lvl < 10) {
+    // Check basic permission for AI actions - most actions require level 9+ now
+    const requiredLevel = ['get_teachers', 'get_schedule', 'get_announcements', 'get_current_substitution_plan'].includes(action) ? 1 : 9;
+    if (userProfile && userProfile.permission_lvl < requiredLevel) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          result: { error: 'Insufficient permissions. Level 10+ required for AI actions.' }
+          result: { error: `Insufficient permissions. Level ${requiredLevel}+ required for this action.` }
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -101,14 +102,14 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
         break
 
       case 'update_vertretungsplan':
-        if (userProfile.permission_lvl >= 10) {
+        if (userProfile.permission_lvl >= 9) {
           console.log('Raw parameters received:', parameters)
           
           // Parse date using robust German parser and ensure school day
           const dateValue = parseDateTextToBerlinSchoolDay(parameters?.date || parameters?.datum || 'today');
           
-          // Ensure all required fields are present with fallbacks
-          const insertData = {
+          // Prepare substitution data for confirmation
+          const substitutionData = {
             date: dateValue.toISOString().split('T')[0],
             class_name: parameters.className || parameters.class_name || 'Unbekannte Klasse',
             period: parseInt(parameters.period) || 1,
@@ -118,42 +119,28 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
             substitute_teacher: parameters.substituteTeacher || parameters.substitute_teacher || 'Vertretung',
             substitute_subject: parameters.substituteSubject || parameters.substitute_subject || 'Vertretung',
             substitute_room: parameters.substituteRoom || parameters.substitute_room || 'Unbekannt',
-            note: parameters.note || 'Keine Notizen',
-            created_by: null
-          }
+            note: parameters.note || 'Keine Notizen'
+          };
           
-          console.log('Inserting data:', insertData)
+          console.log('Prepared substitution data:', substitutionData);
           
-          const { data, error } = await supabase
-            .from('vertretungsplan')
-            .insert(insertData)
-            .select()
-            .single()
+          // Return substitution for confirmation instead of directly inserting
+          const confirmationMessage = `${substitutionData.class_name}, ${substitutionData.period}. Stunde: ${substitutionData.original_subject} bei ${substitutionData.original_teacher} → ${substitutionData.substitute_teacher} (${substitutionData.substitute_room})`;
           
-          if (!error) {
-            console.log('update_vertretungsplan inserted:', data);
-            // Create announcement automatically for visibility across the app
-            const dateStrDE = new Date(insertData.date + 'T12:00:00').toLocaleDateString('de-DE');
-            const announcement = {
-              title: `Vertretungsplan aktualisiert – ${insertData.class_name}`,
-              content: `${dateStrDE}, ${insertData.period}. Stunde: ${insertData.original_subject} bei ${insertData.original_teacher} wird vertreten durch ${insertData.substitute_teacher} (Raum: ${insertData.substitute_room}).`,
-              author: 'E.D.U.A.R.D.',
-              priority: 'high',
-              target_class: insertData.class_name,
-              target_permission_level: 1,
-              created_by: null,
-            };
-            const { error: annErr } = await supabase.from('announcements').insert(announcement);
-            if (annErr) console.error('Announcement insert error:', annErr);
-
-            result = { message: 'Vertretungsplan wurde erfolgreich aktualisiert.', inserted: data }
-            success = true
-          } else {
-            console.error('update_vertretungsplan error:', error);
-            result = { error: error.message }
-          }
+          result = {
+            message: 'Vertretung vorgeschlagen:',
+            confirmations: [confirmationMessage],
+            details: {
+              substitutions: [substitutionData],
+              sickTeacher: substitutionData.original_teacher,
+              date: new Date(substitutionData.date).toLocaleDateString('de-DE'),
+              dateISO: substitutionData.date,
+              affectedLessonsCount: 1
+            }
+          };
+          success = true;
         } else {
-          result = { error: 'Keine Berechtigung zum Bearbeiten des Vertretungsplans - Level 10 erforderlich' }
+          result = { error: 'Keine Berechtigung zum Bearbeiten des Vertretungsplans - Level 9 erforderlich' }
         }
         break
 

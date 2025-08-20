@@ -7,6 +7,7 @@ export function usePermissions() {
   const { profile } = useAuth();
   const [levelPerms, setLevelPerms] = useState<Record<number, Record<string, boolean>>>({});
   const [userPerms, setUserPerms] = useState<Record<string, boolean>>({});
+  const [classPerms, setClassPerms] = useState<Record<string, boolean>>({});
   const [requiresLevel, setRequiresLevel] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
@@ -31,6 +32,14 @@ export function usePermissions() {
           (upData || []).forEach((r: any) => { up[r.permission_id] = r.allowed; });
         }
 
+        // Load class permissions
+        const userClass = (profile as any)?.user_class;
+        let cp: Record<string, boolean> = {};
+        if (userClass) {
+          const { data: cpData } = await supabase.from('class_permissions').select('*').eq('class_name', userClass);
+          (cpData || []).forEach((r: any) => { cp[r.permission_id] = r.allowed; });
+        }
+
         // Load permission definitions (requires_level)
         const { data: defs } = await supabase.from('permission_definitions').select('id, requires_level');
         const req: Record<string, number> = {};
@@ -39,6 +48,7 @@ export function usePermissions() {
         if (!active) return;
         setLevelPerms(lvl);
         setUserPerms(up);
+        setClassPerms(cp);
         setRequiresLevel(req);
       } finally {
         if (active) setLoading(false);
@@ -56,10 +66,12 @@ export function usePermissions() {
       if (typeof minLvl === 'number' && lvl < minLvl) return false;
       // User-specific override first
       if (permissionId in userPerms) return !!userPerms[permissionId];
+      // Class-specific override second
+      if (permissionId in classPerms) return !!classPerms[permissionId];
       // Fallback to level default
       return !!levelPerms[lvl]?.[permissionId];
     };
-  }, [profile?.permission_lvl, userPerms, levelPerms, requiresLevel]);
+  }, [profile?.permission_lvl, userPerms, classPerms, levelPerms, requiresLevel]);
 
   return { can, loading };
 }

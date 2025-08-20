@@ -38,6 +38,12 @@ interface LevelPermissions {
   };
 }
 
+interface ClassPermissions {
+  [className: string]: {
+    [permissionId: string]: boolean;
+  };
+}
+
 const PermissionManager = () => {
   const { profile } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
@@ -45,6 +51,7 @@ const PermissionManager = () => {
   const [saving, setSaving] = useState(false);
   const [userPermissions, setUserPermissions] = useState<UserPermissions>({});
   const [levelPermissions, setLevelPermissions] = useState<LevelPermissions>({});
+  const [classPermissions, setClassPermissions] = useState<ClassPermissions>({});
 
   // Define all available permissions
   const permissions: Permission[] = [
@@ -52,6 +59,7 @@ const PermissionManager = () => {
     { id: 'view_schedule', name: 'Stundenplan einsehen', description: 'Eigenen Stundenplan anzeigen', requiresLevel: 1 },
     { id: 'view_announcements', name: 'Ankündigungen lesen', description: 'Schulankündigungen einsehen', requiresLevel: 1 },
     { id: 'view_vertretungsplan', name: 'Vertretungsplan einsehen', description: 'Vertretungen anzeigen', requiresLevel: 1 },
+    { id: 'substitution_plan_enabled', name: 'Vertretungsplan-Zugriff', description: 'Grundzugriff auf Vertretungsplan-System', requiresLevel: 1 },
     { id: 'create_announcements', name: 'Ankündigungen erstellen', description: 'Neue Ankündigungen verfassen', requiresLevel: 4 },
     { id: 'edit_announcements', name: 'Ankündigungen bearbeiten', description: 'Bestehende Ankündigungen ändern', requiresLevel: 4 },
     { id: 'manage_substitutions', name: 'Vertretungen verwalten', description: 'Vertretungsplan bearbeiten', requiresLevel: 9 },
@@ -155,6 +163,21 @@ const PermissionManager = () => {
       });
       
       setUserPermissions(userPerms);
+
+      // Load class permissions from database
+      const { data: classData, error: classError } = await supabase
+        .from('class_permissions')
+        .select('*');
+      
+      if (classError) throw classError;
+      
+      const classPerms: ClassPermissions = {};
+      classData?.forEach(cp => {
+        if (!classPerms[cp.class_name]) classPerms[cp.class_name] = {};
+        classPerms[cp.class_name][cp.permission_id] = cp.allowed;
+      });
+      
+      setClassPermissions(classPerms);
     } catch (error) {
       console.error('Error loading permissions:', error);
       toast({
@@ -226,6 +249,35 @@ const PermissionManager = () => {
         if (insertUserError) throw insertUserError;
       }
 
+      // Save class permissions to database
+      const classUpdates = [];
+      for (const [className, perms] of Object.entries(classPermissions)) {
+        for (const [permId, allowed] of Object.entries(perms)) {
+          classUpdates.push({
+            class_name: className,
+            permission_id: permId,
+            allowed: allowed,
+            updated_at: new Date().toISOString()
+          });
+        }
+      }
+      
+      // Delete existing class permissions and insert new ones
+      const { error: deleteClassError } = await supabase
+        .from('class_permissions')
+        .delete()
+        .neq('class_name', '');
+      
+      if (deleteClassError) throw deleteClassError;
+      
+      if (classUpdates.length > 0) {
+        const { error: insertClassError } = await supabase
+          .from('class_permissions')
+          .insert(classUpdates);
+        
+        if (insertClassError) throw insertClassError;
+      }
+
       toast({
         title: "Erfolg",
         description: "Berechtigungen wurden persistent gespeichert."
@@ -262,6 +314,16 @@ const PermissionManager = () => {
     }));
   };
 
+  const toggleClassPermission = (className: string, permissionId: string) => {
+    setClassPermissions(prev => ({
+      ...prev,
+      [className]: {
+        ...prev[className],
+        [permissionId]: !prev[className]?.[permissionId]
+      }
+    }));
+  };
+
   const getUserPermission = (userId: number, permissionId: string): boolean => {
     const user = users.find(u => u.id === userId);
     if (!user) return false;
@@ -276,6 +338,12 @@ const PermissionManager = () => {
   const getLevelPermission = (level: number, permissionId: string): boolean => {
     return levelPermissions[level]?.[permissionId] || false;
   };
+
+  const getClassPermission = (className: string, permissionId: string): boolean => {
+    return classPermissions[className]?.[permissionId] || false;
+  };
+
+  const availableClasses = ['10B', '10C', '11A', '11B', '12A', '12B'];
 
   const getPermissionBadge = (level: number) => {
     if (level >= 10) return { text: "Schulleitung", variant: "default" as const };
@@ -326,7 +394,7 @@ const PermissionManager = () => {
       </div>
 
       <Tabs defaultValue="individual" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="individual" className="flex items-center gap-2">
             <User className="h-4 w-4" />
             Individuelle Berechtigungen
@@ -334,6 +402,10 @@ const PermissionManager = () => {
           <TabsTrigger value="levels" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Level-Berechtigungen
+          </TabsTrigger>
+          <TabsTrigger value="classes" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Klassen-Berechtigungen
           </TabsTrigger>
         </TabsList>
 
@@ -420,6 +492,40 @@ const PermissionManager = () => {
                     </div>
                   );
                 })}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="classes" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Klassen-Standardberechtigungen</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {availableClasses.map((className) => (
+                  <div key={className} className="border rounded-lg p-4">
+                    <div className="flex items-center gap-4 mb-4">
+                      <Badge variant="outline">Klasse {className}</Badge>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {(permissionDefinitions.length > 0 ? permissionDefinitions : permissions).map((permission) => (
+                        <div key={permission.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                          <div className="space-y-0.5 flex-1">
+                            <Label className="text-sm font-medium">{permission.name}</Label>
+                            <p className="text-xs text-muted-foreground">{permission.description}</p>
+                          </div>
+                          <Switch
+                            checked={getClassPermission(className, permission.id)}
+                            onCheckedChange={() => toggleClassPermission(className, permission.id)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>

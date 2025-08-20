@@ -160,6 +160,30 @@ export type Database = {
           },
         ]
       }
+      class_permissions: {
+        Row: {
+          allowed: boolean
+          class_name: string
+          created_at: string
+          permission_id: string
+          updated_at: string
+        }
+        Insert: {
+          allowed?: boolean
+          class_name: string
+          created_at?: string
+          permission_id: string
+          updated_at?: string
+        }
+        Update: {
+          allowed?: boolean
+          class_name?: string
+          created_at?: string
+          permission_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       document_analysis: {
         Row: {
           analysis_result: Json | null

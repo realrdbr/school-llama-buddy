@@ -118,26 +118,6 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
       navigate('/auth');
       return;
     }
-    // Check permission before allowing access
-    if (!can('substitution_plan_enabled')) {
-      toast({
-        variant: "destructive",
-        title: "Zugriff verweigert",
-        description: "Sie haben keine Berechtigung für den Vertretungsplan."
-      });
-      navigate('/');
-      return;
-    }
-    
-    if (profile && profile.permission_lvl < 1) {
-      toast({
-        variant: "destructive",
-        title: "Zugriff verweigert",
-        description: "Sie haben keine Berechtigung für diese Seite."
-      });
-      navigate('/');
-      return;
-    }
     
     fetchSchedules();
     fetchSubstitutions();
