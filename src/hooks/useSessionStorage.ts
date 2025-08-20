@@ -101,19 +101,14 @@ export const useSessionStorage = () => {
       }
 
       try {
-        // Check if this is an actual page reload (not just navigation)
+        // Detect real page reload/back-forward using Navigation Timing API
         const navigationEntries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
-        const isPageReload = navigationEntries.length > 0 && 
-          (navigationEntries[0].type === 'reload' || navigationEntries[0].type === 'navigate');
+        const navType = navigationEntries.length > 0 ? navigationEntries[0].type : 'navigate';
         
-        // Check if we've already restored in this session
-        const sessionKey = 'eduard_session_restored';
-        const hasAlreadyRestored = sessionStorage.getItem(sessionKey) === 'true';
+        console.log('Session Storage: Current path:', currentPath, 'Navigation type:', navType);
         
-        console.log('Session Storage: Current path:', currentPath, 'Is page reload:', isPageReload, 'Already restored:', hasAlreadyRestored);
-        
-        // Only auto-redirect if this is a page reload/fresh navigation AND we haven't restored yet in this session
-        if (currentPath === '/' && isPageReload && !hasAlreadyRestored) {
+        // Only auto-redirect from root on real reloads (not back/forward or SPA navigations)
+        if (currentPath === '/' && navType === 'reload') {
           const lastRoute = await loadLastRoute();
           console.log('Session Storage: Last route:', lastRoute);
           
@@ -126,11 +121,9 @@ export const useSessionStorage = () => {
             ];
             
             if (validRoutes.includes(lastRoute)) {
-              console.log('Session Storage: Navigating to last route:', lastRoute);
+              console.log('Session Storage: Navigating to last route after reload:', lastRoute);
               navigate(lastRoute, { replace: true });
               setHasRestoredFromReload(true);
-              // Mark that we've restored in this session
-              sessionStorage.setItem(sessionKey, 'true');
             }
           }
         }
@@ -152,6 +145,12 @@ export const useSessionStorage = () => {
     
     // Don't save auth routes
     if (currentPath !== '/auth' && currentPath !== '/login') {
+      // Skip one save right after a restoration redirect
+      if (hasRestoredFromReload) {
+        setHasRestoredFromReload(false);
+        return;
+      }
+
       // Add a small delay to avoid saving immediately after restoration
       const timeoutId = setTimeout(() => {
         console.log('Session Storage: Saving route:', currentPath);
@@ -160,7 +159,7 @@ export const useSessionStorage = () => {
       
       return () => clearTimeout(timeoutId);
     }
-  }, [location.pathname, profile, isInitialized]);
+  }, [location.pathname, profile, isInitialized, hasRestoredFromReload]);
 
   return {
     isInitialized,
