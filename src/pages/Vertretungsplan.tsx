@@ -90,14 +90,7 @@ const Vertretungsplan = () => {
     substituteRoom: '',
     note: ''
   });
-  // Initialize selectedDate to show week containing the most recent substitutions
-  const [selectedDate, setSelectedDate] = useState(() => {
-    // Check if we should start with next week (if there are future substitutions)
-    const today = new Date();
-    const nextWeek = new Date(today);
-    nextWeek.setDate(nextWeek.getDate() + 7);
-    return toISODateLocal(nextWeek);
-  });
+const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
   const [selectedClass, setSelectedClass] = useState('10b');
 
   const handlePrevWeek = () => {
