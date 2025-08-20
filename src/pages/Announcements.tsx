@@ -22,23 +22,36 @@ interface Announcement {
 
 const Announcements = () => {
   const navigate = useNavigate();
-const { user, profile } = useAuth();
-const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-const [showCreateForm, setShowCreateForm] = useState(false);
-const [newAnnouncement, setNewAnnouncement] = useState({
-  title: '',
-  content: '',
-  priority: 'normal' as 'low' | 'normal' | 'high' | 'urgent'
-});
-const [userClass, setUserClass] = useState<string | null>(null);
+  const { user, profile } = useAuth();
+  const { can } = usePermissions();
+  const canCreateAnnouncements = can('create_announcements');
+  
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newAnnouncement, setNewAnnouncement] = useState({
+    title: '',
+    content: '',
+    priority: 'normal' as 'low' | 'normal' | 'high' | 'urgent'
+  });
+  const [userClass, setUserClass] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
       navigate('/auth');
       return;
     }
+    // Permission enforcement
+    if (!can('view_announcements')) {
+      toast({
+        variant: "destructive",
+        title: "Zugriff verweigert",
+        description: "Sie haben keine Berechtigung für Ankündigungen."
+      });
+      navigate('/');
+      return;
+    }
     fetchAnnouncements();
-  }, [user, navigate]);
+  }, [user, navigate, can]);
 
 const fetchAnnouncements = async () => {
   try {
@@ -92,6 +105,15 @@ const fetchAnnouncements = async () => {
 };
 
 const handleCreateAnnouncement = async () => {
+  if (!canCreateAnnouncements) {
+    toast({
+      variant: "destructive",
+      title: "Zugriff verweigert",
+      description: "Sie haben keine Berechtigung zum Erstellen von Ankündigungen."
+    });
+    return;
+  }
+
   if (!newAnnouncement.title || !newAnnouncement.content) {
     toast({
       variant: "destructive",
@@ -138,6 +160,15 @@ const handleCreateAnnouncement = async () => {
 };
 
   const handleDeleteAnnouncement = async (id: string) => {
+    if (!canCreateAnnouncements) {
+      toast({
+        variant: "destructive",
+        title: "Zugriff verweigert",
+        description: "Sie haben keine Berechtigung zum Löschen von Ankündigungen."
+      });
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('announcements')
@@ -178,9 +209,6 @@ const handleCreateAnnouncement = async () => {
       default: return 'Normal';
     }
   };
-
-  const { can } = usePermissions();
-  const canCreateAnnouncements = can('create_announcements');
 
   return (
     <div className="min-h-screen bg-background">

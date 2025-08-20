@@ -637,8 +637,13 @@ Stundenplan {selectedClass} - Woche {formatWeekRange(__weekStart)}
             </Card>
           )}
           
-          {/* Debug Component */}
-          <DebugVertretungsplan />
+          {/* AI Generator and Debug Components */}
+          {canEditSubstitutions && (
+            <div className="space-y-6">
+              <AIVertretungsGenerator onGenerated={fetchSubstitutions} />
+              <DebugVertretungsplan />
+            </div>
+          )}
         </div>
       </main>
 
