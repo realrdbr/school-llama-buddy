@@ -101,6 +101,7 @@ export const useSessionStorage = () => {
 
       try {
         const lastRoute = await loadLastRoute();
+        console.log('Session Storage: Current path:', currentPath, 'Last route:', lastRoute);
         
         // Only navigate if we're on the root and have a different last route
         if (currentPath === '/' && lastRoute !== '/' && lastRoute !== currentPath) {
@@ -112,6 +113,7 @@ export const useSessionStorage = () => {
           ];
           
           if (validRoutes.includes(lastRoute)) {
+            console.log('Session Storage: Navigating to last route:', lastRoute);
             navigate(lastRoute, { replace: true });
           }
         }
@@ -133,6 +135,7 @@ export const useSessionStorage = () => {
     
     // Don't save auth routes
     if (currentPath !== '/auth' && currentPath !== '/login') {
+      console.log('Session Storage: Saving route:', currentPath);
       saveRoute(currentPath);
     }
   }, [location.pathname, profile, isInitialized]);

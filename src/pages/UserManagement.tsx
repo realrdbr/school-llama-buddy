@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { usePermissions } from '@/hooks/usePermissions';
+import { useEnhancedPermissions } from '@/hooks/useEnhancedPermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,7 @@ interface User {
 const UserManagement = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
-  const { canAccess } = usePermissions();
+  const { hasPermission, isLoaded } = useEnhancedPermissions();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 const [showCreateModal, setShowCreateModal] = useState(false);
@@ -40,7 +40,10 @@ const [deleting, setDeleting] = useState(false);
       return;
     }
 
-    if (profile && !canAccess('user_management')) {
+    // Wait for permissions to load before checking access
+    if (!isLoaded) return;
+
+    if (profile && !hasPermission('user_management')) {
       toast({
         variant: "destructive",
         title: "Zugriff verweigert",
@@ -51,7 +54,7 @@ const [deleting, setDeleting] = useState(false);
     }
     
     fetchUsers();
-  }, [user, profile, navigate, canAccess]);
+  }, [user, profile, navigate, hasPermission, isLoaded]);
 
   const fetchUsers = async () => {
     try {
@@ -139,7 +142,7 @@ const handleDeleteUser = async () => {
     });
   };
 
-  if (loading) {
+  if (loading || !isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
