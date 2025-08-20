@@ -202,6 +202,62 @@ export type Database = {
         }
         Relationships: []
       }
+      level_permissions: {
+        Row: {
+          allowed: boolean
+          created_at: string
+          level: number
+          permission_id: string
+          updated_at: string
+        }
+        Insert: {
+          allowed?: boolean
+          created_at?: string
+          level: number
+          permission_id: string
+          updated_at?: string
+        }
+        Update: {
+          allowed?: boolean
+          created_at?: string
+          level?: number
+          permission_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "level_permissions_permission_id_fkey"
+            columns: ["permission_id"]
+            isOneToOne: false
+            referencedRelation: "permission_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      permission_definitions: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          requires_level: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id: string
+          name: string
+          requires_level?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          requires_level?: number
+        }
+        Relationships: []
+      }
       permissions: {
         Row: {
           created_at: string
@@ -319,6 +375,77 @@ export type Database = {
         }
         Relationships: []
       }
+      user_permissions: {
+        Row: {
+          allowed: boolean
+          created_at: string
+          permission_id: string
+          updated_at: string
+          user_id: number
+        }
+        Insert: {
+          allowed?: boolean
+          created_at?: string
+          permission_id: string
+          updated_at?: string
+          user_id: number
+        }
+        Update: {
+          allowed?: boolean
+          created_at?: string
+          permission_id?: string
+          updated_at?: string
+          user_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permissions_permission_id_fkey"
+            columns: ["permission_id"]
+            isOneToOne: false
+            referencedRelation: "permission_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_permissions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "permissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_sessions: {
+        Row: {
+          created_at: string | null
+          id: string
+          last_route: string | null
+          updated_at: string | null
+          user_id: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          last_route?: string | null
+          updated_at?: string | null
+          user_id?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          last_route?: string | null
+          updated_at?: string | null
+          user_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "permissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vertretungsplan: {
         Row: {
           class_name: string
@@ -382,6 +509,10 @@ export type Database = {
           user_id_input: number
         }
         Returns: Json
+      }
+      check_user_permission: {
+        Args: { permission_id_param: string; user_id_param: number }
+        Returns: boolean
       }
       cleanup_old_conversations: {
         Args: Record<PropertyKey, never>
