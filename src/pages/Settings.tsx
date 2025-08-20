@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { usePermissions } from '@/hooks/usePermissions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,11 +22,10 @@ import { toast } from '@/hooks/use-toast';
 const Settings = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { can } = usePermissions();
   const [autoRefresh, setAutoRefresh] = useState(true);
 
   // Check permissions
-  if (!profile || !can('system_settings')) {
+  if (!profile || profile.permission_lvl < 8) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card>

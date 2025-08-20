@@ -17,21 +17,6 @@ serve(async (req) => {
     const { action, parameters, userProfile } = await req.json()
     console.log('Received action:', action, 'with parameters:', parameters)
 
-    // Check basic permission for AI actions - most actions require level 9+ now
-    const requiredLevel = ['get_teachers', 'get_schedule', 'get_announcements', 'get_current_substitution_plan'].includes(action) ? 1 : 9;
-    if (userProfile && userProfile.permission_lvl < requiredLevel) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          result: { error: `Insufficient permissions. Level ${requiredLevel}+ required for this action.` }
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 403
-        }
-      )
-    }
-
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -102,14 +87,14 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
         break
 
       case 'update_vertretungsplan':
-        if (userProfile.permission_lvl >= 9) {
+        if (userProfile.permission_lvl >= 10) {
           console.log('Raw parameters received:', parameters)
           
           // Parse date using robust German parser and ensure school day
           const dateValue = parseDateTextToBerlinSchoolDay(parameters?.date || parameters?.datum || 'today');
           
-          // Prepare substitution data for confirmation
-          const substitutionData = {
+          // Ensure all required fields are present with fallbacks
+          const insertData = {
             date: dateValue.toISOString().split('T')[0],
             class_name: parameters.className || parameters.class_name || 'Unbekannte Klasse',
             period: parseInt(parameters.period) || 1,
@@ -119,28 +104,42 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
             substitute_teacher: parameters.substituteTeacher || parameters.substitute_teacher || 'Vertretung',
             substitute_subject: parameters.substituteSubject || parameters.substitute_subject || 'Vertretung',
             substitute_room: parameters.substituteRoom || parameters.substitute_room || 'Unbekannt',
-            note: parameters.note || 'Keine Notizen'
-          };
+            note: parameters.note || 'Keine Notizen',
+            created_by: null
+          }
           
-          console.log('Prepared substitution data:', substitutionData);
+          console.log('Inserting data:', insertData)
           
-          // Return substitution for confirmation instead of directly inserting
-          const confirmationMessage = `${substitutionData.class_name}, ${substitutionData.period}. Stunde: ${substitutionData.original_subject} bei ${substitutionData.original_teacher} → ${substitutionData.substitute_teacher} (${substitutionData.substitute_room})`;
+          const { data, error } = await supabase
+            .from('vertretungsplan')
+            .insert(insertData)
+            .select()
+            .single()
           
-          result = {
-            message: 'Vertretung vorgeschlagen:',
-            confirmations: [confirmationMessage],
-            details: {
-              substitutions: [substitutionData],
-              sickTeacher: substitutionData.original_teacher,
-              date: new Date(substitutionData.date).toLocaleDateString('de-DE'),
-              dateISO: substitutionData.date,
-              affectedLessonsCount: 1
-            }
-          };
-          success = true;
+          if (!error) {
+            console.log('update_vertretungsplan inserted:', data);
+            // Create announcement automatically for visibility across the app
+            const dateStrDE = new Date(insertData.date + 'T12:00:00').toLocaleDateString('de-DE');
+            const announcement = {
+              title: `Vertretungsplan aktualisiert – ${insertData.class_name}`,
+              content: `${dateStrDE}, ${insertData.period}. Stunde: ${insertData.original_subject} bei ${insertData.original_teacher} wird vertreten durch ${insertData.substitute_teacher} (Raum: ${insertData.substitute_room}).`,
+              author: 'E.D.U.A.R.D.',
+              priority: 'high',
+              target_class: insertData.class_name,
+              target_permission_level: 1,
+              created_by: null,
+            };
+            const { error: annErr } = await supabase.from('announcements').insert(announcement);
+            if (annErr) console.error('Announcement insert error:', annErr);
+
+            result = { message: 'Vertretungsplan wurde erfolgreich aktualisiert.', inserted: data }
+            success = true
+          } else {
+            console.error('update_vertretungsplan error:', error);
+            result = { error: error.message }
+          }
         } else {
-          result = { error: 'Keine Berechtigung zum Bearbeiten des Vertretungsplans - Level 9 erforderlich' }
+          result = { error: 'Keine Berechtigung zum Bearbeiten des Vertretungsplans - Level 10 erforderlich' }
         }
         break
 
@@ -252,199 +251,33 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
         }
         break
 
-      case 'plan_substitution':
-        // Plan substitution for a sick teacher
-        if (userProfile.permission_lvl >= 9) {
-          try {
-            const teacherName = (parameters.teacherName || parameters.teacher || '').replace(/\b(fr\.?|herr|frau|hr\.?)\s+/i, '').trim();
-            const dateInput = parameters.date || 'heute';
-            const targetDate = parseDateTextToBerlinSchoolDay(dateInput);
-            const dateISO = targetDate.toISOString().split('T')[0];
-            
-            console.log('Planning substitution for:', teacherName, 'on', dateISO);
-            
-            // Call schedule-manager to generate substitution plan
-            const { data: scheduleResult, error: scheduleError } = await supabase.functions.invoke('schedule-manager', {
-              body: {
-                action: 'create_substitution_plan',
-                data: {
-                  teacherName: teacherName,
-                  date: dateISO
-                }
-              }
-            });
-            
-            if (scheduleError || !scheduleResult?.success) {
-              console.error('Schedule manager error:', scheduleError);
-              result = { error: `Fehler bei der Vertretungsplanung: ${scheduleError?.message || 'Unbekannter Fehler'}` };
-              break;
-            }
-            
-            const plan = scheduleResult.substitution_plan || [];
-            if (plan.length === 0) {
-              result = { message: `Keine Stunden für ${teacherName} am ${targetDate.toLocaleDateString('de-DE')} gefunden.` };
-              success = true;
-              break;
-            }
-            
-            // Format confirmations and prepare for user approval
-            const confirmations = plan.map((sub: any) => 
-              `${sub.class_name}, ${sub.period}. Stunde: ${sub.original_subject} → ${sub.substitute_teacher || 'Entfall'} (${sub.substitute_room || sub.original_room})`
-            );
-            
-            result = {
-              message: 'Vertretungsplan wurde vorgeschlagen:',
-              confirmations: confirmations,
-              details: {
-                substitutions: plan,
-                sickTeacher: teacherName,
-                date: targetDate.toLocaleDateString('de-DE'),
-                dateISO: dateISO,
-                affectedLessonsCount: plan.length
-              }
-            };
-            success = true;
-          } catch (error) {
-            console.error('Plan substitution error:', error);
-            result = { error: `Fehler bei der Vertretungsplanung: ${(error as any).message}` };
-          }
-        } else {
-          result = { error: 'Keine Berechtigung für Vertretungsplanung - Level 9 erforderlich' };
-        }
-        break
-
-      case 'confirm_substitution':
-        // Confirm and save the planned substitution
-        if (userProfile.permission_lvl >= 9) {
-          try {
-            const substitutions = parameters.substitutions || [];
-            const sickTeacher = parameters.sickTeacher;
-            const dateISO = parameters.date;
-            
-            console.log('Confirming substitutions:', substitutions);
-            
-            if (!Array.isArray(substitutions) || substitutions.length === 0) {
-              result = { error: 'Keine Vertretungen zum Bestätigen gefunden.' };
-              break;
-            }
-            
-            // Insert all substitutions into database
-            const insertPromises = substitutions.map((sub: any) => 
-              supabase.from('vertretungsplan').insert({
-                date: dateISO,
-                class_name: sub.class_name,
-                period: sub.period,
-                original_teacher: sub.original_teacher,
-                original_subject: sub.original_subject,
-                original_room: sub.original_room,
-                substitute_teacher: sub.substitute_teacher,
-                substitute_subject: sub.substitute_subject,
-                substitute_room: sub.substitute_room,
-                note: sub.note || `Vertretung für ${sickTeacher}`,
-                created_by: null
-              }).select()
-            );
-            
-            const results = await Promise.all(insertPromises);
-            const errors = results.filter(r => r.error);
-            
-            if (errors.length > 0) {
-              console.error('Insert errors:', errors);
-              result = { error: 'Fehler beim Speichern einiger Vertretungen.' };
-              break;
-            }
-            
-            // Create announcement
-            const announcement = {
-              title: `Vertretungsplan: ${sickTeacher} abwesend`,
-              content: `${new Date(dateISO).toLocaleDateString('de-DE')}: ${substitutions.length} Vertretungen für ${sickTeacher} eingetragen.`,
-              author: 'E.D.U.A.R.D.',
-              priority: 'high',
-              target_permission_level: 1,
-              created_by: null,
-            };
-            await supabase.from('announcements').insert(announcement);
-            
-            const confirmed = substitutions.map((sub: any) => 
-              `${sub.class_name}, ${sub.period}. Stunde bestätigt`
-            );
-            
-            result = {
-              message: `${substitutions.length} Vertretungen wurden erfolgreich erstellt.`,
-              confirmed: confirmed
-            };
-            success = true;
-          } catch (error) {
-            console.error('Confirm substitution error:', error);
-            result = { error: `Fehler beim Bestätigen: ${(error as any).message}` };
-          }
-        } else {
-          result = { error: 'Keine Berechtigung zum Bestätigen von Vertretungen - Level 9 erforderlich' };
-        }
-        break
-
       case 'get_current_substitution_plan':
-        // Return the current substitution plan; supports relative dates (heute/morgen/übermorgen/gestern)
-        try {
-          const relToDate = (txt?: string) => {
-            if (!txt) return null;
-            const t = txt.toLowerCase();
-            const base = new Date();
-            base.setHours(12,0,0,0);
-            if (/(heute)/i.test(t)) return base;
-            if (/(morgen)/i.test(t) && !/(übermorgen)/i.test(t)) { const d=new Date(base); d.setDate(d.getDate()+1); return d; }
-            if (/(übermorgen)/i.test(t)) { const d=new Date(base); d.setDate(d.getDate()+2); return d; }
-            if (/(gestern)/i.test(t)) { const d=new Date(base); d.setDate(d.getDate()-1); return d; }
-            const m = txt.match(/\d{4}-\d{2}-\d{2}/);
-            if (m) return new Date(m[0]+'T12:00:00');
-            return null;
-          };
-
-          const targetDate = relToDate(parameters.date || parameters.day || undefined);
-          let subQuery = supabase.from('vertretungsplan').select('*');
-          if (targetDate) {
-            const dateStr = targetDate.toISOString().split('T')[0];
-            subQuery = subQuery.eq('date', dateStr);
-          }
-          subQuery = subQuery.order('date', { ascending: true }).order('period', { ascending: true });
-          const { data: substitutions, error: subError } = await subQuery;
-          if (subError) throw subError;
-
-          const rows = substitutions || [];
-          // Build HTML table similar to Vertretungsplan page list
-          const htmlTable = `
-            <table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;">
-              <thead style="background:#f0f0f0;">
-                <tr>
-                  <th style="border:1px solid #ddd;padding:8px;">Datum</th>
-                  <th style="border:1px solid #ddd;padding:8px;">Klasse</th>
-                  <th style="border:1px solid #ddd;padding:8px;">Stunde</th>
-                  <th style="border:1px solid #ddd;padding:8px;">Fach</th>
-                  <th style="border:1px solid #ddd;padding:8px;">Lehrkraft</th>
-                  <th style="border:1px solid #ddd;padding:8px;">Vertretung</th>
-                  <th style="border:1px solid #ddd;padding:8px;">Raum</th>
-                  <th style="border:1px solid #ddd;padding:8px;">Notiz</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rows.map((r:any)=>`
-                  <tr>
-                    <td style="border:1px solid #ddd;padding:6px;">${new Date(r.date+'T12:00:00').toLocaleDateString('de-DE')}</td>
-                    <td style="border:1px solid #ddd;padding:6px;">${r.class_name}</td>
-                    <td style="border:1px solid #ddd;padding:6px; text-align:center;">${r.period}</td>
-                    <td style="border:1px solid #ddd;padding:6px;">${r.substitute_subject || r.original_subject}</td>
-                    <td style="border:1px solid #ddd;padding:6px;">${r.original_teacher}</td>
-                    <td style="border:1px solid #ddd;padding:6px;">${r.substitute_teacher || 'ENTFALL'}</td>
-                    <td style="border:1px solid #ddd;padding:6px;">${r.substitute_room || r.original_room || '-'}</td>
-                    <td style="border:1px solid #ddd;padding:6px;">${r.note || ''}</td>
-                  </tr>`).join('')}
-              </tbody>
-            </table>`;
-
-          result = { message: 'Aktueller Vertretungsplan', substitutions: rows, htmlTable };
-          success = true;
-        } catch (e:any) {
-          result = { error: e.message || 'Fehler beim Laden des Vertretungsplans' };
+        // Handle specific date requests (morgen, übermorgen, etc.)
+        let targetDate = null;
+        if (parameters.date) {
+          targetDate = parseDateTextToBerlinSchoolDay(parameters.date);
+        }
+        
+        let query = supabase
+          .from('vertretungsplan')
+          .select('*');
+        
+        // If specific date requested, filter by that date
+        if (targetDate) {
+          const dateStr = targetDate.toISOString().split('T')[0];
+          query = query.eq('date', dateStr);
+        }
+        
+        query = query.order('date', { ascending: true })
+                     .order('period', { ascending: true });
+        
+        const { data: substitutions, error: subError } = await query;
+        
+        if (subError) {
+          result = { error: subError.message }
+        } else {
+          result = { substitutions: substitutions || [] }
+          success = true
         }
         break
 
@@ -480,150 +313,188 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
         try {
           const className = parameters.className || parameters.class_name || '10b';
           const dayParam = parameters.day;
-
-          // Relative day support -> resolve to weekday column name
-          const resolveDayToColumn = (d?: string) => {
-            if (!d) return '';
-            const t = String(d).toLowerCase();
-            const base = new Date();
-            base.setHours(12,0,0,0);
-            const weekday = (dt: Date) => [0,'monday','tuesday','wednesday','thursday','friday','saturday'][dt.getDay()] as string;
-            if (/^heute$/.test(t)) return weekday(base);
-            if (/^morgen$/.test(t)) { const dd=new Date(base); dd.setDate(dd.getDate()+1); return weekday(dd); }
-            if (/^übermorgen$/.test(t)) { const dd=new Date(base); dd.setDate(dd.getDate()+2); return weekday(dd); }
-            if (/^gestern$/.test(t)) { const dd=new Date(base); dd.setDate(dd.getDate()-1); return weekday(dd); }
-            const map: Record<string,string> = { montag:'monday', mo:'monday', monday:'monday', dienstag:'tuesday', di:'tuesday', tuesday:'tuesday', mittwoch:'wednesday', mi:'wednesday', wednesday:'wednesday', donnerstag:'thursday', do:'thursday', thursday:'thursday', freitag:'friday', fr:'friday', friday:'friday' };
-            return map[t] || '';
+          
+          // Building weekly mapping and tables dynamically
+          const WEEKDAY_MAP: Record<string, number> = {
+            'montag': 1, 'monday': 1, 'mo': 1,
+            'dienstag': 2, 'tuesday': 2, 'di': 2,
+            'mittwoch': 3, 'wednesday': 3, 'mi': 3,
+            'donnerstag': 4, 'thursday': 4, 'do': 4,
+            'freitag': 5, 'friday': 5, 'fr': 5,
           };
-
-          const dayKey = resolveDayToColumn(dayParam);
+          const WEEKDAY_COLUMNS: Record<number, string> = {
+            1: 'monday', 2: 'tuesday', 3: 'wednesday', 4: 'thursday', 5: 'friday'
+          };
 
           // Use static table list to avoid raw SQL in edge functions
           const availableTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
+          
+          // Build class mapping (robust normalization) - improved to handle all classes
           const tableMap: Record<string, string> = {};
           const availableClasses: string[] = [];
+          
           for (const tableName of availableTables) {
-            const raw = tableName.replace('Stundenplan_', '').replace('_A', '');
+            const raw = tableName.replace('Stundenplan_', '').replace('_A', ''); // e.g., '10b'
             const rawLower = raw.toLowerCase();
             const keyVariants = new Set<string>([
               rawLower,
-              rawLower.replace(/[_\s]/g, ''),
+              rawLower.replace(/[_\s]/g, ''), // remove underscores/spaces
             ]);
             keyVariants.forEach(k => tableMap[k] = tableName);
-            availableClasses.push(raw);
+            availableClasses.push(raw); // display without 'Stundenplan_'
           }
 
-          const normalizedInput = String(className).toLowerCase().replace(/[_\s]/g, '');
+          const normalizedInput = className.toLowerCase().replace(/[_\s]/g, '');
           let table = tableMap[normalizedInput];
+
           if (!table) {
-            const entry = Object.entries(tableMap).find(([k]) => k === normalizedInput || k.startsWith(normalizedInput) || normalizedInput.startsWith(k));
+            // Fallback: try partial matching safely
+            const entry = Object.entries(tableMap).find(([k]) => 
+              k === normalizedInput || k.startsWith(normalizedInput) || normalizedInput.startsWith(k)
+            );
             if (entry) table = entry[1];
           }
+
           if (!table) {
-            result = { error: `E.D.U.A.R.D.: Stundenplan für Klasse "${className}" nicht gefunden. Verfügbare Klassen: ${availableClasses.join(', ')}` };
+            result = { 
+              error: `E.D.U.A.R.D.: Stundenplan für Klasse "${className}" nicht gefunden. Verfügbare Klassen: ${availableClasses.join(', ')}` 
+            };
             break;
           }
 
           const { data: rows, error } = await supabase.from(table).select('*').order('Stunde');
           if (error) throw error;
+          
           if (!rows || rows.length === 0) {
-            result = { error: `E.D.U.A.R.D.: Keine Einträge für Klasse "${className}" gefunden. Bitte überprüfen Sie die Stundenplandaten.` };
+            result = { 
+              error: `E.D.U.A.R.D.: Keine Einträge für Klasse "${className}" gefunden. Bitte überprüfen Sie die Stundenplandaten.` 
+            };
             break;
           }
 
-          const parseEntry = (cell?: string) => {
+          const normalizeDayToColumn = (d: string) => {
+            const key = d.toLowerCase();
+            const num = WEEKDAY_MAP[key];
+            if (!num) return '';
+            return WEEKDAY_COLUMNS[num] || '';
+          };
+          const dayKey = dayParam ? normalizeDayToColumn(dayParam) : '';
+
+          // Parse helper like used in substitution planning
+          const parseCell = (cell?: string) => {
             if (!cell) return [] as Array<{subject:string, teacher:string, room:string}>;
             return cell.split('|').map(s => s.trim()).filter(Boolean).map(sub => {
               const parts = sub.split(/\s+/);
-              if (parts.length >= 3) return { subject: parts[0], teacher: parts[1], room: parts[2] };
+              if (parts.length >= 3) {
+                return { subject: parts[0], teacher: parts[1], room: parts[2] };
+              }
               return { subject: sub, teacher: '', room: '' } as any;
             });
           };
 
-          // Build structured schedule array
-          const schedule = (rows || []).map((r:any)=>({
-            period: r['Stunde'],
-            monday: r['monday'],
-            tuesday: r['tuesday'],
-            wednesday: r['wednesday'],
-            thursday: r['thursday'],
-            friday: r['friday'],
-          }));
+          // Build weekly grid data
+          const schedule = (rows || []).map((r: any) => {
+            const period = r['Stunde'];
+            return {
+              period,
+              monday: r['monday'],
+              tuesday: r['tuesday'],
+              wednesday: r['wednesday'],
+              thursday: r['thursday'],
+              friday: r['friday'],
+            };
+          });
 
-          // Build HTML table (single-day or full-week)
+          // Build HTML table like on the Stundenplan page
+          const parseEntry = (cell?: string) => {
+            if (!cell) return [];
+            return cell.split('|').map(s => s.trim()).filter(Boolean).map(sub => {
+              const parts = sub.split(/\s+/);
+              if (parts.length >= 3) {
+                return { subject: parts[0], teacher: parts[1], room: parts[2] };
+              }
+              return { subject: sub, teacher: '', room: '' };
+            });
+          };
+
           const formatCellHTML = (entry?: string) => {
             const entries = parseEntry(entry);
-            if (entries.length === 0) return '<div style="text-align:center;color:#666;">-</div>';
+            if (entries.length === 0) return '<div style="text-align:center; color:#666;">-</div>';
+            
             if (entries.length > 1) {
-              return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">${entries.map(e=>
-                `<div style=\"padding:4px;background:#f5f5f5;border-radius:4px;font-size:12px;border:1px solid #ddd;\">`
-                + `<div style=\"font-weight:500;\">${e.subject}</div>`
-                + `<div style=\"color:#666;\">${e.teacher}</div>`
-                + `<div style=\"color:#666;\">${e.room}</div>`
-                + `</div>`
+              return `<div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">${entries.map(e => 
+                `<div style="padding:4px; background:#f5f5f5; border-radius:4px; font-size:12px; border:1px solid #ddd;">
+                  <div style="font-weight:500;">${e.subject}</div>
+                  <div style="color:#666;">${e.teacher}</div>
+                  <div style="color:#666;">${e.room}</div>
+                </div>`
               ).join('')}</div>`;
+            } else {
+              const e = entries[0];
+              return `<div style="text-align:center; font-size:13px;">
+                <div style="font-weight:500; margin-bottom:2px;">${e.subject}</div>
+                <div style="color:#666; font-size:11px;">${e.teacher}</div>
+                <div style="color:#666; font-size:11px;">${e.room}</div>
+              </div>`;
             }
-            const e = entries[0];
-            return `<div style="text-align:center;font-size:13px;">
-              <div style="font-weight:500;margin-bottom:2px;">${e.subject}</div>
-              <div style="color:#666;font-size:11px;">${e.teacher}</div>
-              <div style="color:#666;font-size:11px;">${e.room}</div>
-            </div>`;
           };
 
           let htmlTable = '';
-          if (dayKey) {
-            const dayTitle = dayParam.charAt(0).toUpperCase() + dayParam.slice(1);
+          if (dayKey && rows) {
+            // Single day view (filtered by day column)
             htmlTable = `
-            <table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;">
+            <table style="border-collapse:collapse; width:100%; font-family:Arial,sans-serif;">
               <thead style="background:#f0f0f0;">
                 <tr>
-                  <th style="border:1px solid #ddd;padding:8px;text-align:center;">Block</th>
-                  <th style="border:1px solid #ddd;padding:8px;text-align:center;">${dayTitle}</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Block</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">${dayParam.charAt(0).toUpperCase() + dayParam.slice(1)}</th>
                 </tr>
               </thead>
               <tbody>
-                ${(rows||[]).map((r:any)=>`
+                ${rows.map((r: any) => `
                 <tr>
-                  <td style="border:1px solid #ddd;padding:8px;text-align:center;font-weight:bold;">${r.Stunde}</td>
-                  <td style="border:1px solid #ddd;padding:4px;">${formatCellHTML(r[dayKey])}</td>
+                  <td style="border:1px solid #ddd; padding:8px; text-align:center; font-weight:bold;">${r.Stunde}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r[dayKey])}</td>
                 </tr>`).join('')}
               </tbody>
             </table>`;
           } else {
+            // Full week view
             htmlTable = `
-            <table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;">
+            <table style="border-collapse:collapse; width:100%; font-family:Arial,sans-serif;">
               <thead style="background:#f0f0f0;">
                 <tr>
-                  <th style="border:1px solid #ddd;padding:8px;text-align:center;">Block</th>
-                  <th style="border:1px solid #ddd;padding:8px;text-align:center;">Montag</th>
-                  <th style="border:1px solid #ddd;padding:8px;text-align:center;">Dienstag</th>
-                  <th style="border:1px solid #ddd;padding:8px;text-align:center;">Mittwoch</th>
-                  <th style="border:1px solid #ddd;padding:8px;text-align:center;">Donnerstag</th>
-                  <th style="border:1px solid #ddd;padding:8px;text-align:center;">Freitag</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Block</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Montag</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Dienstag</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Mittwoch</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Donnerstag</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Freitag</th>
                 </tr>
               </thead>
               <tbody>
-                ${(rows||[]).map((r:any)=>`
+                ${(rows || []).map((r: any) => `
                 <tr>
-                  <td style="border:1px solid #ddd;padding:8px;text-align:center;font-weight:bold;">${r.Stunde}</td>
-                  <td style="border:1px solid #ddd;padding:4px;">${formatCellHTML(r.monday)}</td>
-                  <td style="border:1px solid #ddd;padding:4px;">${formatCellHTML(r.tuesday)}</td>
-                  <td style="border:1px solid #ddd;padding:4px;">${formatCellHTML(r.wednesday)}</td>
-                  <td style="border:1px solid #ddd;padding:4px;">${formatCellHTML(r.thursday)}</td>
-                  <td style="border:1px solid #ddd;padding:4px;">${formatCellHTML(r.friday)}</td>
+                  <td style="border:1px solid #ddd; padding:8px; text-align:center; font-weight:bold;">${r.Stunde}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.monday)}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.tuesday)}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.wednesday)}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.thursday)}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.friday)}</td>
                 </tr>`).join('')}
               </tbody>
             </table>`;
           }
 
           result = {
-            message: dayKey ? `Stundenplan für Klasse ${className.toUpperCase()} am ${String(dayParam)}` : `Stundenplan (Woche) für Klasse ${className.toUpperCase()}`,
+            message: dayKey
+              ? `Stundenplan für Klasse ${className.toUpperCase()} am ${dayParam.charAt(0).toUpperCase() + dayParam.slice(1)}`
+              : `Stundenplan (Woche) für Klasse ${className.toUpperCase()}`,
             schedule,
             htmlTable,
           };
           success = true;
-        } catch (e:any) {
+        } catch (e: any) {
           console.error('get_schedule error:', e);
           result = { error: e.message || 'Fehler beim Laden des Stundenplans' };
         }

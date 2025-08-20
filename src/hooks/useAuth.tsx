@@ -11,7 +11,6 @@ interface Profile {
   password: string;
   created_at: string;
   must_change_password?: boolean;
-  user_class?: string | null;
 }
 
 interface AuthContextType {
@@ -73,13 +72,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       const userData = data[0];
 
-      // Fetch additional profile info (e.g., class)
-      const { data: permRow } = await supabase
-        .from('permissions')
-        .select('user_class')
-        .eq('id', userData.user_id)
-        .single();
-
       // Create a dummy user for internal auth
       const dummyUser: User = {
         id: username,
@@ -90,7 +82,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         email: `${username}@internal.school`
       };
 
-      const profileData: Profile = {
+      const profileData = {
         id: userData.user_id,
         user_id: userData.user_id.toString(),
         username: username,
@@ -98,8 +90,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         permission_lvl: userData.permission_level,
         password: 'encrypted',
         created_at: new Date().toISOString(),
-        must_change_password: userData.must_change_password || false,
-        user_class: permRow?.user_class ?? null
+        must_change_password: userData.must_change_password || false
       };
 
       // Set user and profile state

@@ -35,12 +35,11 @@ const AIChat = () => {
           body: {
             action: 'confirm_substitution',
             parameters: data,
-              userProfile: {
-                user_id: profile?.id,
-                name: profile?.username || profile?.name,
-                permission_lvl: profile?.permission_lvl,
-                user_class: (profile as any)?.user_class
-              }
+            userProfile: {
+              user_id: profile?.id,
+              name: profile?.username || profile?.name,
+              permission_lvl: profile?.permission_lvl
+            }
           }
         });
 
@@ -392,8 +391,7 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
                   user_id: profile?.id,
                   name: profile?.username || profile?.name,
                   username: profile?.username,
-                  permission_lvl: profile?.permission_lvl,
-                  user_class: (profile as any)?.user_class
+                  permission_lvl: profile?.permission_lvl
                 }
               }
             });
@@ -485,8 +483,7 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
               userProfile: {
                 user_id: profile?.id,
                 name: profile?.username || profile?.name,
-                permission_lvl: profile?.permission_lvl,
-                user_class: (profile as any)?.user_class
+                permission_lvl: profile?.permission_lvl
               }
             }
           });

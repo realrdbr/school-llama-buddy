@@ -67,6 +67,3 @@ verify_jwt = false
 
 [functions.native-tts]
 verify_jwt = false
-
-[functions.schedule-manager]
-verify_jwt = false

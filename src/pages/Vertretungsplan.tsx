@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { usePermissions } from '@/hooks/usePermissions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -75,7 +74,6 @@ const formatWeekRange = (start: Date) => {
 const Vertretungsplan = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
-  const { can } = usePermissions();
   const [substitutions, setSubstitutions] = useState<SubstitutionEntry[]>([]);
   const [schedules, setSchedules] = useState<{ [key: string]: ScheduleEntry[] }>({});
   const [showSubstitutionDialog, setShowSubstitutionDialog] = useState(false);
@@ -116,6 +114,15 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
   useEffect(() => {
     if (!user) {
       navigate('/auth');
+      return;
+    }
+    if (profile && profile.permission_lvl < 1) {
+      toast({
+        variant: "destructive",
+        title: "Zugriff verweigert",
+        description: "Sie haben keine Berechtigung für diese Seite."
+      });
+      navigate('/');
       return;
     }
     
@@ -416,7 +423,7 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
     });
   };
 
-const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >= 10 && can('substitution_plan_enabled');
+const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >= 10;
 
   // Compute week range info for UI
   const __selectedDateObj = new Date(selectedDate + 'T00:00:00');
@@ -461,10 +468,10 @@ const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >
                   </Button>
                 </div>
               </div>
-              <div className="flex flex-col gap-2">
+              <div>
                 <Label htmlFor="class">Klasse</Label>
                 <Select value={selectedClass} onValueChange={setSelectedClass}>
-                  <SelectTrigger className="h-9 w-32">
+                  <SelectTrigger className="w-32">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -482,10 +489,10 @@ const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-6">
           
-          {/* AI Generator - nur für Level 10+ mit substitution_plan_enabled */}
-          {canEditSubstitutions && (
+          {/* AI Generator - nur für Schulleitung */}
+          <RoleBasedLayout requiredPermission={10}>
             <AIVertretungsGenerator onGenerated={fetchSubstitutions} />
-          )}
+          </RoleBasedLayout>
           {/* Schedule Table */}
           <Card>
             <CardHeader>
@@ -637,13 +644,8 @@ Stundenplan {selectedClass} - Woche {formatWeekRange(__weekStart)}
             </Card>
           )}
           
-          {/* AI Generator and Debug Components */}
-          {canEditSubstitutions && (
-            <div className="space-y-6">
-              <AIVertretungsGenerator onGenerated={fetchSubstitutions} />
-              <DebugVertretungsplan />
-            </div>
-          )}
+          {/* Debug Component */}
+          <DebugVertretungsplan />
         </div>
       </main>
 

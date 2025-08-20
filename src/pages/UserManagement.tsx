@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,24 +24,20 @@ interface User {
 const UserManagement = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
-  const { can } = usePermissions();
-  
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [confirmDeleteOpen1, setConfirmDeleteOpen1] = useState(false);
-  const [confirmDeleteOpen2, setConfirmDeleteOpen2] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
+const [showCreateModal, setShowCreateModal] = useState(false);
+const [showEditModal, setShowEditModal] = useState(false);
+const [selectedUser, setSelectedUser] = useState<User | null>(null);
+const [confirmDeleteOpen1, setConfirmDeleteOpen1] = useState(false);
+const [confirmDeleteOpen2, setConfirmDeleteOpen2] = useState(false);
+const [deleting, setDeleting] = useState(false);
   useEffect(() => {
     if (!user) {
       navigate('/auth');
       return;
     }
-    // Permission enforcement
-    if (!can('user_management')) {
+    if (profile && profile.permission_lvl < 10) {
       toast({
         variant: "destructive",
         title: "Zugriff verweigert",
@@ -52,7 +47,7 @@ const UserManagement = () => {
       return;
     }
     fetchUsers();
-  }, [user, profile, navigate, can]);
+  }, [user, profile, navigate]);
 
   const fetchUsers = async () => {
     try {

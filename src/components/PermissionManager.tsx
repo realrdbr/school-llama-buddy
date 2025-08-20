@@ -52,7 +52,6 @@ const PermissionManager = () => {
     { id: 'view_schedule', name: 'Stundenplan einsehen', description: 'Eigenen Stundenplan anzeigen', requiresLevel: 1 },
     { id: 'view_announcements', name: 'Ankündigungen lesen', description: 'Schulankündigungen einsehen', requiresLevel: 1 },
     { id: 'view_vertretungsplan', name: 'Vertretungsplan einsehen', description: 'Vertretungen anzeigen', requiresLevel: 1 },
-    { id: 'substitution_plan_enabled', name: 'Vertretungsplan-Zugriff', description: 'Grundzugriff auf Vertretungsplan-System', requiresLevel: 1 },
     { id: 'create_announcements', name: 'Ankündigungen erstellen', description: 'Neue Ankündigungen verfassen', requiresLevel: 4 },
     { id: 'edit_announcements', name: 'Ankündigungen bearbeiten', description: 'Bestehende Ankündigungen ändern', requiresLevel: 4 },
     { id: 'manage_substitutions', name: 'Vertretungen verwalten', description: 'Vertretungsplan bearbeiten', requiresLevel: 9 },
@@ -69,11 +68,8 @@ const PermissionManager = () => {
     if (profile?.permission_lvl >= 10) {
       fetchUsers();
       loadPermissions();
-      loadPermissionDefinitions();
     }
   }, [profile]);
-
-  const [permissionDefinitions, setPermissionDefinitions] = useState<Permission[]>([]);
 
   const fetchUsers = async () => {
     try {
@@ -97,139 +93,40 @@ const PermissionManager = () => {
     }
   };
 
-  const loadPermissionDefinitions = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('permission_definitions')
-        .select('*')
-        .order('requires_level', { ascending: true });
-      
-      if (error) throw error;
-      
-      const definitions = data?.map(d => ({
-        id: d.id,
-        name: d.name,
-        description: d.description || '',
-        requiresLevel: d.requires_level
-      })) || [];
-      
-      setPermissionDefinitions(definitions);
-    } catch (error) {
-      console.error('Error loading permission definitions:', error);
-      // Fallback to static definitions if DB fails
-      setPermissionDefinitions(permissions);
-    }
-  };
+  const loadPermissions = () => {
+    // Load from localStorage or set defaults
+    const savedUserPermissions = localStorage.getItem('userPermissions');
+    const savedLevelPermissions = localStorage.getItem('levelPermissions');
 
-  const loadPermissions = async () => {
-    try {
-      // Load level permissions from database
-      const { data: levelData, error: levelError } = await supabase
-        .from('level_permissions')
-        .select('*');
-      
-      if (levelError) throw levelError;
-      
-      const levelPerms: LevelPermissions = {};
+    if (savedUserPermissions) {
+      setUserPermissions(JSON.parse(savedUserPermissions));
+    }
+
+    if (savedLevelPermissions) {
+      setLevelPermissions(JSON.parse(savedLevelPermissions));
+    } else {
+      // Set default permissions for each level
+      const defaultLevelPerms: LevelPermissions = {};
       for (let level = 1; level <= 10; level++) {
-        levelPerms[level] = {};
+        defaultLevelPerms[level] = {};
+        permissions.forEach(perm => {
+          defaultLevelPerms[level][perm.id] = level >= perm.requiresLevel;
+        });
       }
-      
-      levelData?.forEach(lp => {
-        if (!levelPerms[lp.level]) levelPerms[lp.level] = {};
-        levelPerms[lp.level][lp.permission_id] = lp.allowed;
-      });
-      
-      setLevelPermissions(levelPerms);
-      
-      // Load user permissions from database
-      const { data: userData, error: userError } = await supabase
-        .from('user_permissions')
-        .select('*');
-      
-      if (userError) throw userError;
-      
-      const userPerms: UserPermissions = {};
-      userData?.forEach(up => {
-        if (!userPerms[up.user_id]) userPerms[up.user_id] = {};
-        userPerms[up.user_id][up.permission_id] = up.allowed;
-      });
-      
-      setUserPermissions(userPerms);
-    } catch (error) {
-      console.error('Error loading permissions:', error);
-      toast({
-        variant: "destructive",
-        title: "Fehler",
-        description: "Berechtigungen konnten nicht geladen werden."
-      });
+      setLevelPermissions(defaultLevelPerms);
     }
   };
 
   const savePermissions = async () => {
     setSaving(true);
     try {
-      // Save level permissions to database
-      const levelUpdates = [];
-      for (const [level, perms] of Object.entries(levelPermissions)) {
-        for (const [permId, allowed] of Object.entries(perms)) {
-          levelUpdates.push({
-            level: parseInt(level),
-            permission_id: permId,
-            allowed: allowed,
-            updated_at: new Date().toISOString()
-          });
-        }
-      }
-      
-      // Delete existing level permissions and insert new ones
-      const { error: deleteError } = await supabase
-        .from('level_permissions')
-        .delete()
-        .gte('level', 1);
-      
-      if (deleteError) throw deleteError;
-      
-      if (levelUpdates.length > 0) {
-        const { error: insertError } = await supabase
-          .from('level_permissions')
-          .insert(levelUpdates);
-        
-        if (insertError) throw insertError;
-      }
-      
-      // Save user permissions to database
-      const userUpdates = [];
-      for (const [userId, perms] of Object.entries(userPermissions)) {
-        for (const [permId, allowed] of Object.entries(perms)) {
-          userUpdates.push({
-            user_id: parseInt(userId),
-            permission_id: permId,
-            allowed: allowed,
-            updated_at: new Date().toISOString()
-          });
-        }
-      }
-      
-      // Delete existing user permissions and insert new ones
-      const { error: deleteUserError } = await supabase
-        .from('user_permissions')
-        .delete()
-        .gte('user_id', 1);
-      
-      if (deleteUserError) throw deleteUserError;
-      
-      if (userUpdates.length > 0) {
-        const { error: insertUserError } = await supabase
-          .from('user_permissions')
-          .insert(userUpdates);
-        
-        if (insertUserError) throw insertUserError;
-      }
+      // Save to localStorage (in a real app, this would be saved to database)
+      localStorage.setItem('userPermissions', JSON.stringify(userPermissions));
+      localStorage.setItem('levelPermissions', JSON.stringify(levelPermissions));
 
       toast({
         title: "Erfolg",
-        description: "Berechtigungen wurden persistent gespeichert."
+        description: "Berechtigungen wurden gespeichert."
       });
     } catch (error) {
       console.error('Error saving permissions:', error);
@@ -364,7 +261,7 @@ const PermissionManager = () => {
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {(permissionDefinitions.length > 0 ? permissionDefinitions : permissions).map((permission) => (
+                        {permissions.map((permission) => (
                           <div key={permission.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                             <div className="space-y-0.5 flex-1">
                               <Label className="text-sm font-medium">{permission.name}</Label>
@@ -405,7 +302,7 @@ const PermissionManager = () => {
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {(permissionDefinitions.length > 0 ? permissionDefinitions : permissions).map((permission) => (
+                        {permissions.map((permission) => (
                           <div key={permission.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                             <div className="space-y-0.5 flex-1">
                               <Label className="text-sm font-medium">{permission.name}</Label>
@@ -414,6 +311,7 @@ const PermissionManager = () => {
                             <Switch
                               checked={getLevelPermission(level, permission.id)}
                               onCheckedChange={() => toggleLevelPermission(level, permission.id)}
+                              disabled={level < permission.requiresLevel}
                             />
                           </div>
                         ))}

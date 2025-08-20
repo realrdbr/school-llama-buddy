@@ -58,12 +58,12 @@ const AIVertretungsGenerator = ({ onGenerated }: AIVertretungsGeneratorProps) =>
       
       setTeachers(data || []);
       
-      // Set default to König if available (use shortened name for matching)
+      // Set default to König if available
       const konigTeacher = data?.find(t => t['last name']?.toLowerCase().includes('könig'));
       if (konigTeacher) {
-        setSelectedTeacher(konigTeacher.shortened); // Use shortened name for better matching
+        setSelectedTeacher(konigTeacher['last name']);
       } else if (data && data.length > 0) {
-        setSelectedTeacher(data[0].shortened);
+        setSelectedTeacher(data[0]['last name']);
       }
     } catch (error) {
       console.error('Error fetching teachers:', error);
@@ -182,19 +182,12 @@ const AIVertretungsGenerator = ({ onGenerated }: AIVertretungsGeneratorProps) =>
       if (data.success) {
         const result = data.result;
         
-      // Try to get the full teacher name from the shortened name for UI display
-      let displayName = selectedTeacher;
-      const fullTeacher = teachers.find(t => t.shortened === selectedTeacher);
-      if (fullTeacher) {
-        displayName = `${fullTeacher['first name']} ${fullTeacher['last name']}`;
-      }
-      
-      // Create proposed plan for confirmation
-      setProposedPlan({
-        date: targetDate,
-        teacher: displayName,
-        affectedLessons: (result?.details?.substitutions as any[]) || []
-      });
+        // Create proposed plan for confirmation
+        setProposedPlan({
+          date: targetDate,
+          teacher: selectedTeacher,
+          affectedLessons: (result?.details?.substitutions as any[]) || []
+        });
         
         setShowConfirmation(true);
         
@@ -283,7 +276,7 @@ const AIVertretungsGenerator = ({ onGenerated }: AIVertretungsGeneratorProps) =>
                 </SelectTrigger>
                 <SelectContent>
                   {teachers.map((teacher) => (
-                    <SelectItem key={teacher.shortened} value={teacher.shortened}>
+                    <SelectItem key={teacher.shortened} value={teacher['last name']}>
                       {teacher['first name']} {teacher['last name']} ({teacher.shortened})
                     </SelectItem>
                   ))}
