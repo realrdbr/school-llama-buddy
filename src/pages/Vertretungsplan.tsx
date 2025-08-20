@@ -450,9 +450,9 @@ const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-4">
-                <div className="hidden md:block">
+            <div className="flex items-end gap-4">
+              <div>
+                <div className="hidden md:block mb-2">
                   <Label>Woche</Label>
                   <div className="text-sm text-muted-foreground">{formatWeekRange(__weekStart)}</div>
                 </div>
