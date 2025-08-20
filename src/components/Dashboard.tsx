@@ -15,7 +15,8 @@ import {
   BookOpen,
   UserPlus,
   Volume2,
-  FileText
+  FileText,
+  Shield
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import CreateUserModal from './CreateUserModal';
@@ -50,6 +51,7 @@ const Dashboard = () => {
 
   const adminFeatures = [
     { icon: Users, title: "Benutzerverwaltung", description: "Benutzer und Berechtigungen verwalten", path: "/user-management" },
+    { icon: Shield, title: "Berechtigungen", description: "Detaillierte Berechtigungen konfigurieren", path: "/permissions" },
     { icon: Volume2, title: "Audio-Durchsagen", description: "Durchsagen verwalten und TTS", path: "/audio-announcements" },
     { icon: KeyRound, title: "Keycard-System", description: "Zugangskontrolle konfigurieren", path: "/keycard" },
     { icon: Settings, title: "Systemeinstellungen", description: "Arduino-Geräte verwalten", path: "/settings" }

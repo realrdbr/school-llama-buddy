@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ interface User {
 const UserManagement = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
+  const { canAccess } = usePermissions();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 const [showCreateModal, setShowCreateModal] = useState(false);
@@ -37,7 +39,8 @@ const [deleting, setDeleting] = useState(false);
       navigate('/auth');
       return;
     }
-    if (profile && profile.permission_lvl < 10) {
+
+    if (profile && !canAccess('user_management')) {
       toast({
         variant: "destructive",
         title: "Zugriff verweigert",
@@ -46,8 +49,9 @@ const [deleting, setDeleting] = useState(false);
       navigate('/');
       return;
     }
+    
     fetchUsers();
-  }, [user, profile, navigate]);
+  }, [user, profile, navigate, canAccess]);
 
   const fetchUsers = async () => {
     try {

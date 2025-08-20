@@ -17,6 +17,7 @@ import Klassenverwaltung from "./pages/Klassenverwaltung";
 import AIChat from "./pages/AIChat";
 import Keycard from "./pages/Keycard";
 import Settings from "./pages/Settings";
+import Permissions from "./pages/Permissions";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
             <Route path="/klassenverwaltung" element={<Klassenverwaltung />} />
             <Route path="/keycard" element={<Keycard />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/permissions" element={<Permissions />} />
             <Route path="/tts" element={<AudioAnnouncements />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

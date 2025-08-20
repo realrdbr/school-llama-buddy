@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +22,8 @@ interface Announcement {
 
 const Announcements = () => {
   const navigate = useNavigate();
-const { user, profile } = useAuth();
+  const { user, profile } = useAuth();
+  const { canAccess } = usePermissions();
 const [announcements, setAnnouncements] = useState<Announcement[]>([]);
 const [showCreateForm, setShowCreateForm] = useState(false);
 const [newAnnouncement, setNewAnnouncement] = useState({
@@ -36,8 +38,19 @@ const [userClass, setUserClass] = useState<string | null>(null);
       navigate('/auth');
       return;
     }
+
+    if (profile && !canAccess('view_announcements')) {
+      toast({
+        variant: "destructive",
+        title: "Zugriff verweigert",
+        description: "Sie haben keine Berechtigung für diese Seite."
+      });
+      navigate('/');
+      return;
+    }
+    
     fetchAnnouncements();
-  }, [user, navigate]);
+  }, [user, profile, navigate, canAccess]);
 
 const fetchAnnouncements = async () => {
   try {
@@ -178,7 +191,7 @@ const handleCreateAnnouncement = async () => {
     }
   };
 
-  const canCreateAnnouncements = profile?.permission_lvl && profile.permission_lvl >= 5;
+  const canCreateAnnouncements = canAccess('create_announcements');
 
   return (
     <div className="min-h-screen bg-background">

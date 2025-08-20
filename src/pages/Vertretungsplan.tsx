@@ -436,7 +436,7 @@ const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="h-10">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Zurück zum Dashboard
               </Button>
@@ -456,14 +456,14 @@ const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >
                   <Label>Woche</Label>
                   <div className="text-sm text-muted-foreground">{formatWeekRange(__weekStart)}</div>
                 </div>
-                <div className="flex items-end gap-2">
-                  <Button variant="outline" size="sm" onClick={handlePrevWeek}>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={handlePrevWeek} className="h-10">
                     <ChevronLeft className="h-4 w-4 mr-1" /> Vorherige Woche
                   </Button>
-                  <Button variant="secondary" size="sm" onClick={handleThisWeek}>
+                  <Button variant="secondary" size="sm" onClick={handleThisWeek} className="h-10">
                     Diese Woche
                   </Button>
-                  <Button variant="outline" size="sm" onClick={handleNextWeek}>
+                  <Button variant="outline" size="sm" onClick={handleNextWeek} className="h-10">
                     Nächste Woche <ChevronRight className="h-4 w-4 ml-1" />
                   </Button>
                 </div>
@@ -471,7 +471,7 @@ const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >
               <div>
                 <Label htmlFor="class">Klasse</Label>
                 <Select value={selectedClass} onValueChange={setSelectedClass}>
-                  <SelectTrigger className="w-32">
+                  <SelectTrigger className="w-32 h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
