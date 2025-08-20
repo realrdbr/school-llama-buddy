@@ -94,29 +94,44 @@ export const useSessionStorage = () => {
 
       const currentPath = location.pathname;
       
-      // Don't restore route if we're on auth page or if this is the first visit
+      // Don't restore route if we're on auth page
       if (currentPath === '/auth' || currentPath === '/login') {
         setIsInitialized(true);
         return;
       }
 
       try {
-        const lastRoute = await loadLastRoute();
-        console.log('Session Storage: Current path:', currentPath, 'Last route:', lastRoute);
+        // Check if this is an actual page reload (not just navigation)
+        const navigationEntries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+        const isPageReload = navigationEntries.length > 0 && 
+          (navigationEntries[0].type === 'reload' || navigationEntries[0].type === 'navigate');
         
-        // Only navigate if we're on the root and have a different last route
-        if (currentPath === '/' && lastRoute !== '/' && lastRoute !== currentPath) {
-          // Validate that the route is accessible (basic protection against invalid routes)
-          const validRoutes = [
-            '/stundenplan', '/announcements', '/vertretungsplan', '/ai-chat',
-            '/audio-announcements', '/document-analysis', '/user-management',
-            '/klassenverwaltung', '/keycard', '/settings', '/permissions'
-          ];
+        // Check if we've already restored in this session
+        const sessionKey = 'eduard_session_restored';
+        const hasAlreadyRestored = sessionStorage.getItem(sessionKey) === 'true';
+        
+        console.log('Session Storage: Current path:', currentPath, 'Is page reload:', isPageReload, 'Already restored:', hasAlreadyRestored);
+        
+        // Only auto-redirect if this is a page reload/fresh navigation AND we haven't restored yet in this session
+        if (currentPath === '/' && isPageReload && !hasAlreadyRestored) {
+          const lastRoute = await loadLastRoute();
+          console.log('Session Storage: Last route:', lastRoute);
           
-          if (validRoutes.includes(lastRoute)) {
-            console.log('Session Storage: Navigating to last route:', lastRoute);
-            navigate(lastRoute, { replace: true });
-            setHasRestoredFromReload(true);
+          if (lastRoute !== '/' && lastRoute !== currentPath) {
+            // Validate that the route is accessible
+            const validRoutes = [
+              '/stundenplan', '/announcements', '/vertretungsplan', '/ai-chat',
+              '/audio-announcements', '/document-analysis', '/user-management',
+              '/klassenverwaltung', '/keycard', '/settings', '/permissions'
+            ];
+            
+            if (validRoutes.includes(lastRoute)) {
+              console.log('Session Storage: Navigating to last route:', lastRoute);
+              navigate(lastRoute, { replace: true });
+              setHasRestoredFromReload(true);
+              // Mark that we've restored in this session
+              sessionStorage.setItem(sessionKey, 'true');
+            }
           }
         }
       } catch (error) {
