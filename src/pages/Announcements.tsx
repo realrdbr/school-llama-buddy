@@ -23,7 +23,7 @@ interface Announcement {
 const Announcements = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
-  const { canAccess } = usePermissions();
+  const { canAccess, isLoaded } = usePermissions();
 const [announcements, setAnnouncements] = useState<Announcement[]>([]);
 const [showCreateForm, setShowCreateForm] = useState(false);
 const [newAnnouncement, setNewAnnouncement] = useState({
@@ -39,6 +39,8 @@ const [userClass, setUserClass] = useState<string | null>(null);
       return;
     }
 
+    if (!isLoaded) return; // wait for permissions to load
+
     if (profile && !canAccess('view_announcements')) {
       toast({
         variant: "destructive",
@@ -50,7 +52,7 @@ const [userClass, setUserClass] = useState<string | null>(null);
     }
     
     fetchAnnouncements();
-  }, [user, profile, navigate, canAccess]);
+  }, [user, profile, navigate, canAccess, isLoaded]);
 
 const fetchAnnouncements = async () => {
   try {

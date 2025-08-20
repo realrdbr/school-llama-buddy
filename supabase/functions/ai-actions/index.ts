@@ -500,6 +500,109 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
         }
         break;
 
+      case 'plan_substitution': {
+        try {
+          const teacherName = String(parameters?.teacherName || '').trim();
+          const target = parseDateTextToBerlinSchoolDay(parameters?.date || 'heute');
+          const dateStr = target.toISOString().split('T')[0];
+
+          const { data: teacherRows, error: tErr } = await supabase
+            .from('teachers')
+            .select('shortened, "last name"');
+          if (tErr) throw tErr;
+
+          const teacherRow = (teacherRows || []).find((t: any) =>
+            (t['last name'] || '').toLowerCase().includes(teacherName.toLowerCase())
+          );
+          const teacherAbbr = (teacherRow?.shortened || teacherName).toLowerCase();
+
+          const weekday = new Date(dateStr + 'T12:00:00').getDay();
+          const dayMap: Record<number, string> = { 1:'monday', 2:'tuesday', 3:'wednesday', 4:'thursday', 5:'friday' };
+          const col = dayMap[weekday] || 'monday';
+
+          const tables = ['Stundenplan_10b_A','Stundenplan_10c_A'];
+          const substitutions: any[] = [];
+
+          const parseCell = (cell?: string) => {
+            if (!cell) return [] as Array<{subject:string, teacher:string, room:string}>;
+            return cell.split('|').map(s => s.trim()).filter(Boolean).map(sub => {
+              const parts = sub.split(/\s+/);
+              if (parts.length >= 3) {
+                return { subject: parts[0], teacher: parts[1], room: parts[2] };
+              }
+              return { subject: sub, teacher: '', room: '' } as any;
+            });
+          };
+
+          for (const table of tables) {
+            const { data: rows, error: sErr } = await supabase.from(table).select('*');
+            if (sErr) throw sErr;
+            const className = table.replace('Stundenplan_','').replace('_A','');
+            for (const r of rows || []) {
+              const period = r['Stunde'];
+              const cell = r[col] as string | null;
+              if (!cell || typeof cell !== 'string') continue;
+              const entries = parseCell(cell);
+              const match = entries.find(e => e.teacher && e.teacher.toLowerCase().includes(teacherAbbr));
+              if (match) {
+                substitutions.push({
+                  className,
+                  period,
+                  subject: match.subject,
+                  room: match.room,
+                  originalTeacher: teacherName,
+                  substituteTeacher: 'Vertretung'
+                });
+              }
+            }
+          }
+
+          result = { success: true, result: { details: { date: dateStr, teacher: teacherName, substitutions }, message: `Vorschlag für Vertretungsplan am ${dateStr}` } };
+          success = true;
+        } catch (e: any) {
+          console.error('plan_substitution error:', e);
+          result = { error: e.message || 'Fehler beim Generieren des Vertretungsplans' };
+        }
+        break;
+      }
+
+      case 'confirm_substitution': {
+        try {
+          const dateStr: string = parameters?.date;
+          const sickTeacher: string = parameters?.sickTeacher;
+          const subs: any[] = Array.isArray(parameters?.substitutions) ? parameters.substitutions : [];
+
+          if (!dateStr || subs.length === 0) {
+            result = { error: 'Keine Einträge zum Speichern vorhanden.' };
+            break;
+          }
+
+          const rows = subs.map((s) => ({
+            date: dateStr,
+            class_name: String(s.className || '').toUpperCase(),
+            period: Number(s.period) || 1,
+            original_teacher: sickTeacher || s.originalTeacher || 'Unbekannt',
+            original_subject: s.subject || 'Unbekannt',
+            original_room: s.room || 'Unbekannt',
+            substitute_teacher: s.substituteTeacher || 'Vertretung',
+            substitute_subject: s.subject || 'Vertretung',
+            substitute_room: s.room || 'Unbekannt',
+            note: 'Automatisch generiert (AI)',
+            created_by: null
+          }));
+
+          const { error: insErr } = await supabase.from('vertretungsplan').insert(rows);
+          if (insErr) throw insErr;
+
+          result = { success: true, result: { message: 'Vertretungsplan gespeichert', count: rows.length } };
+          success = true;
+        } catch (e: any) {
+          console.error('confirm_substitution error:', e);
+          result = { error: e.message || 'Fehler beim Speichern des Vertretungsplans' };
+        }
+        break;
+      }
+
       default:
         result = { error: 'Unbekannte Aktion' };
         break;
