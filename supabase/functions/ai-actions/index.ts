@@ -285,6 +285,66 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
           success = true
         }
         break
+        
+      case 'get_class_substitutions_week':
+        try {
+          const classNameRaw = parameters.className || parameters.class_name;
+          if (!classNameRaw) {
+            result = { error: 'Klasse muss angegeben werden.' };
+            break;
+          }
+          const className = String(classNameRaw).trim();
+
+          // Calculate current week (Mon-Fri)
+          const now = new Date();
+          const day = now.getDay(); // 0=Sun..6=Sat
+          const monday = new Date(now);
+          const diffToMonday = (day === 0 ? -6 : 1 - day); // if Sunday, go back 6
+          monday.setDate(now.getDate() + diffToMonday);
+          const friday = new Date(monday);
+          friday.setDate(monday.getDate() + 4);
+
+          const startISO = monday.toISOString().split('T')[0];
+          const endISO = friday.toISOString().split('T')[0];
+
+          let query = supabase
+            .from('vertretungsplan')
+            .select('*')
+            .eq('class_name', className)
+            .gte('date', startISO)
+            .lte('date', endISO)
+            .order('date', { ascending: true })
+            .order('period', { ascending: true });
+
+          const { data: subs, error: subsErr } = await query;
+          if (subsErr) {
+            result = { error: subsErr.message };
+            break;
+          }
+
+          const rows = subs || [];
+          const formatter = new Intl.DateTimeFormat('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+          const htmlRows = rows.map((r) => {
+            const d = new Date(r.date + 'T12:00:00');
+            const datum = formatter.format(d);
+            const original = `${r.original_subject} (${r.original_teacher})`;
+            const vertretung = `${r.substitute_subject || '-'} ${r.substitute_teacher ? '('+r.substitute_teacher+')' : ''}`.trim();
+            return `<tr><td>${datum}</td><td>${r.period}</td><td>${original}</td><td>${vertretung}</td><td>${r.substitute_room || '-'}</td><td>${r.note || '-'}</td></tr>`;
+          }).join('');
+
+          const htmlTable = `<table style="width:100%;border-collapse:collapse;min-width:520px"><thead><tr><th style="text-align:left;border-bottom:1px solid #ddd;padding:6px">Datum</th><th style="text-align:left;border-bottom:1px solid #ddd;padding:6px">Stunde</th><th style="text-align:left;border-bottom:1px solid #ddd;padding:6px">Original</th><th style="text-align:left;border-bottom:1px solid #ddd;padding:6px">Vertretung</th><th style="text-align:left;border-bottom:1px solid #ddd;padding:6px">Raum</th><th style="text-align:left;border-bottom:1px solid #ddd;padding:6px">Notiz</th></tr></thead><tbody>${htmlRows || '<tr><td colspan="6" style="padding:6px">Keine Vertretungen gefunden.</td></tr>'}</tbody></table>`;
+
+          result = {
+            message: `Vertretungsplan der ${className} für diese Woche (${startISO}–${endISO}).`,
+            substitutions: rows,
+            htmlTable
+          }
+          success = true
+        } catch (e) {
+          console.error('get_class_substitutions_week error:', e);
+          result = { error: 'Fehler beim Laden des Vertretungsplans.' }
+        }
+        break
 
       case 'get_class_next_subject':
         // Enhanced function to find when a specific class has a specific subject next

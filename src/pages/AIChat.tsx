@@ -367,7 +367,7 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
         if (actionLineMatch) {
           const actionLine = actionLineMatch[0];
           const parts = actionLine.split('|').map(p => p.trim()).filter(Boolean);
-          const actionName = parts.shift()!.replace(/^AKTION:/i, '').trim();
+          let actionName = parts.shift()!.replace(/^AKTION:/i, '').trim();
 
           // Parse parameters (support values containing colons)
           const parameters: any = {};
@@ -377,6 +377,18 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
             const key = rawKey.trim();
             const value = rawValParts.join(':').trim();
             if (key) parameters[key] = value;
+          }
+
+          // Heuristic override: weekly substitution plan requests
+          const asksWeeklySub = /(vertretungsplan|vertretung).*(woche|diese\s*woche|ganze\s*woche)/i.test(currentInput);
+          if (asksWeeklySub) {
+            // Extract class if not provided
+            if (!parameters.className && !parameters.class_name) {
+              const classMatch = currentInput.match(/\b(\d{1,2}[a-zA-Z])\b/);
+              if (classMatch) parameters.className = classMatch[1];
+            }
+            actionName = 'get_class_substitutions_week';
+            delete (parameters as any).subject; // not needed
           }
 
           // Normalize teacher honorifics early (edge function also normalizes)

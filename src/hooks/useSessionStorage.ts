@@ -135,7 +135,7 @@ export const useSessionStorage = () => {
     };
 
     initializeSession();
-  }, [profile, location.pathname, navigate]);
+  }, [profile]);
 
   // Save current route whenever it changes, but only after initialization and not immediately after restoration
   useEffect(() => {
