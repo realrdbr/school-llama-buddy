@@ -217,17 +217,17 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
         break
 
       case 'get_announcements':
-        let query = supabase
+        let announceQuery = supabase
           .from('announcements')
           .select('*')
           .order('created_at', { ascending: false });
         
         // Filter by user's class if they have one assigned
         if (userProfile.user_class) {
-          query = query.or(`target_class.eq.${userProfile.user_class},target_class.is.null`);
+          announceQuery = announceQuery.or(`target_class.eq.${userProfile.user_class},target_class.is.null`);
         }
         
-        const { data: announcements, error: annError } = await query;
+        const { data: announcements, error: annError } = await announceQuery;
         
         if (annError) {
           result = { error: annError.message }
@@ -258,20 +258,20 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
           targetDate = parseDateTextToBerlinSchoolDay(parameters.date);
         }
         
-        let query = supabase
+        let subQuery = supabase
           .from('vertretungsplan')
           .select('*');
         
         // If specific date requested, filter by that date
         if (targetDate) {
           const dateStr = targetDate.toISOString().split('T')[0];
-          query = query.eq('date', dateStr);
+          subQuery = subQuery.eq('date', dateStr);
         }
         
-        query = query.order('date', { ascending: true })
+        subQuery = subQuery.order('date', { ascending: true })
                      .order('period', { ascending: true });
         
-        const { data: substitutions, error: subError } = await query;
+        const { data: substitutions, error: subError } = await subQuery;
         
         if (subError) {
           result = { error: subError.message }
