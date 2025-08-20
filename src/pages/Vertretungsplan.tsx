@@ -468,10 +468,10 @@ const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >
                   </Button>
                 </div>
               </div>
-              <div>
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="class">Klasse</Label>
                 <Select value={selectedClass} onValueChange={setSelectedClass}>
-                  <SelectTrigger className="w-32">
+                  <SelectTrigger className="h-9 w-32">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

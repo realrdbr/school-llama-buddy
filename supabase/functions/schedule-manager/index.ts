@@ -134,10 +134,10 @@ serve(async (req) => {
         }
         
         // Find all lessons for this teacher on this day across all class tables
-        const classTableNames = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
+        const allClassTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
         const teacherLessons = [];
         
-        for (const tableName of classTableNames) {
+        for (const tableName of allClassTables) {
           const { data: classSchedule, error: scheduleError } = await supabase
             .from(tableName)
             .select('*');
