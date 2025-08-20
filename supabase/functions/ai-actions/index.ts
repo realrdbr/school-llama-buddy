@@ -223,8 +223,8 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
           .order('created_at', { ascending: false });
         
         // Filter by user's class if they have one assigned
-        if (userProfile.user_class) {
-          announceQuery = announceQuery.or(`target_class.eq.${userProfile.user_class},target_class.is.null`);
+        if ((userProfile as any).user_class) {
+          announceQuery = announceQuery.or(`target_class.eq.${(userProfile as any).user_class},target_class.is.null`);
         }
         
         const { data: announcements, error: annError } = await announceQuery;
@@ -268,6 +268,11 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
           subQuery = subQuery.eq('date', dateStr);
         }
         
+        // Filter by user's class if they have one assigned
+        if ((userProfile as any).user_class) {
+          subQuery = subQuery.eq('class_name', (userProfile as any).user_class);
+        }
+        
         subQuery = subQuery.order('date', { ascending: true })
                      .order('period', { ascending: true });
         
@@ -282,16 +287,16 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
         break
 
       case 'get_next_subject_lesson':
-        if (userProfile.user_class) {
+        if ((userProfile as any).user_class) {
           // Get current schedule for user's class
-          const scheduleTableName = `Stundenplan_${userProfile.user_class}_A`;
+          const scheduleTableName = `Stundenplan_${(userProfile as any).user_class}_A`;
           
           const { data: scheduleData, error: scheduleError } = await supabase
             .from(scheduleTableName)
             .select('*');
           
           if (scheduleError) {
-            result = { error: `Stundenplan für Klasse ${userProfile.user_class} konnte nicht geladen werden.` };
+            result = { error: `Stundenplan für Klasse ${(userProfile as any).user_class} konnte nicht geladen werden.` };
           } else {
             // Process schedule and find next occurrence of subject
             const requestedSubject = parameters.subject?.toLowerCase();
