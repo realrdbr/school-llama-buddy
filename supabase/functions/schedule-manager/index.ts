@@ -23,52 +23,57 @@ serve(async (req) => {
 
     switch (action) {
       case 'store_schedule':
-        // Store persistent class schedule
-        const { data: scheduleData, error: scheduleError } = await supabase
-          .from('class_schedules')
-          .upsert({
-            class_name: data.className,
-            day_of_week: data.dayOfWeek,
-            period: data.period,
-            subject: data.subject,
-            teacher: data.teacher,
-            room: data.room,
-            start_time: data.startTime,
-            end_time: data.endTime,
-            updated_at: new Date().toISOString()
-          })
-          .select()
-
-        if (scheduleError) throw scheduleError
-        result = { success: true, schedule: scheduleData }
+        // Not implemented - schedule data is stored in pre-defined tables
+        result = { success: false, error: 'Schedule storage not implemented - use direct table access' }
         break
 
       case 'get_schedule':
-        // Retrieve class schedule
+        // Retrieve class schedule from the correct table
+        const scheduleTableName = `Stundenplan_${data.className}_A`;
         const { data: allSchedules, error: getError } = await supabase
-          .from('class_schedules')
+          .from(scheduleTableName)
           .select('*')
-          .eq('class_name', data.className)
-          .order('day_of_week, period')
+          .order('Stunde')
 
         if (getError) throw getError
         result = { success: true, schedules: allSchedules }
         break
 
       case 'find_affected_lessons':
-        // Find lessons affected by teacher absence
-        const { data: affectedLessons, error: affectedError } = await supabase
-          .from('class_schedules')
-          .select('*')
-          .eq('teacher', data.teacherName)
-          .eq('day_of_week', data.dayOfWeek)
-
-        if (affectedError) throw affectedError
-        result = { success: true, affected_lessons: affectedLessons }
+        // Find lessons affected by teacher absence across all class tables
+        const classTableNames = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
+        const allAffectedLessons = [];
+        
+        for (const tableName of classTableNames) {
+          const { data: classLessons, error: classError } = await supabase
+            .from(tableName)
+            .select('*');
+            
+          if (!classError && classLessons) {
+            // Parse lessons to find teacher matches
+            const dayColumns = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+            classLessons.forEach(lesson => {
+              dayColumns.forEach((day, dayIndex) => {
+                const lessonContent = lesson[day];
+                if (lessonContent && lessonContent.includes(data.teacherName)) {
+                  allAffectedLessons.push({
+                    class_name: tableName.replace('Stundenplan_', '').replace('_A', ''),
+                    period: lesson.Stunde,
+                    day_of_week: dayIndex + 1,
+                    teacher: data.teacherName,
+                    content: lessonContent
+                  });
+                }
+              });
+            });
+          }
+        }
+        
+        result = { success: true, affected_lessons: allAffectedLessons }
         break
 
       case 'find_substitute_teacher':
-        // Find suitable substitute teacher
+        // Find suitable substitute teacher using correct table structure
         const { data: teachers, error: teachersError } = await supabase
           .from('teachers')
           .select('*')
@@ -85,12 +90,13 @@ serve(async (req) => {
 
         // Find best substitute based on subject expertise and availability
         const availableTeachers = teachers.filter(teacher => {
-          // Skip the absent teacher
-          if (teacher.name === data.absentTeacher) return false
+          // Skip the absent teacher (check both shortened and full name)
+          const teacherFullName = `${teacher['first name']} ${teacher['last name']}`;
+          if (teacherFullName === data.absentTeacher || teacher.shortened === data.absentTeacher) return false
           
           // Check if teacher is already assigned during this period
           const isAlreadyAssigned = existingSubstitutions.some(sub => 
-            sub.substitute_teacher === teacher.name && sub.period === data.period
+            sub.substitute_teacher === teacher.shortened && sub.period === data.period
           )
           
           return !isAlreadyAssigned
@@ -98,10 +104,10 @@ serve(async (req) => {
 
         // Prioritize teachers by subject match and preferred room
         const bestSubstitute = availableTeachers.find(teacher => 
-          teacher.subjects?.includes(data.subject) && 
-          teacher.preferred_rooms?.includes(data.room)
+          teacher.subjects?.toLowerCase().includes(data.subject?.toLowerCase()) && 
+          teacher.fav_rooms?.includes(data.room)
         ) || availableTeachers.find(teacher => 
-          teacher.subjects?.includes(data.subject)
+          teacher.subjects?.toLowerCase().includes(data.subject?.toLowerCase())
         ) || availableTeachers[0]
 
         result = { 
@@ -119,15 +125,62 @@ serve(async (req) => {
         // Get day of week for the date
         const date = new Date(absenceDate)
         const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay() // Convert Sunday=0 to Sunday=7
+        const dayColumns = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', '', ''];
+        const targetDayColumn = dayColumns[dayOfWeek];
         
-        // Find all lessons for this teacher on this day
-        const { data: teacherLessons, error: lessonsError } = await supabase
-          .from('class_schedules')
-          .select('*')
-          .eq('teacher', teacherName)
-          .eq('day_of_week', dayOfWeek)
-
-        if (lessonsError) throw lessonsError
+        if (!targetDayColumn) {
+          result = { success: true, substitution_plan: [], affected_lessons_count: 0 };
+          break;
+        }
+        
+        // Find all lessons for this teacher on this day across all class tables
+        const classTableNames = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
+        const teacherLessons = [];
+        
+        for (const tableName of classTableNames) {
+          const { data: classSchedule, error: scheduleError } = await supabase
+            .from(tableName)
+            .select('*');
+            
+          if (!scheduleError && classSchedule) {
+            classSchedule.forEach(lesson => {
+              const lessonContent = lesson[targetDayColumn];
+              if (lessonContent && lessonContent.toLowerCase().includes(teacherName.toLowerCase())) {
+                // Parse lesson content to extract subject and room
+                const parts = lessonContent.split(/[\s,/|]+/).filter(p => p.trim());
+                let subject = 'Unbekannt';
+                let room = 'Unbekannt';
+                
+                // Find subject (usually first part or recognizable abbreviation)
+                for (const part of parts) {
+                  if (part.length >= 2 && part.length <= 4 && /^[A-Za-z]+$/.test(part)) {
+                    if (!part.toLowerCase().includes(teacherName.toLowerCase())) {
+                      subject = part;
+                      break;
+                    }
+                  }
+                }
+                
+                // Find room (numbers or number+letter combinations)
+                for (const part of parts) {
+                  if (/^\d+[A-Za-z]?$/.test(part) || /^[A-Za-z]\d+$/.test(part)) {
+                    room = part;
+                    break;
+                  }
+                }
+                
+                teacherLessons.push({
+                  class_name: tableName.replace('Stundenplan_', '').replace('_A', ''),
+                  period: lesson.Stunde,
+                  subject: subject,
+                  room: room,
+                  teacher: teacherName,
+                  day_column: targetDayColumn
+                });
+              }
+            });
+          }
+        }
 
         // Get all available teachers
         const { data: allTeachers, error: allTeachersError } = await supabase
@@ -149,10 +202,11 @@ serve(async (req) => {
         for (const lesson of teacherLessons) {
           // Find best substitute
           const availableForPeriod = allTeachers.filter(teacher => {
-            if (teacher.name === teacherName) return false
+            const teacherFullName = `${teacher['first name']} ${teacher['last name']}`;
+            if (teacherFullName === teacherName || teacher.shortened === teacherName) return false
             
             const isAlreadyAssigned = existingSubs.some(sub => 
-              sub.substitute_teacher === teacher.name && sub.period === lesson.period
+              sub.substitute_teacher === teacher.shortened && sub.period === lesson.period
             )
             
             return !isAlreadyAssigned
@@ -162,16 +216,16 @@ serve(async (req) => {
           let substituteReason = "Keine Vertretung verfügbar"
 
           if (availableForPeriod.length > 0) {
-            // Priority 1: Same subject + preferred room
+            // Priority 1: Same subject + preferred room  
             bestSubstitute = availableForPeriod.find(teacher => 
-              teacher.subjects?.includes(lesson.subject) && 
-              teacher.preferred_rooms?.includes(lesson.room)
+              teacher.subjects?.toLowerCase().includes(lesson.subject.toLowerCase()) && 
+              teacher.fav_rooms?.includes(lesson.room)
             )
             
             // Priority 2: Same subject
             if (!bestSubstitute) {
               bestSubstitute = availableForPeriod.find(teacher => 
-                teacher.subjects?.includes(lesson.subject)
+                teacher.subjects?.toLowerCase().includes(lesson.subject.toLowerCase())
               )
             }
             
@@ -181,11 +235,11 @@ serve(async (req) => {
             }
 
             if (bestSubstitute) {
-              substituteReason = `Vertretung durch ${bestSubstitute.name}`
+              substituteReason = `Vertretung durch ${bestSubstitute.shortened}`
               
               // Add to existing substitutions to prevent double-booking
               existingSubs.push({
-                substitute_teacher: bestSubstitute.name,
+                substitute_teacher: bestSubstitute.shortened,
                 period: lesson.period
               })
             }
@@ -197,14 +251,12 @@ serve(async (req) => {
             original_teacher: teacherName,
             original_subject: lesson.subject,
             original_room: lesson.room,
-            substitute_teacher: bestSubstitute?.name || "Entfall",
+            substitute_teacher: bestSubstitute?.shortened || "Entfall",
             substitute_subject: bestSubstitute ? lesson.subject : "Entfall",
             substitute_room: bestSubstitute ? 
-              (bestSubstitute.preferred_rooms?.[0] || lesson.room) : 
+              (bestSubstitute.fav_rooms?.split(',')[0]?.trim() || lesson.room) : 
               lesson.room,
-            note: substituteReason,
-            start_time: lesson.start_time,
-            end_time: lesson.end_time
+            note: substituteReason
           })
         }
 
