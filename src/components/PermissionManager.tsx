@@ -40,11 +40,18 @@ interface LevelPermissions {
 
 const PermissionManager = () => {
   const { profile } = useAuth();
+  const { 
+    permissions, 
+    userPermissions, 
+    levelPermissions, 
+    setUserPermission, 
+    setLevelPermission, 
+    reloadPermissions,
+    isLoaded
+  } = useEnhancedPermissions();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [userPermissions, setUserPermissions] = useState<UserPermissions>({});
-  const [levelPermissions, setLevelPermissions] = useState<LevelPermissions>({});
 
   // Define all available permissions
   const permissions: Permission[] = [

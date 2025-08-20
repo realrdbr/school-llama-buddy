@@ -278,6 +278,7 @@ const AIChat = () => {
 BENUTZERINFORMATIONEN:
 - Aktueller Benutzer: ${profile?.name || profile?.username} (ID: ${profile?.id})
 - Berechtigung: Level ${profile?.permission_lvl}
+- Benutzerklasse: ${(profile as any)?.user_class || 'Nicht zugeordnet'}
 
 AKTUELLE ZEIT UND DATUM:
 - Heute ist: ${new Date().toLocaleDateString('de-DE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -296,6 +297,12 @@ BERECHTIGUNGSLEVEL-SYSTEM:
 
 SCHULZEITEN ANTWORT:
 - Wenn gefragt "Bis wann geht die Schule?" oder ähnlich, antworte IMMER: "Die Schule geht von 07:45–13:20 Uhr (Blöcke 1–3) oder 07:45–15:15 Uhr (mit Block 4)."
+
+KLASSENSPEZIFISCHE KI-UNTERSTÜTZUNG:
+- Der Benutzer ist in Klasse "${(profile as any)?.user_class || 'Nicht zugeordnet'}" eingetragen
+- Bei Fragen zu "meinem Stundenplan" oder "meine Klasse" beziehe dich auf diese Klasse
+- Bei Fragen wie "Habe ich morgen Deutsch?" prüfe den Stundenplan der Benutzerklasse
+- Bei Vertretungsplan-Anfragen zeige nur die Änderungen für die Benutzerklasse
           
           Verfügbare AKTIONEN für Level ${profile?.permission_lvl}:
           ${profile?.permission_lvl && profile.permission_lvl >= 10 ? 

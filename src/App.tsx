@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import { useSessionStorage } from "@/hooks/useSessionStorage";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -21,6 +23,131 @@ import Permissions from "./pages/Permissions";
 
 const queryClient = new QueryClient();
 
+// Session-aware wrapper component
+const SessionAwareApp = () => {
+  useSessionStorage(); // Initialize session management
+
+  return (
+    <Routes>
+      <Route path="/" element={<Index />} />
+      <Route path="/auth" element={<Auth />} />
+      
+      {/* Protected routes with specific permissions */}
+      <Route 
+        path="/stundenplan" 
+        element={
+          <ProtectedRoute requiredPermission="view_schedule">
+            <Stundenplan />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/announcements" 
+        element={
+          <ProtectedRoute requiredPermission="view_announcements">
+            <Announcements />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/audio-announcements" 
+        element={
+          <ProtectedRoute requiredPermission="audio_announcements">
+            <AudioAnnouncements />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/document-analysis" 
+        element={
+          <ProtectedRoute requiredPermission="document_analysis">
+            <DocumentAnalysis />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/user-management" 
+        element={
+          <ProtectedRoute requiredPermission="user_management">
+            <UserManagement />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/vertretungsplan" 
+        element={
+          <ProtectedRoute requiredPermission="view_vertretungsplan">
+            <Vertretungsplan />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/ai-chat" 
+        element={
+          <ProtectedRoute requiredPermission="view_chat">
+            <AIChat />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/klassenverwaltung" 
+        element={
+          <ProtectedRoute requiredPermission="manage_schedules">
+            <Klassenverwaltung />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/keycard" 
+        element={
+          <ProtectedRoute requiredPermission="keycard_system">
+            <Keycard />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/settings" 
+        element={
+          <ProtectedRoute requiredPermission="system_settings">
+            <Settings />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/permissions" 
+        element={
+          <ProtectedRoute requiredPermission="permission_management">
+            <Permissions />
+          </ProtectedRoute>
+        } 
+      />
+      
+      {/* Legacy route alias */}
+      <Route 
+        path="/tts" 
+        element={
+          <ProtectedRoute requiredPermission="audio_announcements">
+            <AudioAnnouncements />
+          </ProtectedRoute>
+        } 
+      />
+      
+      {/* Catch-all route for 404 */}
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
@@ -28,24 +155,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/stundenplan" element={<Stundenplan />} />
-            <Route path="/announcements" element={<Announcements />} />
-            <Route path="/audio-announcements" element={<AudioAnnouncements />} />
-            <Route path="/document-analysis" element={<DocumentAnalysis />} />
-            <Route path="/user-management" element={<UserManagement />} />
-            <Route path="/vertretungsplan" element={<Vertretungsplan />} />
-            <Route path="/ai-chat" element={<AIChat />} />
-            <Route path="/klassenverwaltung" element={<Klassenverwaltung />} />
-            <Route path="/keycard" element={<Keycard />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/permissions" element={<Permissions />} />
-            <Route path="/tts" element={<AudioAnnouncements />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <SessionAwareApp />
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

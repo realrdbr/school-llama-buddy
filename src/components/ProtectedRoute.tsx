@@ -1,0 +1,60 @@
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useEnhancedPermissions } from '@/hooks/useEnhancedPermissions';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
+
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  requiredPermission: string;
+  fallbackPath?: string;
+  showToast?: boolean;
+}
+
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  children,
+  requiredPermission,
+  fallbackPath = '/',
+  showToast = true
+}) => {
+  const navigate = useNavigate();
+  const { profile } = useAuth();
+  const { hasPermission, isLoaded } = useEnhancedPermissions();
+
+  useEffect(() => {
+    if (!profile) {
+      navigate('/auth');
+      return;
+    }
+
+    if (isLoaded && !hasPermission(requiredPermission)) {
+      if (showToast) {
+        toast({
+          variant: "destructive",
+          title: "Zugriff verweigert",
+          description: "Sie haben keine Berechtigung für diese Seite."
+        });
+      }
+      navigate(fallbackPath);
+    }
+  }, [profile, isLoaded, hasPermission, requiredPermission, navigate, fallbackPath, showToast]);
+
+  // Show loading while checking permissions
+  if (!profile || !isLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  // Show nothing if access denied (navigation will handle redirect)
+  if (!hasPermission(requiredPermission)) {
+    return null;
+  }
+
+  return <>{children}</>;
+};
+
+export default ProtectedRoute;
