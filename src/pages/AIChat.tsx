@@ -303,16 +303,20 @@ KLASSENSPEZIFISCHE KI-UNTERSTÜTZUNG:
 - Bei Fragen zu "meinem Stundenplan" oder "meine Klasse" beziehe dich auf diese Klasse
 - Bei Fragen wie "Habe ich morgen Deutsch?" prüfe den Stundenplan der Benutzerklasse
 - Bei Vertretungsplan-Anfragen zeige nur die Änderungen für die Benutzerklasse
+
+NEUE STUNDENPLAN-AKTIONEN:
+- GET_CLASS_NEXT_SUBJECT: Finde heraus, wann eine bestimmte Klasse ein bestimmtes Fach hat (Parameter: className, subject)
+- Beispiel: "Wann hat die 10b das nächste Mal Deutsch?" → AKTION:GET_CLASS_NEXT_SUBJECT|className:10b|subject:Deutsch
           
-          Verfügbare AKTIONEN für Level ${profile?.permission_lvl}:
-          ${profile?.permission_lvl && profile.permission_lvl >= 10 ? 
-            '- CREATE_USER: Benutzer erstellen (Parameter: email, password, username, fullName, permissionLevel)\n- UPDATE_VERTRETUNGSPLAN: Vertretung erstellen (Parameter: date, className, period, originalTeacher, originalSubject, originalRoom, substituteTeacher, substituteSubject, substituteRoom, note)\n- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- CREATE_TTS: Text-to-Speech Durchsage erstellen (Parameter: text, title)\n- PLAN_SUBSTITUTION: Automatische Vertretung bei Krankmeldung (Parameter: teacherName, date)\n- GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
-          : profile?.permission_lvl && profile.permission_lvl >= 9 ?
-            '- UPDATE_VERTRETUNGSPLAN: Vertretung erstellen (Parameter: date, className, period, originalTeacher, originalSubject, originalRoom, substituteTeacher, substituteSubject, substituteRoom, note)\n- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- CREATE_TTS: Text-to-Speech Durchsage erstellen (Parameter: text, title)\n- PLAN_SUBSTITUTION: Automatische Vertretung bei Krankmeldung (Parameter: teacherName, date)\n- GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
-          : profile?.permission_lvl && profile.permission_lvl >= 4 ?
-            '- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
-          : 'GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
-          }
+  Verfügbare AKTIONEN für Level ${profile?.permission_lvl}:
+  ${profile?.permission_lvl && profile.permission_lvl >= 10 ? 
+    '- CREATE_USER: Benutzer erstellen (Parameter: email, password, username, fullName, permissionLevel)\n- UPDATE_VERTRETUNGSPLAN: Vertretung erstellen (Parameter: date, className, period, originalTeacher, originalSubject, originalRoom, substituteTeacher, substituteSubject, substituteRoom, note)\n- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- CREATE_TTS: Text-to-Speech Durchsage erstellen (Parameter: text, title)\n- PLAN_SUBSTITUTION: Automatische Vertretung bei Krankmeldung (Parameter: teacherName, date)\n- GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_CLASS_NEXT_SUBJECT: Nächstes Fach einer Klasse finden (Parameter: className, subject)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
+  : profile?.permission_lvl && profile.permission_lvl >= 9 ?
+    '- UPDATE_VERTRETUNGSPLAN: Vertretung erstellen (Parameter: date, className, period, originalTeacher, originalSubject, originalRoom, substituteTeacher, substituteSubject, substituteRoom, note)\n- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- CREATE_TTS: Text-to-Speech Durchsage erstellen (Parameter: text, title)\n- PLAN_SUBSTITUTION: Automatische Vertretung bei Krankmeldung (Parameter: teacherName, date)\n- GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_CLASS_NEXT_SUBJECT: Nächstes Fach einer Klasse finden (Parameter: className, subject)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
+  : profile?.permission_lvl && profile.permission_lvl >= 4 ?
+    '- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_CLASS_NEXT_SUBJECT: Nächstes Fach einer Klasse finden (Parameter: className, subject)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
+  : '- GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_CLASS_NEXT_SUBJECT: Nächstes Fach einer Klasse finden (Parameter: className, subject)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
+  }
           
 
 WICHTIGE REGELN:
@@ -334,6 +338,8 @@ BEISPIELE FÜR STUNDENPLAN-ANFRAGEN:
 - "Stundenplan der 10c" → AKTION:GET_SCHEDULE|className:10c (ganze Woche)
 - "Zeig mir den Stundenplan der 10b für die ganze Woche" → AKTION:GET_SCHEDULE|className:10b (ganze Woche)
 - "Stundenplan 10c Mittwoch" → AKTION:GET_SCHEDULE|className:10c|day:Mittwoch (nur Mittwoch)
+- "Wann hat die 10b das nächste Mal Deutsch?" → AKTION:GET_CLASS_NEXT_SUBJECT|className:10b|subject:Deutsch
+- "Wann hat 10c Mathematik?" → AKTION:GET_CLASS_NEXT_SUBJECT|className:10c|subject:Mathematik
 
 4. Antworte normal, aber beginne mit der AKTION-Zeile wenn eine Aktion erforderlich ist.
 5. Bei unvollständigen Angaben verwende sinnvolle Standardwerte.

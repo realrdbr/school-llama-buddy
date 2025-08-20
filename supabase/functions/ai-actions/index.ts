@@ -286,7 +286,149 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
         }
         break
 
-      case 'get_next_subject_lesson':
+      case 'get_class_next_subject':
+        // Enhanced function to find when a specific class has a specific subject next
+        try {
+          const className = parameters.className || parameters.class_name;
+          const subjectName = parameters.subject || parameters.subjectName;
+          
+          if (!className || !subjectName) {
+            result = { error: 'Klasse und Fach müssen angegeben werden.' };
+            break;
+          }
+          
+          // Building table name for the class schedule
+          const availableTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
+          const tableMap: Record<string, string> = {};
+          
+          for (const tableName of availableTables) {
+            const raw = tableName.replace('Stundenplan_', '').replace('_A', '');
+            const rawLower = raw.toLowerCase();
+            tableMap[rawLower] = tableName;
+            tableMap[rawLower.replace(/[_\s]/g, '')] = tableName;
+          }
+          
+          const normalizedClassName = className.toLowerCase().replace(/[_\s]/g, '');
+          const table = tableMap[normalizedClassName];
+          
+          if (!table) {
+            result = { error: `Stundenplan für Klasse "${className}" nicht gefunden. Verfügbare Klassen: 10b, 10c` };
+            break;
+          }
+          
+          // Get current schedule data
+          const { data: scheduleData, error: scheduleError } = await supabase
+            .from(table)
+            .select('*')
+            .order('Stunde');
+          
+          if (scheduleError) {
+            result = { error: `Fehler beim Laden des Stundenplans: ${scheduleError.message}` };
+            break;
+          }
+          
+          if (!scheduleData || scheduleData.length === 0) {
+            result = { error: `Keine Stundenplandaten für Klasse ${className} gefunden.` };
+            break;
+          }
+          
+          // Find next occurrence of the subject
+          const today = new Date();
+          const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+          const weekDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+          const germanWeekDays = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'];
+          
+          // Helper function to parse schedule entries
+          const parseEntry = (cell?: string) => {
+            if (!cell) return [];
+            return cell.split('|').map(s => s.trim()).filter(Boolean).map(sub => {
+              const parts = sub.split(/\s+/);
+              if (parts.length >= 3) {
+                return { subject: parts[0].toLowerCase(), teacher: parts[1], room: parts[2] };
+              }
+              return { subject: sub.toLowerCase(), teacher: '', room: '' };
+            });
+          };
+          
+          // Normalize subject name for comparison
+          const normalizedSearchSubject = subjectName.toLowerCase()
+            .replace(/mathe/g, 'mathematik')
+            .replace(/^ma$/g, 'mathematik')
+            .replace(/^de$/g, 'deutsch')
+            .replace(/^en$/g, 'englisch')
+            .replace(/^ge$/g, 'geschichte')
+            .replace(/^ek$/g, 'erdkunde')
+            .replace(/^bi$/g, 'biologie')
+            .replace(/^ch$/g, 'chemie')
+            .replace(/^ph$/g, 'physik')
+            .replace(/^sp$/g, 'sport')
+            .replace(/^ku$/g, 'kunst')
+            .replace(/^mu$/g, 'musik')
+            .replace(/^re$/g, 'religion')
+            .replace(/^et$/g, 'ethik')
+            .replace(/^if$/g, 'informatik');
+          
+          // Search through the week starting from today
+          let foundDay = null;
+          let foundDetails = null;
+          
+          // Check from current day onwards
+          for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+            const checkDay = (currentDay + dayOffset - 1) % 7; // Convert to Monday=0 index
+            if (checkDay < 0 || checkDay >= 5) continue; // Skip weekends
+            
+            const dayColumn = weekDays[checkDay];
+            
+            // Check each period of the day
+            for (const period of scheduleData) {
+              const dayEntries = parseEntry(period[dayColumn]);
+              
+              for (const entry of dayEntries) {
+                // Check if subject matches (partial matching for flexibility)
+                if (entry.subject.includes(normalizedSearchSubject) || 
+                    normalizedSearchSubject.includes(entry.subject) ||
+                    entry.subject === normalizedSearchSubject) {
+                  foundDay = germanWeekDays[checkDay];
+                  foundDetails = {
+                    day: foundDay,
+                    period: period.Stunde,
+                    subject: entry.subject,
+                    teacher: entry.teacher,
+                    room: entry.room,
+                    fullEntry: `${entry.subject} ${entry.teacher} ${entry.room}`.trim()
+                  };
+                  break;
+                }
+              }
+              if (foundDay) break;
+            }
+            if (foundDay) break;
+          }
+          
+          if (foundDay && foundDetails) {
+            result = {
+              message: `Die Klasse ${className} hat das nächste Mal ${subjectName} am ${foundDay}.`,
+              details: foundDetails,
+              day: foundDay,
+              period: foundDetails.period,
+              teacher: foundDetails.teacher,
+              room: foundDetails.room
+            };
+            success = true;
+          } else {
+            result = { 
+              message: `Die Klasse ${className} hat kein ${subjectName} in der aktuellen Woche im Stundenplan.`,
+              searchedSubject: normalizedSearchSubject,
+              availableSubjects: scheduleData.flatMap(period => 
+                weekDays.flatMap(day => parseEntry(period[day]).map(e => e.subject))
+              ).filter((v, i, a) => a.indexOf(v) === i) // unique subjects
+            };
+          }
+        } catch (error) {
+          console.error('Error in get_class_next_subject:', error);
+          result = { error: `Fehler bei der Stundenplan-Abfrage: ${(error as any).message}` };
+        }
+        break
         if ((userProfile as any).user_class) {
           // Get current schedule for user's class
           const scheduleTableName = `Stundenplan_${(userProfile as any).user_class}_A`;
