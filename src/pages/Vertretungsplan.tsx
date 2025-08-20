@@ -166,7 +166,7 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
       const substitutionData = data.map(sub => ({
         id: sub.id,
         date: sub.date,
-        class: sub.class_name,
+        class: (sub.class_name || '').toLowerCase(),
         period: sub.period,
         subject: sub.substitute_subject || sub.original_subject,
         teacher: sub.original_teacher,
@@ -262,7 +262,7 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
     const targetDateString = toISODateLocal(targetDay);
     
     return substitutions.some(sub => 
-      sub.class === classname && 
+      (sub.class || '').toLowerCase() === (classname || '').toLowerCase() && 
       sub.date === targetDateString && 
       sub.period === period
     );
@@ -282,7 +282,7 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
     const targetDateString = toISODateLocal(targetDay);
     
     return substitutions.find(sub => 
-      sub.class === classname && 
+      (sub.class || '').toLowerCase() === (classname || '').toLowerCase() && 
       sub.date === targetDateString && 
       sub.period === period
     );
@@ -457,13 +457,13 @@ const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >
                   <div className="text-sm text-muted-foreground">{formatWeekRange(__weekStart)}</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={handlePrevWeek} className="h-10">
+                  <Button variant="outline" size="sm" onClick={handlePrevWeek} className="h-10 w-32">
                     <ChevronLeft className="h-4 w-4 mr-1" /> Vorherige Woche
                   </Button>
-                  <Button variant="secondary" size="sm" onClick={handleThisWeek} className="h-10">
+                  <Button variant="secondary" size="sm" onClick={handleThisWeek} className="h-10 w-32">
                     Diese Woche
                   </Button>
-                  <Button variant="outline" size="sm" onClick={handleNextWeek} className="h-10">
+                  <Button variant="outline" size="sm" onClick={handleNextWeek} className="h-10 w-32">
                     Nächste Woche <ChevronRight className="h-4 w-4 ml-1" />
                   </Button>
                 </div>
@@ -541,7 +541,7 @@ Stundenplan {selectedClass} - Woche {formatWeekRange(__weekStart)}
                                   
                                   // Check if there's a substitution for this specific date/class/period
                                   const specificSubstitution = substitutions.find(sub => 
-                                    sub.class === selectedClass && 
+                                    (sub.class || '').toLowerCase() === (selectedClass || '').toLowerCase() && 
                                     sub.date === toISODateLocal(targetDay) && 
                                     sub.period === entry.period
                                   );

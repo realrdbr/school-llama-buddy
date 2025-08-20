@@ -635,7 +635,7 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
 
           const rows = subs.map((s) => ({
             date: dateStr,
-            class_name: String(s.className || '').toUpperCase(),
+            class_name: String(s.className || '').toLowerCase(),
             period: Number(s.period) || 1,
             original_teacher: sickTeacher || s.originalTeacher || 'Unbekannt',
             original_subject: s.subject || 'Unbekannt',
@@ -649,6 +649,24 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
 
           const { error: insErr } = await supabase.from('vertretungsplan').insert(rows);
           if (insErr) throw insErr;
+
+          // Create a single announcement summarizing the saved substitutions
+          const dateStrDE = new Date(dateStr + 'T12:00:00').toLocaleDateString('de-DE');
+          const classes = Array.from(new Set(rows.map(r => r.class_name))).join(', ');
+          const contentLines = rows
+            .sort((a, b) => a.period - b.period)
+            .map(r => `${r.class_name.toUpperCase()}, ${r.period}. Stunde: ${r.original_subject} bei ${r.original_teacher} → ${r.substitute_teacher} (Raum: ${r.substitute_room})`)
+            .join('\n');
+          const { error: annErr } = await supabase.from('announcements').insert({
+            title: `Vertretungsplan aktualisiert – ${dateStrDE}`,
+            content: contentLines,
+            author: 'E.D.U.A.R.D.',
+            priority: 'high',
+            target_class: classes || null,
+            target_permission_level: 1,
+            created_by: null,
+          });
+          if (annErr) console.error('Announcement insert error:', annErr);
 
           result = { message: 'Vertretungsplan gespeichert', count: rows.length };
           success = true;
