@@ -397,6 +397,10 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
           const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
           const weekDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
           const germanWeekDays = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'];
+          // Startzeiten je Schulstunde (gemäß Blockzeiten, Näherungswerte)
+          const periodStartTimes: Record<number, string> = { 1: '07:45', 2: '08:30', 3: '09:35', 4: '10:20', 5: '11:50', 6: '12:35', 7: '13:45', 8: '14:30' };
+          const todayISO = today.toISOString().split('T')[0];
+          const makeDateTime = (dateISO: string, hhmm: string) => new Date(`${dateISO}T${hhmm}:00`);
           
           // Helper function to parse schedule entries
           const parseEntry = (cell?: string) => {
@@ -439,8 +443,16 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
             
             const dayColumn = weekDays[checkDay];
             
-            // Check each period of the day
+            // Check each period of the day (skip past periods when checking today)
             for (const period of scheduleData) {
+              const pNum = Number(period.Stunde);
+              if (dayOffset === 0) {
+                const startStr = periodStartTimes[pNum as keyof typeof periodStartTimes];
+                if (startStr) {
+                  const start = makeDateTime(todayISO, startStr);
+                  if (new Date() >= start) { continue; }
+                }
+              }
               const dayEntries = parseEntry(period[dayColumn]);
               
               for (const entry of dayEntries) {
@@ -515,6 +527,89 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
           result = { error: 'Ihre Klasse ist nicht in Ihrem Profil hinterlegt.' };
         }
         break
+
+      case 'get_class_next_subjects_all': {
+        try {
+          const className = parameters.className || parameters.class_name;
+          if (!className) {
+            result = { error: 'Klasse muss angegeben werden.' };
+            break;
+          }
+          // Resolve schedule table
+          const availableTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
+          const tableMap: Record<string,string> = {};
+          for (const t of availableTables) {
+            const raw = t.replace('Stundenplan_','').replace('_A','');
+            const key = raw.toLowerCase().replace(/[_\s]/g,'');
+            tableMap[key] = t;
+          }
+          const tKey = String(className).toLowerCase().replace(/[_\s]/g,'');
+          const table = tableMap[tKey];
+          if (!table) { result = { error: `Stundenplan für Klasse "${className}" nicht gefunden.` }; break; }
+          const { data: rows, error } = await supabase.from(table).select('*').order('Stunde');
+          if (error) { result = { error: `Fehler beim Laden des Stundenplans: ${error.message}` }; break; }
+          const weekDays = ['monday','tuesday','wednesday','thursday','friday'];
+          const germanWeekDays = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag'];
+          const parseEntry = (cell?: string) => {
+            if (!cell) return [] as Array<{subject:string,teacher:string,room:string}>;
+            return cell.split('|').map(s=>s.trim()).filter(Boolean).map(sub=>{
+              const parts = sub.split(/\s+/);
+              if (parts.length>=3) return {subject:parts[0].toLowerCase(),teacher:parts[1],room:parts[2]};
+              return {subject:sub.toLowerCase(),teacher:'',room:''};
+            });
+          };
+          const periodStartTimes: Record<number,string> = {1:'07:45',2:'08:30',3:'09:35',4:'10:20',5:'11:50',6:'12:35',7:'13:45',8:'14:30'};
+          const today = new Date();
+          const todayISO = today.toISOString().split('T')[0];
+          const makeDateTime = (dateISO:string, hhmm:string) => new Date(`${dateISO}T${hhmm}:00`);
+          // Collect unique subjects
+          const subjects = new Set<string>();
+          for (const r of rows || []) {
+            for (const d of weekDays) parseEntry((r as any)[d]).forEach(e=>subjects.add(e.subject));
+          }
+          // Function to find next occurrence for a subject
+          const findNext = (subject: string) => {
+            const currentDay = today.getDay();
+            for (let dayOffset=0; dayOffset<7; dayOffset++) {
+              const checkDay = (currentDay + dayOffset - 1) % 7;
+              if (checkDay < 0 || checkDay >= 5) continue;
+              const dayCol = weekDays[checkDay];
+              for (const r of rows || []) {
+                const pNum = Number((r as any).Stunde);
+                if (dayOffset===0) {
+                  const startStr = periodStartTimes[pNum as keyof typeof periodStartTimes];
+                  if (startStr) {
+                    const start = makeDateTime(todayISO, startStr);
+                    if (new Date() >= start) continue;
+                  }
+                }
+                const entries = parseEntry((r as any)[dayCol]);
+                const hit = entries.find(e=> e.subject===subject || e.subject.includes(subject) || subject.includes(e.subject));
+                if (hit) {
+                  return { subject, day: germanWeekDays[checkDay], period: pNum, teacher: hit.teacher, room: hit.room };
+                }
+              }
+            }
+            return null;
+          };
+          const results: Array<any> = [];
+          subjects.forEach((subj)=>{
+            const res = findNext(subj);
+            if (res) results.push(res);
+          });
+          // Sort by day then period
+          const dayOrder: Record<string,number> = {Montag:0,Dienstag:1,Mittwoch:2,Donnerstag:3,Freitag:4};
+          results.sort((a,b)=> (dayOrder[a.day]-dayOrder[b.day]) || (a.period-b.period));
+          const rowsHtml = results.map(r=>`<tr><td>${r.subject}</td><td>${r.day}</td><td>${r.period}</td><td>${r.teacher||'-'}</td><td>${r.room||'-'}</td></tr>`).join('');
+          const htmlTable = `<table style="width:100%;border-collapse:collapse;min-width:520px"><thead><tr><th style=\"text-align:left;border-bottom:1px solid #ddd;padding:6px\">Fach</th><th style=\"text-align:left;border-bottom:1px solid #ddd;padding:6px\">Tag</th><th style=\"text-align:left;border-bottom:1px solid #ddd;padding:6px\">Stunde</th><th style=\"text-align:left;border-bottom:1px solid #ddd;padding:6px\">Lehrer</th><th style=\"text-align:left;border-bottom:1px solid #ddd;padding:6px\">Raum</th></tr></thead><tbody>${rowsHtml || '<tr><td colspan=\"5\" style=\"padding:6px\">Keine Daten gefunden.</td></tr>'}</tbody></table>`;
+          result = { message: `Nächste Termine je Fach für Klasse ${String(className).toUpperCase()}.`, items: results, htmlTable };
+          success = true;
+        } catch (e:any) {
+          console.error('get_class_next_subjects_all error:', e);
+          result = { error: e.message || 'Fehler bei der Bestimmung der nächsten Fächer' };
+        }
+        break;
+      }
 
       case 'get_schedule':
         try {

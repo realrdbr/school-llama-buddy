@@ -391,6 +391,17 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
             delete (parameters as any).subject; // not needed
           }
 
+          // Detect request: next time for each subject ("jedes Fach" / "alle Fächer")
+          const asksNextEachSubject = /(jedes\s*fach|alle\s*fächer|alle\s*faecher)/i.test(currentInput) && /(n(ä|ae)chste?n?\s*mal|n(ä|ae)chste?n?)/i.test(currentInput);
+          if (asksNextEachSubject) {
+            if (!parameters.className && !parameters.class_name) {
+              const classMatch = currentInput.match(/\b(\d{1,2}[a-zA-Z])\b/);
+              if (classMatch) parameters.className = classMatch[1];
+            }
+            actionName = 'get_class_next_subjects_all';
+            delete (parameters as any).subject;
+          }
+
           // Normalize teacher honorifics early (edge function also normalizes)
           if (parameters.teacherName) {
             parameters.teacherName = parameters.teacherName.replace(/\b(fr\.?|herr|frau|hr\.?)\s+/i, '').trim();
@@ -477,6 +488,13 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
                         </button>
                       </div>`;
                     }
+                  }
+                  break;
+                }
+                case 'get_class_next_subjects_all': {
+                  const htmlTable = res.htmlTable as string | undefined;
+                  if (htmlTable) {
+                    details = `\n\n<div style="overflow-x:auto;">${htmlTable}</div>`;
                   }
                   break;
                 }

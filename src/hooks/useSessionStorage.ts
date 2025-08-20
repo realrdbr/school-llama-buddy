@@ -107,12 +107,12 @@ export const useSessionStorage = () => {
         
         console.log('Session Storage: Current path:', currentPath, 'Navigation type:', navType);
         
-        // Only auto-redirect from root on real reloads (not back/forward or SPA navigations)
-        if (currentPath === '/' && navType === 'reload') {
+        // Auto-redirect on real reloads to last visited route (not back/forward or SPA navigations)
+        if (navType === 'reload') {
           const lastRoute = await loadLastRoute();
           console.log('Session Storage: Last route:', lastRoute);
           
-          if (lastRoute !== '/' && lastRoute !== currentPath) {
+          if (lastRoute && lastRoute !== currentPath) {
             // Validate that the route is accessible
             const validRoutes = [
               '/stundenplan', '/announcements', '/vertretungsplan', '/ai-chat',
