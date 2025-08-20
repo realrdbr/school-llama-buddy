@@ -11,6 +11,7 @@ export const useSessionStorage = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const [isInitialized, setIsInitialized] = useState(false);
+  const [hasRestoredFromReload, setHasRestoredFromReload] = useState(false);
 
   // Cookie helper functions
   const setCookie = (name: string, value: string, days: number) => {
@@ -115,6 +116,7 @@ export const useSessionStorage = () => {
           if (validRoutes.includes(lastRoute)) {
             console.log('Session Storage: Navigating to last route:', lastRoute);
             navigate(lastRoute, { replace: true });
+            setHasRestoredFromReload(true);
           }
         }
       } catch (error) {
@@ -127,7 +129,7 @@ export const useSessionStorage = () => {
     initializeSession();
   }, [profile, location.pathname, navigate]);
 
-  // Save current route whenever it changes
+  // Save current route whenever it changes, but only after initialization and not immediately after restoration
   useEffect(() => {
     if (!isInitialized || !profile) return;
 
@@ -135,8 +137,13 @@ export const useSessionStorage = () => {
     
     // Don't save auth routes
     if (currentPath !== '/auth' && currentPath !== '/login') {
-      console.log('Session Storage: Saving route:', currentPath);
-      saveRoute(currentPath);
+      // Add a small delay to avoid saving immediately after restoration
+      const timeoutId = setTimeout(() => {
+        console.log('Session Storage: Saving route:', currentPath);
+        saveRoute(currentPath);
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [location.pathname, profile, isInitialized]);
 
