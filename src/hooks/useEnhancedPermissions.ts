@@ -107,6 +107,9 @@ export const useEnhancedPermissions = () => {
     const userId = profile.id;
     const userLevel = profile.permission_lvl;
 
+    // Admins (level 10+) have full access
+    if (userLevel >= 10) return true;
+
     // Check user-specific permission first
     const userSpecific = userPermissions[userId]?.[permissionId];
     if (userSpecific !== undefined) return userSpecific;

@@ -33,17 +33,21 @@ export const useSessionStorage = () => {
   // Save route to both cookie and database
   const saveRoute = async (route: string) => {
     try {
-      // Always save to cookie for immediate persistence
+      // Always save to cookie and localStorage for immediate persistence
       setCookie(LAST_ROUTE_COOKIE, route, COOKIE_EXPIRES_DAYS);
-
+      try { localStorage.setItem(LAST_ROUTE_COOKIE, route); } catch {}
+      
       // Save to database if user is logged in
       if (profile?.id) {
         const { error } = await supabase
           .from('user_sessions')
-          .upsert({
-            user_id: profile.id,
-            last_route: route,
-          });
+          .upsert(
+            {
+              user_id: profile.id,
+              last_route: route,
+            },
+            { onConflict: 'user_id' }
+          );
         
         if (error) {
           console.error('Failed to save route to database:', error);
@@ -70,12 +74,15 @@ export const useSessionStorage = () => {
         }
       }
 
-      // Fallback to cookie
+      // Fallback to localStorage then cookie
+      const localRoute = localStorage.getItem(LAST_ROUTE_COOKIE);
+      if (localRoute) return localRoute;
       const cookieRoute = getCookie(LAST_ROUTE_COOKIE);
       return cookieRoute || '/';
     } catch (error) {
       console.error('Failed to load last route:', error);
-      return getCookie(LAST_ROUTE_COOKIE) || '/';
+      const localRoute = localStorage.getItem(LAST_ROUTE_COOKIE);
+      return localRoute || getCookie(LAST_ROUTE_COOKIE) || '/';
     }
   };
 
