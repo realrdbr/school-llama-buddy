@@ -288,29 +288,25 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
         
       case 'get_class_substitutions_week':
         try {
-          const classNameRaw = parameters.className || parameters.class_name;
-          if (!classNameRaw) {
-            result = { error: 'Klasse muss angegeben werden.' };
-            break;
-          }
+          const classNameRaw = parameters.className || parameters.class_name || (userProfile as any)?.user_class || '10b';
           const className = String(classNameRaw).trim();
 
-          // Calculate current week (Mon-Fri)
+          // Calculate current week: Monday start, end = next Monday (inclusive)
           const now = new Date();
           const day = now.getDay(); // 0=Sun..6=Sat
           const monday = new Date(now);
-          const diffToMonday = (day === 0 ? -6 : 1 - day); // if Sunday, go back 6
+          const diffToMonday = (day === 0 ? -6 : 1 - day);
           monday.setDate(now.getDate() + diffToMonday);
-          const friday = new Date(monday);
-          friday.setDate(monday.getDate() + 4);
+          const nextMonday = new Date(monday);
+          nextMonday.setDate(monday.getDate() + 7);
 
           const startISO = monday.toISOString().split('T')[0];
-          const endISO = friday.toISOString().split('T')[0];
+          const endISO = nextMonday.toISOString().split('T')[0];
 
           let query = supabase
             .from('vertretungsplan')
             .select('*')
-            .eq('class_name', className)
+            .ilike('class_name', className)
             .gte('date', startISO)
             .lte('date', endISO)
             .order('date', { ascending: true })

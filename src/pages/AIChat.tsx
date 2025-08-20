@@ -427,6 +427,7 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
                   user_id: profile?.id,
                   name: profile?.username || profile?.name,
                   username: profile?.username,
+                  user_class: (profile as any)?.user_class,
                   permission_lvl: profile?.permission_lvl
                 }
               }
