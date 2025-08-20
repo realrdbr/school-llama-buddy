@@ -138,28 +138,39 @@ export const useEnhancedPermissions = () => {
     if (!canManagePermissions()) return false;
 
     try {
-      const { error } = await supabase
+      // Try update first to avoid duplicates when no unique constraint exists
+      const { data: updateData, error: updateError } = await supabase
         .from('user_permissions')
-        .upsert({
-          user_id: userId,
-          permission_id: permissionId,
-          allowed
-        });
+        .update({ allowed, updated_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .eq('permission_id', permissionId)
+        .select();
 
-      if (!error) {
-        // Update local state
-        setUserPermissions(prev => ({
-          ...prev,
-          [userId]: {
-            ...prev[userId],
-            [permissionId]: allowed
-          }
-        }));
-        return true;
-      } else {
-        console.error('Error setting user permission:', error);
-        return false;
+      if (updateError) {
+        console.error('Error updating user permission, will try insert:', updateError);
       }
+
+      // If nothing was updated, insert
+      if (!updateData || updateData.length === 0) {
+        const { error: insertError } = await supabase
+          .from('user_permissions')
+          .insert({ user_id: userId, permission_id: permissionId, allowed });
+
+        if (insertError) {
+          console.error('Error inserting user permission:', insertError);
+          return false;
+        }
+      }
+
+      // Update local state
+      setUserPermissions(prev => ({
+        ...prev,
+        [userId]: {
+          ...prev[userId],
+          [permissionId]: allowed
+        }
+      }));
+      return true;
     } catch (error) {
       console.error('Error setting user permission:', error);
       return false;
@@ -171,28 +182,39 @@ export const useEnhancedPermissions = () => {
     if (!canManagePermissions()) return false;
 
     try {
-      const { error } = await supabase
+      // Try update first
+      const { data: updateData, error: updateError } = await supabase
         .from('level_permissions')
-        .upsert({
-          level,
-          permission_id: permissionId,
-          allowed
-        });
+        .update({ allowed, updated_at: new Date().toISOString() })
+        .eq('level', level)
+        .eq('permission_id', permissionId)
+        .select();
 
-      if (!error) {
-        // Update local state
-        setLevelPermissions(prev => ({
-          ...prev,
-          [level]: {
-            ...prev[level],
-            [permissionId]: allowed
-          }
-        }));
-        return true;
-      } else {
-        console.error('Error setting level permission:', error);
-        return false;
+      if (updateError) {
+        console.error('Error updating level permission, will try insert:', updateError);
       }
+
+      // If nothing was updated, insert
+      if (!updateData || updateData.length === 0) {
+        const { error: insertError } = await supabase
+          .from('level_permissions')
+          .insert({ level, permission_id: permissionId, allowed });
+
+        if (insertError) {
+          console.error('Error inserting level permission:', insertError);
+          return false;
+        }
+      }
+
+      // Update local state
+      setLevelPermissions(prev => ({
+        ...prev,
+        [level]: {
+          ...prev[level],
+          [permissionId]: allowed
+        }
+      }));
+      return true;
     } catch (error) {
       console.error('Error setting level permission:', error);
       return false;
