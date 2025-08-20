@@ -604,20 +604,14 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
 
           if (substitutions.length === 0) {
             result = { 
-              success: true, 
-              result: { 
-                details: { date: dateStr, teacher: teacherName, substitutions: [] }, 
-                message: `Keine Stunden für ${teacherName} am ${dateStr} gefunden. Bitte überprüfen Sie den Namen und das Datum.` 
-              } 
+              details: { date: dateStr, teacher: teacherName, substitutions: [] }, 
+              message: `Keine Stunden für ${teacherName} am ${dateStr} gefunden. Bitte überprüfen Sie den Namen und das Datum.` 
             };
           } else {
             const dayName = new Date(dateStr + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long' });
             result = { 
-              success: true, 
-              result: { 
-                details: { date: dateStr, teacher: teacherName, substitutions }, 
-                message: `Vertretungsplan für ${teacherName} am ${dayName} (${dateStr}) erstellt. ${substitutions.length} Stunde(n) betroffen.` 
-              } 
+              details: { date: dateStr, teacher: teacherName, substitutions }, 
+              message: `Vertretungsplan für ${teacherName} am ${dayName} (${dateStr}) erstellt. ${substitutions.length} Stunde(n) betroffen.` 
             };
           }
           success = true;
@@ -656,7 +650,7 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
           const { error: insErr } = await supabase.from('vertretungsplan').insert(rows);
           if (insErr) throw insErr;
 
-          result = { success: true, result: { message: 'Vertretungsplan gespeichert', count: rows.length } };
+          result = { message: 'Vertretungsplan gespeichert', count: rows.length };
           success = true;
         } catch (e: any) {
           console.error('confirm_substitution error:', e);
