@@ -491,6 +491,21 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
                   }
                   break;
                 }
+                case 'get_class_substitutions_week': {
+                  const htmlTable = res.htmlTable as string | undefined;
+                  if (htmlTable) {
+                    details = `\n\n<div style="overflow-x:auto;">${htmlTable}</div>`;
+                  } else {
+                    const subs = (res.substitutions || []) as Array<any>;
+                    if (subs.length) {
+                      const lines = subs.map((s: any) => `${s.date} - ${s.period}. Stunde: ${s.original_subject} → ${s.substitute_teacher || 'Entfall'}`).join('\n');
+                      details = `\n\nVertretungen:\n${lines}`;
+                    } else {
+                      details = `\n\nKeine Vertretungen für diese Woche gefunden.`;
+                    }
+                  }
+                  break;
+                }
                 case 'get_class_next_subjects_all': {
                   const htmlTable = res.htmlTable as string | undefined;
                   if (htmlTable) {
