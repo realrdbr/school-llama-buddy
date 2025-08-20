@@ -104,11 +104,11 @@ export const useSessionStorage = () => {
         // Detect real page reload/back-forward using Navigation Timing API
         const navigationEntries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
         const navType = navigationEntries.length > 0 ? navigationEntries[0].type : 'navigate';
-        
-        console.log('Session Storage: Current path:', currentPath, 'Navigation type:', navType);
+        const legacyNav = (performance as any).navigation?.type;
+        console.log('Session Storage: Current path:', currentPath, 'Navigation type:', navType, 'Legacy:', legacyNav);
         
         // Auto-redirect on real reloads to last visited route (not back/forward or SPA navigations)
-        if (navType === 'reload') {
+        if (navType === 'reload' || legacyNav === 1) {
           const lastRoute = await loadLastRoute();
           console.log('Session Storage: Last route:', lastRoute);
           
@@ -145,6 +145,10 @@ export const useSessionStorage = () => {
     
     // Don't save auth routes
     if (currentPath !== '/auth' && currentPath !== '/login') {
+      // Don't persist the root route as last route to avoid starting on Home unintentionally
+      if (currentPath === '/') {
+        return;
+      }
       // Skip one save right after a restoration redirect
       if (hasRestoredFromReload) {
         setHasRestoredFromReload(false);
