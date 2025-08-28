@@ -94,6 +94,14 @@ export const useSessionStorage = () => {
 
       const currentPath = location.pathname;
       
+      // Skip restoration if this is a fresh login
+      const isFreshLogin = localStorage.getItem('fresh_login') === 'true';
+      if (isFreshLogin) {
+        localStorage.removeItem('fresh_login');
+        setIsInitialized(true);
+        return;
+      }
+      
       // Don't restore route if we're on auth page
       if (currentPath === '/auth' || currentPath === '/login') {
         setIsInitialized(true);

@@ -99,9 +99,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       // Store login data in localStorage for persistence
       localStorage.setItem('school_profile', JSON.stringify(profileData));
+      localStorage.setItem('fresh_login', 'true');
       
-      // Clear any stored last route to ensure fresh start
+      // Clear any stored last route from all sources to ensure fresh start
       localStorage.removeItem('eduard_last_route');
+      document.cookie = 'eduard_last_route=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      
+      // Clear from database
+      if (profileData.id) {
+        await supabase
+          .from('user_sessions')
+          .delete()
+          .eq('user_id', profileData.id);
+      }
       
       setLoading(false);
       return { 
