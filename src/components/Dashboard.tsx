@@ -164,7 +164,7 @@ const Dashboard = () => {
                 </div>
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
-                {profile?.permission_lvl && profile.permission_lvl >= 10 && (
+                {hasPermission('user_management') && (
                   <Button variant="outline" size="sm" onClick={() => setShowCreateUser(true)} className="flex-1 sm:flex-none text-xs sm:text-sm">
                     <UserPlus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                     <span className="hidden sm:inline">Benutzer erstellen</span>
@@ -207,30 +207,30 @@ const Dashboard = () => {
           <AIAssistant />
           
           {/* Admin Features */}
-          {profile?.permission_lvl && profile.permission_lvl >= 8 && (
+          {getFilteredFeatures(adminFeaturesWithPermissions).length > 0 && (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-foreground">
-                {profile.permission_lvl >= 10 ? "Schulleitung" : "Verwaltung"}
+                {profile?.permission_lvl && profile.permission_lvl >= 10 ? "Schulleitung" : "Verwaltung"}
               </h2>
               {renderFeatureCards(adminFeaturesWithPermissions)}
             </div>
           )}
 
           {/* Teacher Features */}
-          {profile?.permission_lvl && profile.permission_lvl >= 5 && (
+          {getFilteredFeatures(teacherFeaturesWithPermissions).length > 0 && (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-foreground">
-                {profile.permission_lvl >= 8 ? "Lehrkraft-Funktionen" : "Ihre Funktionen"}
+                {profile?.permission_lvl && profile.permission_lvl >= 8 ? "Lehrkraft-Funktionen" : "Ihre Funktionen"}
               </h2>
               {renderFeatureCards(teacherFeaturesWithPermissions)}
             </div>
           )}
 
           {/* Student/Visitor Features */}
-          {profile?.permission_lvl && profile.permission_lvl >= 1 && (
+          {getFilteredFeatures(studentFeaturesWithPermissions).length > 0 && (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-foreground">
-                {profile.permission_lvl >= 5 ? "Schüler-Funktionen" : profile.permission_lvl > 1 ? "Ihre Funktionen" : "Verfügbare Funktionen"}
+                {profile?.permission_lvl && profile.permission_lvl >= 5 ? "Schüler-Funktionen" : profile?.permission_lvl && profile.permission_lvl > 1 ? "Ihre Funktionen" : "Verfügbare Funktionen"}
               </h2>
               {renderFeatureCards(studentFeaturesWithPermissions)}
             </div>

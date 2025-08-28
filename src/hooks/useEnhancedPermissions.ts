@@ -107,10 +107,7 @@ export const useEnhancedPermissions = () => {
     const userId = profile.id;
     const userLevel = profile.permission_lvl;
 
-    // Admins (level 10+) have full access
-    if (userLevel >= 10) return true;
-
-    // Check user-specific permission first
+    // Check user-specific permission first (highest priority)
     const userSpecific = userPermissions[userId]?.[permissionId];
     if (userSpecific !== undefined) return userSpecific;
 
@@ -138,28 +135,17 @@ export const useEnhancedPermissions = () => {
     if (!canManagePermissions()) return false;
 
     try {
-      // Try update first to avoid duplicates when no unique constraint exists
-      const { data: updateData, error: updateError } = await supabase
+      // Use native PostgreSQL UPSERT with ON CONFLICT
+      const { error } = await supabase
         .from('user_permissions')
-        .update({ allowed, updated_at: new Date().toISOString() })
-        .eq('user_id', userId)
-        .eq('permission_id', permissionId)
-        .select();
+        .upsert(
+          { user_id: userId, permission_id: permissionId, allowed, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id,permission_id' }
+        );
 
-      if (updateError) {
-        console.error('Error updating user permission, will try insert:', updateError);
-      }
-
-      // If nothing was updated, insert
-      if (!updateData || updateData.length === 0) {
-        const { error: insertError } = await supabase
-          .from('user_permissions')
-          .insert({ user_id: userId, permission_id: permissionId, allowed });
-
-        if (insertError) {
-          console.error('Error inserting user permission:', insertError);
-          return false;
-        }
+      if (error) {
+        console.error('Error upserting user permission:', error);
+        return false;
       }
 
       // Update local state
@@ -182,28 +168,17 @@ export const useEnhancedPermissions = () => {
     if (!canManagePermissions()) return false;
 
     try {
-      // Try update first
-      const { data: updateData, error: updateError } = await supabase
+      // Use native PostgreSQL UPSERT with ON CONFLICT
+      const { error } = await supabase
         .from('level_permissions')
-        .update({ allowed, updated_at: new Date().toISOString() })
-        .eq('level', level)
-        .eq('permission_id', permissionId)
-        .select();
+        .upsert(
+          { level, permission_id: permissionId, allowed, updated_at: new Date().toISOString() },
+          { onConflict: 'level,permission_id' }
+        );
 
-      if (updateError) {
-        console.error('Error updating level permission, will try insert:', updateError);
-      }
-
-      // If nothing was updated, insert
-      if (!updateData || updateData.length === 0) {
-        const { error: insertError } = await supabase
-          .from('level_permissions')
-          .insert({ level, permission_id: permissionId, allowed });
-
-        if (insertError) {
-          console.error('Error inserting level permission:', insertError);
-          return false;
-        }
+      if (error) {
+        console.error('Error upserting level permission:', error);
+        return false;
       }
 
       // Update local state
