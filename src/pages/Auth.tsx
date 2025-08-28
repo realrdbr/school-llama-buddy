@@ -25,7 +25,9 @@ const Auth = () => {
       if (profile?.must_change_password) {
         setShowChangePassword(true);
       } else {
-        navigate('/');
+        // Clear any stored route before redirecting to home
+        localStorage.removeItem('eduard_last_route');
+        navigate('/', { replace: true });
       }
     }
   }, [user, loading, profile, navigate]);
@@ -69,7 +71,9 @@ const Auth = () => {
           title: "Erfolgreich angemeldet",
           description: "Willkommen zurück!"
         });
-        navigate('/');
+        // Clear any stored route before redirecting to home
+        localStorage.removeItem('eduard_last_route');
+        navigate('/', { replace: true });
       }
     }
     setIsLoading(false);
@@ -77,7 +81,9 @@ const Auth = () => {
 
   const handlePasswordChanged = () => {
     setShowChangePassword(false);
-    navigate('/');
+    // Clear any stored route before redirecting to home
+    localStorage.removeItem('eduard_last_route');
+    navigate('/', { replace: true });
   };
 
   if (loading) {

@@ -100,6 +100,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Store login data in localStorage for persistence
       localStorage.setItem('school_profile', JSON.stringify(profileData));
       
+      // Clear any stored last route to ensure fresh start
+      localStorage.removeItem('eduard_last_route');
+      
       setLoading(false);
       return { 
         error: null, 
