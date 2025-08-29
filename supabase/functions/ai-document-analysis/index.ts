@@ -19,8 +19,8 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Call local Ollama API for document analysis
-    const analysisResponse = await fetch('http://localhost:11434/api/chat', {
+    // Call Ollama API for document analysis
+    const analysisResponse = await fetch('http://79.243.42.245:11434/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -47,8 +47,8 @@ serve(async (req) => {
     // Get document content for context
     const documentContext = document.analysis_result?.full_analysis || document.content_summary || 'Keine Analyse verfügbar'
 
-    // Call local Ollama API for Q&A
-    const qaResponse = await fetch('http://localhost:11434/api/chat', {
+    // Call Ollama API for Q&A
+    const qaResponse = await fetch('http://79.243.42.245:11434/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
