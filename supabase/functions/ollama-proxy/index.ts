@@ -32,39 +32,64 @@ serve(async (req) => {
     }
 
     // Forward request to Ollama instance
-    // Try new public IP first, then fallback to local endpoints for development
-    const ollamaUrls = [
-      'http://79.243.42.245:11434/api/generate',
-      'http://host.docker.internal:11434/api/generate',
-      'http://localhost:11434/api/generate',
-      'http://127.0.0.1:11434/api/generate'
+    // Prefer /api/generate, but gracefully fallback to /api/chat if /generate is unavailable (404)
+    const baseUrls = [
+      'http://79.243.42.245:11434',
+      'http://host.docker.internal:11434',
+      'http://localhost:11434',
+      'http://127.0.0.1:11434'
     ];
     
-    let ollamaResponse;
-    let lastError;
+    let ollamaResponse: Response | null = null;
+    let lastError: any;
+    let connected = false;
     
-    for (const url of ollamaUrls) {
-      try {
-        console.log(`Trying Ollama at: ${url}`);
-        ollamaResponse = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload)
-        });
-
-        if (ollamaResponse.ok) {
-          console.log(`Successfully connected to Ollama at: ${url}`);
-          break;
-        } else {
-          throw new Error(`Ollama API error: ${ollamaResponse.status}`);
+    for (const base of baseUrls) {
+      const endpoints = ['/api/generate', '/api/chat'];
+      for (const endpoint of endpoints) {
+        try {
+          const url = `${base}${endpoint}`;
+          console.log(`Trying Ollama at: ${url}`);
+          
+          // Choose appropriate body for endpoint
+          const body = endpoint.endsWith('/api/generate')
+            ? payload
+            : (requestBody && Array.isArray(requestBody.messages)
+                ? {
+                    model: requestBody.model,
+                    messages: requestBody.messages,
+                    stream: !!requestBody.stream,
+                    options: requestBody.options || undefined,
+                  }
+                : {
+                    model: requestBody.model,
+                    messages: [{ role: 'user', content: payload?.prompt || requestBody?.prompt || '' }],
+                    stream: !!requestBody.stream,
+                    options: requestBody.options || undefined,
+                  }
+              );
+    
+          ollamaResponse = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+    
+          if (ollamaResponse.ok) {
+            console.log(`Successfully connected to Ollama at: ${url}`);
+            connected = true;
+            break;
+          } else {
+            throw new Error(`Ollama API error: ${ollamaResponse.status}`);
+          }
+        } catch (error) {
+          console.error(`Failed to connect to ${base}${endpoint}:`, (error as any).message || error);
+          lastError = error;
+          ollamaResponse = null;
+          continue;
         }
-      } catch (error) {
-        console.error(`Failed to connect to ${url}:`, error.message);
-        lastError = error;
-        ollamaResponse = null;
       }
+      if (connected) break;
     }
 
     if (!ollamaResponse) {
