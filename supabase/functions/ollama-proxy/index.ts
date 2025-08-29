@@ -15,13 +15,29 @@ serve(async (req) => {
   try {
     const requestBody = await req.json()
 
+    // Normalize payload: convert chat-style messages to generate prompt if necessary
+    let payload: any = requestBody;
+    if (requestBody && Array.isArray(requestBody.messages)) {
+      const prompt = requestBody.messages.map((m: any) => {
+        const role = m.role || 'user'
+        const prefix = role === 'system' ? 'System' : role === 'assistant' ? 'Assistant' : 'User'
+        return `${prefix}: ${m.content}`
+      }).join('\n\n')
+      payload = {
+        model: requestBody.model,
+        prompt,
+        stream: !!requestBody.stream,
+        options: requestBody.options || undefined,
+      }
+    }
+
     // Forward request to Ollama instance
     // Try new public IP first, then fallback to local endpoints for development
     const ollamaUrls = [
-      'http://79.243.42.245:11434/api/chat',
-      'http://host.docker.internal:11434/api/chat',
-      'http://localhost:11434/api/chat',
-      'http://127.0.0.1:11434/api/chat'
+      'http://79.243.42.245:11434/api/generate',
+      'http://host.docker.internal:11434/api/generate',
+      'http://localhost:11434/api/generate',
+      'http://127.0.0.1:11434/api/generate'
     ];
     
     let ollamaResponse;
@@ -35,7 +51,7 @@ serve(async (req) => {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(requestBody)
+          body: JSON.stringify(payload)
         });
 
         if (ollamaResponse.ok) {
@@ -57,8 +73,13 @@ serve(async (req) => {
 
     const responseData = await ollamaResponse.json()
 
+    // Normalize to chat-like shape for frontend compatibility
+    const normalized = responseData?.message?.content
+      ? responseData
+      : { ...responseData, message: { role: 'assistant', content: responseData?.response || '' } }
+
     return new Response(
-      JSON.stringify(responseData),
+      JSON.stringify(normalized),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200

@@ -19,24 +19,24 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Call Ollama API for document analysis
-    const analysisResponse = await fetch('http://79.243.42.245:11434/api/chat', {
+    // Call Ollama API (generate endpoint) for document analysis
+    const prompt = `Du bist ein KI-Assistent, der Schuldokumente analysiert. Analysiere das Dokument und extrahiere wichtige Informationen wie Fach, Klassenstufe, Themen und erstelle eine Zusammenfassung.
+
+Dokument: ${fileName}
+
+Inhalt:
+${fileContent}
+
+Gib eine strukturierte Analyse mit den Feldern: Fach, Klassenstufe, Themen (Liste), Zusammenfassung.`;
+
+    const analysisResponse = await fetch('http://79.243.42.245:11434/api/generate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: 'llama3.1:8b',
-        messages: [
-          {
-            role: 'system',
-            content: 'Du bist ein KI-Assistent, der Schuldokumente analysiert. Analysiere das Dokument und extrahiere wichtige Informationen wie Fach, Klassenstufe, Themen und erstelle eine Zusammenfassung.'
-          },
-          {
-            role: 'user',
-            content: `Analysiere bitte dieses Dokument: ${fileName}\n\nInhalt:\n${fileContent}\n\nErstelle eine strukturierte Analyse mit Fach, Klassenstufe, Themen und Zusammenfassung.`
-          }
-        ],
+        prompt,
         stream: false
       })
     })
@@ -46,7 +46,7 @@ serve(async (req) => {
     }
 
     const analysisData = await analysisResponse.json()
-    const analysisResult = analysisData.message?.content || 'Analyse nicht verfügbar'
+    const analysisResult = analysisData.response || analysisData.message?.content || 'Analyse nicht verfügbar'
 
     // Extract structured information (basic parsing)
     const extractSubject = (text: string) => {

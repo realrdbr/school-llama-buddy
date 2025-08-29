@@ -47,18 +47,8 @@ serve(async (req) => {
     // Get document content for context
     const documentContext = document.analysis_result?.full_analysis || document.content_summary || 'Keine Analyse verfügbar'
 
-    // Call Ollama API for Q&A
-    const qaResponse = await fetch('http://79.243.42.245:11434/api/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama3.1:8b',
-        messages: [
-          {
-            role: 'system',
-            content: `Du bist ein KI-Assistent, der Fragen zu hochgeladenen Dokumenten beantwortet. Du hast Zugang zu einer Analyse des Dokuments "${document.file_name}".
+    // Call Ollama API for Q&A using generate endpoint
+    const prompt = `Du bist ein KI-Assistent, der Fragen zu hochgeladenen Dokumenten beantwortet. Du hast Zugang zu einer Analyse des Dokuments "${document.file_name}".
 
 Dokument-Informationen:
 - Dateiname: ${document.file_name}
@@ -69,13 +59,19 @@ Dokument-Informationen:
 Dokumenteninhalt/Analyse:
 ${documentContext}
 
-Beantworte die Frage des Benutzers basierend auf diesem Dokument. Wenn es sich um mathematische Aufgaben handelt, löse sie Schritt für Schritt. Bei anderen Fächern gib detaillierte, hilfreiche Antworten.`
-          },
-          {
-            role: 'user',
-            content: question
-          }
-        ],
+Beantworte die Frage des Benutzers basierend auf diesem Dokument. Wenn es sich um mathematische Aufgaben handelt, löse sie Schritt für Schritt. Bei anderen Fächern gib detaillierte, hilfreiche Antworten.
+
+Frage des Benutzers:
+${question}`;
+
+    const qaResponse = await fetch('http://79.243.42.245:11434/api/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama3.1:8b',
+        prompt,
         stream: false
       })
     })
@@ -85,7 +81,7 @@ Beantworte die Frage des Benutzers basierend auf diesem Dokument. Wenn es sich u
     }
 
     const qaData = await qaResponse.json()
-    const answer = qaData.message?.content || 'Antwort nicht verfügbar'
+    const answer = qaData.response || qaData.message?.content || 'Antwort nicht verfügbar'
 
     // Log the Q&A interaction (optional - you could create a qa_interactions table)
     const { error: logError } = await supabase
