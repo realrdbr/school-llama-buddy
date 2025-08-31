@@ -8,6 +8,14 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    cors: {
+      origin: [
+        "https://gymolb.eduard.services",
+        "https://*.eduard.services",
+        /^https:\/\/.*\.eduard\.services$/
+      ],
+      credentials: true
+    }
   },
   plugins: [
     react(),
