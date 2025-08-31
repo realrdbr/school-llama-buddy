@@ -32,27 +32,26 @@ serve(async (req) => {
     }
 
     // Forward request to Ollama instance
-    // Try endpoints in priority order: gymolb.eduard.services, then direct IPs
-    const baseUrls = [
-      'https://gymolb.eduard.services/ollama',
-      'http://79.243.42.245:11434',
-      'https://gymolb.eduard.services/ollama_fallback',
-      'http://79.243.42.245:11435'
+    // Try endpoints in priority order as specified
+    const endpoints = [
+      { url: 'https://gymolb.eduard.services/ollama', paths: ['/api/generate', '/api/chat'] },
+      { url: 'http://79.243.42.245:11434', paths: ['/api/chat'] },
+      { url: 'https://gymolb.eduard.services/ollama_fallback', paths: ['/api/generate', '/api/chat'] },
+      { url: 'http://79.243.42.245:11435', paths: ['/api/chat'] }
     ];
     
     let ollamaResponse: Response | null = null;
     let lastError: any;
     let connected = false;
     
-    for (const base of baseUrls) {
-      const endpoints = ['/api/generate', '/api/chat'];
-      for (const endpoint of endpoints) {
+    for (const endpoint of endpoints) {
+      for (const path of endpoint.paths) {
         try {
-          const url = `${base}${endpoint}`;
+          const url = `${endpoint.url}${path}`;
           console.log(`Trying Ollama at: ${url}`);
           
           // Choose appropriate body for endpoint
-          const body = endpoint.endsWith('/api/generate')
+          const body = path.endsWith('/api/generate')
             ? payload
             : (requestBody && Array.isArray(requestBody.messages)
                 ? {
@@ -83,7 +82,7 @@ serve(async (req) => {
             throw new Error(`Ollama API error: ${ollamaResponse.status}`);
           }
         } catch (error) {
-          console.error(`Failed to connect to ${base}${endpoint}:`, (error as any).message || error);
+          console.error(`Failed to connect to ${endpoint.url}${path}:`, (error as any).message || error);
           lastError = error;
           ollamaResponse = null;
           continue;
