@@ -23,12 +23,12 @@ const Hausaufgaben = () => {
     setQuestion('');
 
     try {
-      // TODO: Implement API call to llama3.1:8b
+      // TODO: Implement API call to Redbear/e.d.u.a.r.d.
       // For now, show a placeholder response
       setTimeout(() => {
         const assistantResponse = {
           role: 'assistant' as const,
-          content: 'Ich helfe gerne bei Ihren Hausaufgaben! Diese Funktion wird bald mit dem llama3.1:8b Modell implementiert.'
+          content: 'Ich helfe gerne bei Ihren Hausaufgaben! Diese Funktion wird bald mit dem Redbear/e.d.u.a.r.d. Modell implementiert.'
         };
         setConversation(prev => [...prev, assistantResponse]);
         setIsLoading(false);
@@ -62,7 +62,7 @@ const Hausaufgaben = () => {
             </Button>
             <div>
               <h1 className="text-2xl font-bold text-foreground">Hausaufgaben-Assistent</h1>
-              <p className="text-muted-foreground">KI-gestützte Lernhilfe mit llama3.1:8b</p>
+              <p className="text-muted-foreground">KI-gestützte Lernhilfe mit Redbear/e.d.u.a.r.d.</p>
             </div>
           </div>
         </div>

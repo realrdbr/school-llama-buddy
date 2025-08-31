@@ -267,7 +267,7 @@ const AIChat = () => {
       // Use Supabase Edge Function as proxy to avoid CORS issues
       const { data: responseData, error: proxyError } = await supabase.functions.invoke('ollama-proxy', {
         body: {
-          model: 'llama3.1:8b',
+          model: 'Redbear/e.d.u.a.r.d.',
           messages: [
             {
               role: 'system',
@@ -582,7 +582,7 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
       console.error('Ollama error:', error);
       toast({
         title: "Fehler",
-        description: "Ollama-Server nicht erreichbar. Stellen Sie sicher, dass Ollama läuft und das Modell 'llama3.1:8b' installiert ist.",
+        description: "Ollama-Server nicht erreichbar. Stellen Sie sicher, dass Ollama läuft und das Modell 'Redbear/e.d.u.a.r.d.' installiert ist.",
         variant: "destructive"
       });
     } finally {

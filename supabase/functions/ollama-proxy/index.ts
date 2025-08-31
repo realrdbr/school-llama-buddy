@@ -116,7 +116,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         error: error.message || 'Internal server error',
-        details: 'Stelle sicher, dass Ollama auf 127.0.0.1:11434 läuft und das Modell llama3.1:8b installiert ist.'
+        details: 'Stelle sicher, dass Ollama auf 127.0.0.1:11434 läuft und das Modell Redbear/e.d.u.a.r.d. installiert ist.'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

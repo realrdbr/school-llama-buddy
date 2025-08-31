@@ -70,7 +70,7 @@ ${question}`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama3.1:8b',
+        model: 'Redbear/e.d.u.a.r.d.',
         prompt,
         stream: false
       })
