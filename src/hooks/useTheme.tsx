@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,6 +17,12 @@ interface ThemeColors {
   border: string;
   card: string;
   'card-foreground': string;
+  destructive: string;
+  'destructive-foreground': string;
+  popover: string;
+  'popover-foreground': string;
+  input: string;
+  ring: string;
 }
 
 interface Theme {
@@ -39,7 +46,7 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-// Preset themes
+// Preset themes with complete color definitions
 const presetThemes: Theme[] = [
   {
     name: 'White Mode',
@@ -56,7 +63,13 @@ const presetThemes: Theme[] = [
       'muted-foreground': '215.4 16.3% 46.9%',
       border: '214.3 31.8% 91.4%',
       card: '0 0% 100%',
-      'card-foreground': '222.2 84% 4.9%'
+      'card-foreground': '222.2 84% 4.9%',
+      destructive: '0 84.2% 60.2%',
+      'destructive-foreground': '210 40% 98%',
+      popover: '0 0% 100%',
+      'popover-foreground': '222.2 84% 4.9%',
+      input: '214.3 31.8% 91.4%',
+      ring: '222.2 84% 4.9%'
     },
     is_preset: true
   },
@@ -75,12 +88,18 @@ const presetThemes: Theme[] = [
       'muted-foreground': '215 20.2% 65.1%',
       border: '217.2 32.6% 17.5%',
       card: '222.2 84% 4.9%',
-      'card-foreground': '210 40% 98%'
+      'card-foreground': '210 40% 98%',
+      destructive: '0 62.8% 30.6%',
+      'destructive-foreground': '210 40% 98%',
+      popover: '222.2 84% 4.9%',
+      'popover-foreground': '210 40% 98%',
+      input: '217.2 32.6% 17.5%',
+      ring: '212.7 26.8% 83.9%'
     },
     is_preset: true
   },
   {
-    name: 'Cyan Accent',
+    name: 'Gymolb Accent',
     colors: {
       background: '0 0% 100%',
       foreground: '222.2 84% 4.9%',
@@ -94,14 +113,20 @@ const presetThemes: Theme[] = [
       'muted-foreground': '215.4 16.3% 46.9%',
       border: '214.3 31.8% 91.4%',
       card: '0 0% 100%',
-      'card-foreground': '222.2 84% 4.9%'
+      'card-foreground': '222.2 84% 4.9%',
+      destructive: '0 84.2% 60.2%',
+      'destructive-foreground': '210 40% 98%',
+      popover: '0 0% 100%',
+      'popover-foreground': '222.2 84% 4.9%',
+      input: '214.3 31.8% 91.4%',
+      ring: '188 100% 33%'
     },
     is_preset: true
   }
 ];
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentTheme, setCurrentTheme] = useState<Theme | null>(presetThemes[0]); // Default to White Mode
+  const [currentTheme, setCurrentTheme] = useState<Theme | null>(presetThemes[0]);
   const [userThemes, setUserThemes] = useState<Theme[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
@@ -109,9 +134,43 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Apply theme colors to CSS variables
   const applyTheme = (theme: Theme) => {
     const root = document.documentElement;
+    
+    // Apply all theme colors as CSS custom properties
     Object.entries(theme.colors).forEach(([key, value]) => {
       root.style.setProperty(`--${key}`, value);
     });
+    
+    // Also set sidebar colors based on theme
+    if (theme.name === 'Dark Mode') {
+      root.style.setProperty('--sidebar-background', '240 5.9% 10%');
+      root.style.setProperty('--sidebar-foreground', '240 4.8% 95.9%');
+      root.style.setProperty('--sidebar-primary', '224.3 76.3% 48%');
+      root.style.setProperty('--sidebar-primary-foreground', '0 0% 100%');
+      root.style.setProperty('--sidebar-accent', '240 3.7% 15.9%');
+      root.style.setProperty('--sidebar-accent-foreground', '240 4.8% 95.9%');
+      root.style.setProperty('--sidebar-border', '240 3.7% 15.9%');
+      root.style.setProperty('--sidebar-ring', '217.2 91.2% 59.8%');
+    } else if (theme.name === 'Gymolb Accent') {
+      root.style.setProperty('--sidebar-background', '0 0% 98%');
+      root.style.setProperty('--sidebar-foreground', '240 5.3% 26.1%');
+      root.style.setProperty('--sidebar-primary', '188 100% 33%');
+      root.style.setProperty('--sidebar-primary-foreground', '0 0% 98%');
+      root.style.setProperty('--sidebar-accent', '188 95% 90%');
+      root.style.setProperty('--sidebar-accent-foreground', '188 100% 33%');
+      root.style.setProperty('--sidebar-border', '220 13% 91%');
+      root.style.setProperty('--sidebar-ring', '188 100% 33%');
+    } else {
+      // Default light mode sidebar
+      root.style.setProperty('--sidebar-background', '0 0% 98%');
+      root.style.setProperty('--sidebar-foreground', '240 5.3% 26.1%');
+      root.style.setProperty('--sidebar-primary', '240 5.9% 10%');
+      root.style.setProperty('--sidebar-primary-foreground', '0 0% 98%');
+      root.style.setProperty('--sidebar-accent', '240 4.8% 95.9%');
+      root.style.setProperty('--sidebar-accent-foreground', '240 5.9% 10%');
+      root.style.setProperty('--sidebar-border', '220 13% 91%');
+      root.style.setProperty('--sidebar-ring', '217.2 91.2% 59.8%');
+    }
+    
     setCurrentTheme(theme);
   };
 
@@ -141,12 +200,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       setUserThemes(themes);
 
-      // Find active theme or use default
       const activeTheme = themes.find(theme => theme.is_active);
       if (activeTheme) {
         applyTheme(activeTheme);
       } else {
-        // Set default White Mode theme as active
         await setTheme(presetThemes[0]);
       }
     } catch (error) {
@@ -156,12 +213,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Set theme as active
   const setTheme = async (theme: Theme) => {
     if (!user) return;
 
     try {
-      // Deactivate all current themes
       await supabase
         .from('user_themes')
         .update({ is_active: false })
@@ -169,7 +224,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       let themeId = theme.id;
 
-      // If it's a preset, create a copy for the user
       if (theme.is_preset || !theme.id) {
         const { data, error } = await supabase
           .from('user_themes')
@@ -186,7 +240,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (error) throw error;
         themeId = data.id;
       } else {
-        // Activate existing theme
         await supabase
           .from('user_themes')
           .update({ is_active: true })
@@ -200,12 +253,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Create new custom theme
   const createTheme = async (name: string, colors: ThemeColors) => {
     if (!user) return;
 
     try {
-      // Deactivate all current themes
       await supabase
         .from('user_themes')
         .update({ is_active: false })
@@ -232,7 +283,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Update existing theme
   const updateTheme = async (themeId: string, colors: ThemeColors) => {
     if (!user) return;
 
@@ -254,7 +304,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Delete theme
   const deleteTheme = async (themeId: string) => {
     if (!user) return;
 
@@ -267,7 +316,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       if (error) throw error;
 
-      // If deleted theme was active, switch to default
       if (currentTheme?.id === themeId) {
         await setTheme(presetThemes[0]);
       }
@@ -281,7 +329,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (user) {
       loadUserThemes();
     } else {
-      // Apply default theme for non-authenticated users
       applyTheme(presetThemes[0]);
       setLoading(false);
     }
