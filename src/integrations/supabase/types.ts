@@ -446,6 +446,47 @@ export type Database = {
           },
         ]
       }
+      user_themes: {
+        Row: {
+          colors: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          is_preset: boolean
+          name: string
+          updated_at: string
+          user_id: number
+        }
+        Insert: {
+          colors?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_preset?: boolean
+          name?: string
+          updated_at?: string
+          user_id: number
+        }
+        Update: {
+          colors?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_preset?: boolean
+          name?: string
+          updated_at?: string
+          user_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_themes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "permissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vertretungsplan: {
         Row: {
           class_name: string

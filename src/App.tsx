@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import { ThemeProvider } from "@/hooks/useTheme";
 import { useSessionStorage } from "@/hooks/useSessionStorage";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
@@ -20,6 +21,7 @@ import AIChat from "./pages/AIChat";
 import Keycard from "./pages/Keycard";
 import Settings from "./pages/Settings";
 import Permissions from "./pages/Permissions";
+import ThemeSettings from "./pages/ThemeSettings";
 
 const queryClient = new QueryClient();
 
@@ -132,6 +134,11 @@ const SessionAwareApp = () => {
         } 
       />
       
+      <Route 
+        path="/theme-settings" 
+        element={<ThemeSettings />} 
+      />
+      
       {/* Legacy route alias */}
       <Route 
         path="/tts" 
@@ -151,13 +158,15 @@ const SessionAwareApp = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <SessionAwareApp />
-        </BrowserRouter>
-      </TooltipProvider>
+      <ThemeProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <SessionAwareApp />
+          </BrowserRouter>
+        </TooltipProvider>
+      </ThemeProvider>
     </AuthProvider>
   </QueryClientProvider>
 );
