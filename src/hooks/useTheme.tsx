@@ -129,7 +129,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [currentTheme, setCurrentTheme] = useState<Theme | null>(presetThemes[0]);
   const [userThemes, setUserThemes] = useState<Theme[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   // Apply theme colors to CSS variables
   const applyTheme = (theme: Theme) => {
@@ -176,7 +176,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Load user themes from database
   const loadUserThemes = async () => {
-    if (!user) {
+    if (!profile) {
       setLoading(false);
       return;
     }
@@ -185,7 +185,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const { data, error } = await supabase
         .from('user_themes')
         .select('*')
-        .eq('user_id', Number(user.id))
+        .eq('user_id', profile.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -214,39 +214,54 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const setTheme = async (theme: Theme) => {
-    if (!user) return;
+    // Always apply visually
+    applyTheme(theme);
+
+    if (!profile) {
+      return;
+    }
 
     try {
+      // Deactivate all user's themes
       await supabase
         .from('user_themes')
         .update({ is_active: false })
-        .eq('user_id', Number(user.id));
+        .eq('user_id', profile.id);
 
-      let themeId = theme.id;
-
-      if (theme.is_preset || !theme.id) {
-        const { data, error } = await supabase
-          .from('user_themes')
-          .insert({
-            user_id: Number(user.id),
-            name: theme.name,
-            colors: theme.colors as any,
-            is_preset: false,
-            is_active: true
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-        themeId = data.id;
-      } else {
+      if (theme.id) {
         await supabase
           .from('user_themes')
-          .update({ is_active: true })
-          .eq('id', theme.id);
+          .update({ is_active: true, colors: theme.colors as any })
+          .eq('id', theme.id)
+          .eq('user_id', profile.id);
+      } else {
+        // Handle presets or unsaved themes: try update existing by name, else insert
+        const { data: existing } = await supabase
+          .from('user_themes')
+          .select('id')
+          .eq('user_id', profile.id)
+          .eq('name', theme.name)
+          .maybeSingle();
+
+        if (existing?.id) {
+          await supabase
+            .from('user_themes')
+            .update({ colors: theme.colors as any, is_active: true })
+            .eq('id', existing.id)
+            .eq('user_id', profile.id);
+        } else {
+          await supabase
+            .from('user_themes')
+            .insert({
+              user_id: profile.id,
+              name: theme.name,
+              colors: theme.colors as any,
+              is_preset: false,
+              is_active: true
+            });
+        }
       }
 
-      applyTheme(theme);
       await loadUserThemes();
     } catch (error) {
       console.error('Error setting theme:', error);
@@ -254,18 +269,21 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const createTheme = async (name: string, colors: ThemeColors) => {
-    if (!user) return;
+    // Apply immediately for visual feedback
+    applyTheme({ name, colors });
+
+    if (!profile) return;
 
     try {
       await supabase
         .from('user_themes')
         .update({ is_active: false })
-        .eq('user_id', Number(user.id));
+        .eq('user_id', profile.id);
 
       const { data, error } = await supabase
         .from('user_themes')
         .insert({
-          user_id: Number(user.id),
+          user_id: profile.id,
           name,
           colors: colors as any,
           is_preset: false,
@@ -284,14 +302,14 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const updateTheme = async (themeId: string, colors: ThemeColors) => {
-    if (!user) return;
+    if (!profile) return;
 
     try {
       const { error } = await supabase
         .from('user_themes')
         .update({ colors: colors as any })
         .eq('id', themeId)
-        .eq('user_id', Number(user.id));
+        .eq('user_id', profile.id);
 
       if (error) throw error;
 
@@ -305,14 +323,14 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const deleteTheme = async (themeId: string) => {
-    if (!user) return;
+    if (!profile) return;
 
     try {
       const { error } = await supabase
         .from('user_themes')
         .delete()
         .eq('id', themeId)
-        .eq('user_id', Number(user.id));
+        .eq('user_id', profile.id);
 
       if (error) throw error;
 
@@ -326,13 +344,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   useEffect(() => {
-    if (user) {
+    if (profile) {
       loadUserThemes();
     } else {
       applyTheme(presetThemes[0]);
       setLoading(false);
     }
-  }, [user]);
+  }, [profile]);
 
   return (
     <ThemeContext.Provider value={{
