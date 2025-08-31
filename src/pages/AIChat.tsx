@@ -582,7 +582,7 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
       console.error('Ollama error:', error);
       toast({
         title: "Fehler",
-        description: "Ollama-Server nicht erreichbar. Stellen Sie sicher, dass Ollama läuft und das Modell 'Redbear/e.d.u.a.r.d.' installiert ist.",
+        description: "Der Server ist gerade nicht erreichbar. Bitte versuchen Sie es später erneut.",
         variant: "destructive"
       });
     } finally {
