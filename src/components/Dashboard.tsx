@@ -17,7 +17,8 @@ import {
   UserPlus,
   Volume2,
   FileText,
-  Shield
+  Shield,
+  Palette
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import CreateUserModal from './CreateUserModal';
@@ -70,7 +71,8 @@ const Dashboard = () => {
   const studentFeatures = [
     { icon: Clock, title: "Stundenplan", description: "Aktueller Stundenplan und Vertretungen", path: "/stundenplan" },
     { icon: Calendar, title: "Vertretungsplan", description: "Aktuelle Vertretungen einsehen", path: "/vertretungsplan" },
-    { icon: Megaphone, title: "Ankündigungen", description: "Aktuelle Schulnachrichten", path: "/announcements" }
+    { icon: Megaphone, title: "Ankündigungen", description: "Aktuelle Schulnachrichten", path: "/announcements" },
+    { icon: Palette, title: "Design & Farben", description: "Farbschema der App anpassen", path: "/theme-settings" }
   ];
 
   // Filter features based on permissions
@@ -99,7 +101,8 @@ const Dashboard = () => {
   const studentFeaturesWithPermissions = [
     { ...studentFeatures[0], permission: 'view_schedule' },
     { ...studentFeatures[1], permission: 'view_vertretungsplan' },
-    { ...studentFeatures[2], permission: 'view_announcements' }
+    { ...studentFeatures[2], permission: 'view_announcements' },
+    { ...studentFeatures[3], permission: 'theme_settings' }
   ];
 
   const renderFeatureCards = (features: any[]) => {

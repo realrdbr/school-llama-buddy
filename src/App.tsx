@@ -136,7 +136,11 @@ const SessionAwareApp = () => {
       
       <Route 
         path="/theme-settings" 
-        element={<ThemeSettings />} 
+        element={
+          <ProtectedRoute requiredPermission="theme_settings">
+            <ThemeSettings />
+          </ProtectedRoute>
+        } 
       />
       
       {/* Legacy route alias */}

@@ -21,6 +21,7 @@ import {
   FileText,
   Shield,
   MessageSquare,
+  Palette,
   X
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
@@ -125,12 +126,18 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ className = "" }) =
       path: "/keycard", 
       permission: "keycard_system" 
     },
-    { 
-      icon: Settings, 
-      label: "Einstellungen", 
-      path: "/settings", 
-      permission: "system_settings" 
-    }
+  { 
+    icon: Palette, 
+    label: "Farben", 
+    path: "/theme-settings", 
+    permission: "theme_settings" 
+  },
+  { 
+    icon: Settings, 
+    label: "Einstellungen", 
+    path: "/settings", 
+    permission: "system_settings" 
+  }
   ];
 
   // Filter items based on permissions

@@ -19,11 +19,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   showToast = true
 }) => {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, loading } = useAuth();
   const { hasPermission, isLoaded } = useEnhancedPermissions();
 
   useEffect(() => {
-    if (!profile) {
+    if (!profile && !loading) {
       navigate('/auth');
       return;
     }
@@ -38,10 +38,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       }
       navigate(fallbackPath);
     }
-  }, [profile, isLoaded, hasPermission, requiredPermission, navigate, fallbackPath, showToast]);
+  }, [profile, loading, isLoaded, hasPermission, requiredPermission, navigate, fallbackPath, showToast]);
 
   // Show loading while checking permissions
-  if (!profile || !isLoaded) {
+  if (loading || !profile || !isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin" />
