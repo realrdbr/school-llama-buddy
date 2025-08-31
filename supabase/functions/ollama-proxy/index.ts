@@ -32,12 +32,12 @@ serve(async (req) => {
     }
 
     // Forward request to Ollama instance
-    // Prefer /api/generate, but gracefully fallback to /api/chat if /generate is unavailable (404)
+    // Try endpoints in priority order: gymolb.eduard.services, then direct IPs
     const baseUrls = [
-      'http://79.243.42.245:11435',
-      'http://host.docker.internal:11434',
-      'http://localhost:11434',
-      'http://127.0.0.1:11434'
+      'https://gymolb.eduard.services/ollama',
+      'http://79.243.42.245:11434',
+      'https://gymolb.eduard.services/ollama_fallback',
+      'http://79.243.42.245:11435'
     ];
     
     let ollamaResponse: Response | null = null;
