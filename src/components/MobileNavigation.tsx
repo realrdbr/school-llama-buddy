@@ -162,17 +162,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ className = "" }) =
         </SheetTrigger>
         <SheetContent side="left" className="w-80 overflow-y-auto">
           <SheetHeader className="space-y-4">
-            <div className="flex items-center justify-between">
-              <SheetTitle className="text-lg font-bold">E.D.U.A.R.D.</SheetTitle>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setIsOpen(false)}
-                className="p-1 h-6 w-6"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+            <SheetTitle className="text-lg font-bold">E.D.U.A.R.D.</SheetTitle>
             
             {/* User Info */}
             <div className="flex flex-col items-start space-y-2 p-3 bg-muted/50 rounded-lg">
