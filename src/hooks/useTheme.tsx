@@ -126,14 +126,24 @@ const presetThemes: Theme[] = [
 ];
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentTheme, setCurrentTheme] = useState<Theme | null>(presetThemes[0]);
+  const [currentTheme, setCurrentTheme] = useState<Theme | null>(null);
   const [userThemes, setUserThemes] = useState<Theme[]>([]);
   const [loading, setLoading] = useState(true);
   const { user, profile } = useAuth();
 
-  // Apply theme colors to CSS variables
+  // Local storage key for theme persistence
+  const THEME_STORAGE_KEY = 'app_active_theme';
+
+  // Apply theme colors to CSS variables and handle dark mode
   const applyTheme = (theme: Theme) => {
     const root = document.documentElement;
+    
+    // Handle dark mode class
+    if (theme.name === 'Dark Mode') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
     
     // Apply all theme colors as CSS custom properties
     Object.entries(theme.colors).forEach(([key, value]) => {
@@ -171,6 +181,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       root.style.setProperty('--sidebar-ring', '217.2 91.2% 59.8%');
     }
     
+    // Save to localStorage for persistence
+    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(theme));
     setCurrentTheme(theme);
   };
 
@@ -200,11 +212,21 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       setUserThemes(themes);
 
-      const activeTheme = themes.find(theme => theme.is_active);
-      if (activeTheme) {
-        applyTheme(activeTheme);
-      } else {
-        await setTheme(presetThemes[0]);
+      // Find active theme from database
+      const activeThemeData = data?.find((d: any) => d.is_active);
+      
+      if (activeThemeData) {
+        const activeTheme = {
+          id: activeThemeData.id,
+          name: activeThemeData.name,
+          colors: activeThemeData.colors as unknown as ThemeColors,
+          is_preset: activeThemeData.is_preset
+        };
+        
+        // Only apply if different from current theme to avoid unnecessary re-renders
+        if (!currentTheme || currentTheme.name !== activeTheme.name) {
+          applyTheme(activeTheme);
+        }
       }
     } catch (error) {
       console.error('Error loading user themes:', error);
@@ -214,7 +236,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const setTheme = async (theme: Theme) => {
-    // Always apply visually
+    // Apply immediately for no flicker
     applyTheme(theme);
 
     if (!profile) {
@@ -222,20 +244,15 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     try {
-      // Deactivate all user's themes
-      await supabase
-        .from('user_themes')
-        .update({ is_active: false })
-        .eq('user_id', profile.id);
-
       if (theme.id) {
+        // Existing user theme - activate it
         await supabase
           .from('user_themes')
-          .update({ is_active: true, colors: theme.colors as any })
+          .update({ is_active: true })
           .eq('id', theme.id)
           .eq('user_id', profile.id);
       } else {
-        // Handle presets or unsaved themes: try update existing by name, else insert
+        // Preset or new theme - upsert by name
         const { data: existing } = await supabase
           .from('user_themes')
           .select('id')
@@ -244,24 +261,26 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           .maybeSingle();
 
         if (existing?.id) {
+          // Update existing entry
           await supabase
             .from('user_themes')
             .update({ colors: theme.colors as any, is_active: true })
-            .eq('id', existing.id)
-            .eq('user_id', profile.id);
+            .eq('id', existing.id);
         } else {
+          // Insert new entry
           await supabase
             .from('user_themes')
             .insert({
               user_id: profile.id,
               name: theme.name,
               colors: theme.colors as any,
-              is_preset: false,
+              is_preset: theme.is_preset || false,
               is_active: true
             });
         }
       }
 
+      // Refresh themes list without overriding current theme
       await loadUserThemes();
     } catch (error) {
       console.error('Error setting theme:', error);
@@ -269,17 +288,14 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const createTheme = async (name: string, colors: ThemeColors) => {
+    const newTheme: Theme = { name, colors, is_preset: false };
+    
     // Apply immediately for visual feedback
-    applyTheme({ name, colors });
+    applyTheme(newTheme);
 
     if (!profile) return;
 
     try {
-      await supabase
-        .from('user_themes')
-        .update({ is_active: false })
-        .eq('user_id', profile.id);
-
       const { data, error } = await supabase
         .from('user_themes')
         .insert({
@@ -294,7 +310,18 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       if (error) throw error;
 
-      applyTheme({ id: data.id, name, colors, is_preset: false, is_active: true });
+      // Optimistically update themes list
+      const createdTheme: Theme = { 
+        id: data.id, 
+        name, 
+        colors, 
+        is_preset: false 
+      };
+      
+      setUserThemes(prev => [createdTheme, ...prev]);
+      setCurrentTheme(createdTheme);
+      
+      // Refresh from database
       await loadUserThemes();
     } catch (error) {
       console.error('Error creating theme:', error);
@@ -343,11 +370,28 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  // Initialize theme from localStorage immediately
+  useEffect(() => {
+    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    
+    if (savedTheme) {
+      try {
+        const theme = JSON.parse(savedTheme);
+        applyTheme(theme);
+      } catch (error) {
+        console.error('Error parsing saved theme:', error);
+        applyTheme(presetThemes[0]);
+      }
+    } else {
+      applyTheme(presetThemes[0]);
+    }
+  }, []);
+
+  // Load user themes when profile is available
   useEffect(() => {
     if (profile) {
       loadUserThemes();
     } else {
-      applyTheme(presetThemes[0]);
       setLoading(false);
     }
   }, [profile]);
