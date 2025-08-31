@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,12 +9,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Plus, Palette, Eye } from 'lucide-react';
+import { ArrowLeft, Trash2, Plus, Palette, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ColorPicker } from '@/components/ColorPicker';
 
 const ThemeSettings = () => {
-  const { currentTheme, userThemes, presets, setTheme, createTheme, updateTheme, deleteTheme } = useTheme();
+  const navigate = useNavigate();
+  const { currentTheme, userThemes, presets, setTheme, createTheme, updateTheme, deleteTheme, loading } = useTheme();
   const { toast } = useToast();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -119,7 +121,16 @@ const ThemeSettings = () => {
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
+      {/* Back Button */}
       <div className="mb-6">
+        <Button 
+          variant="ghost" 
+          onClick={() => navigate(-1)}
+          className="mb-4"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Zurück
+        </Button>
         <h1 className="text-3xl font-bold text-foreground mb-2">Theme-Einstellungen</h1>
         <p className="text-muted-foreground">
           Passen Sie das Aussehen der Anwendung nach Ihren Wünschen an
@@ -194,7 +205,11 @@ const ThemeSettings = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {userThemes.length === 0 ? (
+              {loading ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Themes werden geladen...</p>
+                </div>
+              ) : userThemes.length === 0 ? (
                 <div className="text-center py-8">
                   <Palette className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-muted-foreground">
