@@ -457,13 +457,13 @@ const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >
                   <div className="text-sm text-muted-foreground">{formatWeekRange(__weekStart)}</div>
                 </div>
                 <div className="flex items-center justify-center gap-2">
-                  <Button variant="outline" size="sm" onClick={handlePrevWeek} className="h-10 w-32">
+                  <Button variant="outline" size="sm" onClick={handlePrevWeek} className="h-10 w-32 flex items-center justify-center">
                     <ChevronLeft className="h-4 w-4 mr-1" /> Vorherige Woche
                   </Button>
-                  <Button variant="secondary" size="sm" onClick={handleThisWeek} className="h-10 w-32">
+                  <Button variant="secondary" size="sm" onClick={handleThisWeek} className="h-10 w-32 flex items-center justify-center">
                     Diese Woche
                   </Button>
-                  <Button variant="outline" size="sm" onClick={handleNextWeek} className="h-10 w-32">
+                  <Button variant="outline" size="sm" onClick={handleNextWeek} className="h-10 w-32 flex items-center justify-center">
                     Nächste Woche <ChevronRight className="h-4 w-4 ml-1" />
                   </Button>
                 </div>

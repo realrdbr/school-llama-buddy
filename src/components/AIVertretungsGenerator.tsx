@@ -182,11 +182,27 @@ const AIVertretungsGenerator = ({ onGenerated }: AIVertretungsGeneratorProps) =>
       if (data.success) {
         const result = data.result;
         
+        console.log('AI Response result:', result);
+        console.log('AI Response substitutions:', result?.details?.substitutions);
+        
+        // Map server data to component-expected format
+        const substitutions = result?.details?.substitutions || [];
+        const mappedSubstitutions = substitutions.map((sub: any) => ({
+          className: sub.class_name,
+          period: sub.period,
+          subject: sub.original_subject,
+          room: sub.original_room,
+          substituteTeacher: sub.substitute_teacher,
+          originalTeacher: sub.original_teacher
+        }));
+        
+        console.log('Mapped substitutions for display:', mappedSubstitutions);
+        
         // Create proposed plan for confirmation
         setProposedPlan({
           date: targetDate,
           teacher: selectedTeacher,
-          affectedLessons: (result?.details?.substitutions as any[]) || []
+          affectedLessons: mappedSubstitutions
         });
         
         setShowConfirmation(true);
