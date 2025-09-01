@@ -451,12 +451,12 @@ const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >
               </div>
             </div>
             <div className="flex items-end gap-4">
-              <div>
-                <div className="hidden md:block mb-2">
+              <div className="flex flex-col items-center">
+                <div className="hidden md:block mb-2 text-center">
                   <Label>Woche</Label>
                   <div className="text-sm text-muted-foreground">{formatWeekRange(__weekStart)}</div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2">
                   <Button variant="outline" size="sm" onClick={handlePrevWeek} className="h-10 w-32">
                     <ChevronLeft className="h-4 w-4 mr-1" /> Vorherige Woche
                   </Button>

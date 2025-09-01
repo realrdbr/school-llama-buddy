@@ -357,7 +357,7 @@ const AIVertretungsGenerator = ({ onGenerated }: AIVertretungsGeneratorProps) =>
               {proposedPlan.affectedLessons && proposedPlan.affectedLessons.length > 0 && (
                 <div>
                   <h4 className="font-medium mb-2">Betroffene Stunden:</h4>
-                  <div className="space-y-2">
+                  <div className="max-h-64 overflow-y-auto space-y-2">
                     {proposedPlan.affectedLessons.map((lesson, index) => (
                       <div key={index} className="flex justify-between items-center p-2 bg-muted rounded">
                         <div>
@@ -374,6 +374,11 @@ const AIVertretungsGenerator = ({ onGenerated }: AIVertretungsGeneratorProps) =>
                       </div>
                     ))}
                   </div>
+                  {proposedPlan.affectedLessons.length > 5 && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {proposedPlan.affectedLessons.length} Stunden insgesamt
+                    </p>
+                  )}
                 </div>
               )}
 

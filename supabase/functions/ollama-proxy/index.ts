@@ -34,7 +34,7 @@ serve(async (req) => {
     // Forward request to Ollama instance
     // Try endpoints in priority order as specified
     const endpoints = [
-      { url: 'https://gymolb.eduard.services/ollama', paths: ['/api/generate', '/api/chat'] },
+      { url: 'https://gymolb.eduard.services/ai', paths: ['/api/generate', '/api/chat'] },
       { url: 'http://79.243.42.245:11434', paths: ['/api/chat'] },
       { url: 'https://gymolb.eduard.services/ollama_fallback', paths: ['/api/generate', '/api/chat'] },
       { url: 'http://79.243.42.245:11435', paths: ['/api/chat'] }
