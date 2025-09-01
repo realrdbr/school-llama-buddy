@@ -12,6 +12,17 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  // Only allow POST requests for chat endpoints
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed. Use POST for chat requests.' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 405
+      }
+    )
+  }
+
   try {
     const requestBody = await req.json()
 
