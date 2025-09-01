@@ -44,7 +44,6 @@ serve(async (req) => {
 
     // Forward request to Ollama instance - try HTTP first to avoid TLS issues, then HTTPS
     const endpoints = [
-      { url: 'http://gymolb.eduard.services/ai', paths: ['/api/generate', '/api/chat'] },
       { url: 'https://gymolb.eduard.services/ai', paths: ['/api/generate', '/api/chat'] }
     ];
     
@@ -116,18 +115,35 @@ serve(async (req) => {
       throw new Error(`Could not connect to Ollama. Last error: ${lastError?.message}`);
     }
 
-    const contentType = ollamaResponse.headers.get('content-type') || ''
+    // Read raw text first to handle both JSON and NDJSON robustly
+    const raw = await ollamaResponse.text()
+
     let responseData: any = null
-    if (contentType.includes('application/json')) {
-      responseData = await ollamaResponse.json()
-    } else {
-      const raw = await ollamaResponse.text()
-      try {
-        // Try NDJSON: take the last non-empty line
-        const lines = raw.trim().split(/\r?\n/).filter(Boolean)
-        const last = lines[lines.length - 1]
-        responseData = JSON.parse(last)
-      } catch {
+    try {
+      // Try full JSON first
+      responseData = JSON.parse(raw)
+    } catch {
+      // Fallback: handle NDJSON by parsing all valid JSON lines and merging
+      const lines = raw.split(/\r?\n/).filter(Boolean)
+      const parsedLines: any[] = []
+      for (const line of lines) {
+        try {
+          parsedLines.push(JSON.parse(line))
+        } catch {}
+      }
+
+      if (parsedLines.length) {
+        const lastObj = parsedLines[parsedLines.length - 1]
+        const responseStr = parsedLines
+          .map((l) => l.response || l.message?.content || '')
+          .join('')
+        responseData = {
+          ...lastObj,
+          response: responseStr || lastObj?.response || '',
+          message: lastObj?.message || { role: 'assistant', content: responseStr || '' },
+        }
+      } else {
+        // As a last resort, return the raw content as response
         responseData = { response: raw }
       }
     }
@@ -135,7 +151,7 @@ serve(async (req) => {
     // Normalize to chat-like shape for frontend compatibility
     const normalized = responseData?.message?.content
       ? responseData
-      : { ...responseData, message: { role: 'assistant', content: responseData?.response || '' } }
+      : { ...responseData, message: { role: 'assistant', content: String(responseData?.response ?? '') } }
 
     return new Response(
       JSON.stringify(normalized),
