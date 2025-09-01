@@ -42,8 +42,9 @@ serve(async (req) => {
       }
     }
 
-    // Forward request to Ollama instance - use your working nginx endpoint
+    // Forward request to Ollama instance - try HTTP first to avoid TLS issues, then HTTPS
     const endpoints = [
+      { url: 'http://gymolb.eduard.services/ai', paths: ['/api/generate', '/api/chat'] },
       { url: 'https://gymolb.eduard.services/ai', paths: ['/api/generate', '/api/chat'] }
     ];
     
