@@ -37,7 +37,7 @@ serve(async (req) => {
       payload = {
         model: requestBody.model,
         prompt,
-        stream: !!requestBody.stream,
+        stream: false,
         options: requestBody.options || undefined,
       }
     }
@@ -45,9 +45,9 @@ serve(async (req) => {
     // Forward request to Ollama instance
     // Try endpoints in priority order - prioritize working IP first
     const endpoints = [
-      { url: 'http://79.243.42.245:11434', paths: ['/api/chat', '/api/generate'] },
-      { url: 'https://gymolb.eduard.services/ai', paths: ['/api/chat', '/api/generate'] },
-      { url: 'https://gymolb.eduard.services/ollama_fallback', paths: ['/api/chat', '/api/generate'] },
+      { url: 'http://79.243.42.245:11434', paths: ['/api/generate', '/api/chat'] },
+      { url: 'https://gymolb.eduard.services/ai', paths: ['/api/generate', '/api/chat'] },
+      { url: 'https://gymolb.eduard.services/ollama_fallback', paths: ['/api/generate', '/api/chat'] },
       { url: 'http://79.243.42.245:11435', paths: ['/api/chat'] }
     ];
     
@@ -61,27 +61,40 @@ serve(async (req) => {
           const url = `${endpoint.url}${path}`;
           console.log(`Trying Ollama at: ${url}`);
           
-          // Choose appropriate body for endpoint
-          const body = path.endsWith('/api/generate')
-            ? payload
-            : (requestBody && Array.isArray(requestBody.messages)
-                ? {
-                    model: requestBody.model,
-                    messages: requestBody.messages,
-                    stream: !!requestBody.stream,
-                    options: requestBody.options || undefined,
-                  }
-                : {
-                    model: requestBody.model,
-                    messages: [{ role: 'user', content: payload?.prompt || requestBody?.prompt || '' }],
-                    stream: !!requestBody.stream,
-                    options: requestBody.options || undefined,
-                  }
-              );
-    
+          // Choose appropriate body for endpoint - force non-streaming JSON for stability
+          const useGenerate = path.endsWith('/api/generate');
+
+          let body: any;
+          if (useGenerate) {
+            const prompt = requestBody?.prompt
+              ?? (Array.isArray(requestBody?.messages)
+                ? requestBody.messages.map((m: any) => {
+                    const role = m.role || 'user';
+                    const prefix = role === 'system' ? 'System' : role === 'assistant' ? 'Assistant' : 'User';
+                    return `${prefix}: ${m.content}`;
+                  }).join('\n\n')
+                : '');
+            body = {
+              model: requestBody.model,
+              prompt,
+              stream: false,
+              options: requestBody.options || undefined,
+            };
+          } else {
+            const messages = Array.isArray(requestBody?.messages)
+              ? requestBody.messages
+              : [{ role: 'user', content: requestBody?.prompt || '' }];
+            body = {
+              model: requestBody.model,
+              messages,
+              stream: false,
+              options: requestBody.options || undefined,
+            };
+          }
+
           ollamaResponse = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify(body),
           });
     
@@ -106,7 +119,21 @@ serve(async (req) => {
       throw new Error(`Could not connect to Ollama. Last error: ${lastError?.message}`);
     }
 
-    const responseData = await ollamaResponse.json()
+    const contentType = ollamaResponse.headers.get('content-type') || ''
+    let responseData: any = null
+    if (contentType.includes('application/json')) {
+      responseData = await ollamaResponse.json()
+    } else {
+      const raw = await ollamaResponse.text()
+      try {
+        // Try NDJSON: take the last non-empty line
+        const lines = raw.trim().split(/\r?\n/).filter(Boolean)
+        const last = lines[lines.length - 1]
+        responseData = JSON.parse(last)
+      } catch {
+        responseData = { response: raw }
+      }
+    }
 
     // Normalize to chat-like shape for frontend compatibility
     const normalized = responseData?.message?.content
