@@ -115,36 +115,68 @@ serve(async (req) => {
       throw new Error(`Could not connect to Ollama. Last error: ${lastError?.message}`);
     }
 
+    // Log response details for debugging
+    const contentType = ollamaResponse.headers.get('content-type') || 'unknown'
+    console.log(`Response Content-Type: ${contentType}`)
+    
     // Read raw text first to handle both JSON and NDJSON robustly
     const raw = await ollamaResponse.text()
+    console.log(`Raw response length: ${raw.length}`)
+    console.log(`Response starts with: ${raw.substring(0, 100)}...`)
 
     let responseData: any = null
     try {
       // Try full JSON first
       responseData = JSON.parse(raw)
-    } catch {
-      // Fallback: handle NDJSON by parsing all valid JSON lines and merging
+      console.log('Successfully parsed as single JSON object')
+    } catch (jsonError) {
+      console.log('Single JSON parsing failed, trying NDJSON parsing...')
+      
+      // Handle NDJSON by parsing all valid JSON lines and merging
       const lines = raw.split(/\r?\n/).filter(Boolean)
+      console.log(`Found ${lines.length} lines to parse`)
+      
       const parsedLines: any[] = []
       for (const line of lines) {
         try {
-          parsedLines.push(JSON.parse(line))
-        } catch {}
+          const parsed = JSON.parse(line)
+          parsedLines.push(parsed)
+        } catch (lineError) {
+          console.log(`Failed to parse line: ${line.substring(0, 50)}...`)
+        }
       }
 
-      if (parsedLines.length) {
-        const lastObj = parsedLines[parsedLines.length - 1]
-        const responseStr = parsedLines
-          .map((l) => l.response || l.message?.content || '')
+      if (parsedLines.length > 0) {
+        console.log(`Successfully parsed ${parsedLines.length} NDJSON lines`)
+        
+        // Find the final response object (where done: true)
+        const finalObj = parsedLines.find(obj => obj.done === true) || parsedLines[parsedLines.length - 1]
+        
+        // Concatenate all message content from all lines
+        const completeContent = parsedLines
+          .filter(obj => obj.message?.content) // Only lines with content
+          .map(obj => obj.message.content)
           .join('')
+        
+        console.log(`Complete content length: ${completeContent.length}`)
+        console.log(`Complete content: ${completeContent.substring(0, 100)}...`)
+        
+        // Build the final response object
         responseData = {
-          ...lastObj,
-          response: responseStr || lastObj?.response || '',
-          message: lastObj?.message || { role: 'assistant', content: responseStr || '' },
+          ...finalObj,
+          response: completeContent,
+          message: {
+            role: 'assistant',
+            content: completeContent
+          }
         }
       } else {
+        console.log('No valid JSON lines found, using raw content as fallback')
         // As a last resort, return the raw content as response
-        responseData = { response: raw }
+        responseData = { 
+          response: raw,
+          message: { role: 'assistant', content: raw }
+        }
       }
     }
 
