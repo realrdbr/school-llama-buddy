@@ -966,16 +966,24 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
 
           console.log('Available teachers:', teacherRows?.length || 0);
 
+          // Strip common titles from input (Herr/Frau/Dr/Prof) for matching
+          const teacherNameNorm = teacherName
+            .toLowerCase()
+            .replace(/\b(herr|frau|dr|prof)\b\.?\s*/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+
           // Find the sick teacher in our database
           const teacherRow = (teacherRows || []).find((t: any) => {
             const lastName = (t['last name'] || '').toLowerCase();
             const firstName = (t['first name'] || '').toLowerCase();
+            const abbr = (t.shortened || '').toLowerCase();
             const fullName = `${firstName} ${lastName}`.trim();
             
-            return lastName.includes(teacherName.toLowerCase()) || 
-                   firstName.includes(teacherName.toLowerCase()) ||
-                   fullName.includes(teacherName.toLowerCase()) ||
-                   (t.shortened || '').toLowerCase() === teacherName.toLowerCase();
+            return lastName.includes(teacherNameNorm) || 
+                   firstName.includes(teacherNameNorm) ||
+                   fullName.includes(teacherNameNorm) ||
+                   abbr === teacherNameNorm;
           });
 
           if (!teacherRow) {
@@ -1083,7 +1091,6 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
                     const subjects = (t.subjects || '').toLowerCase();
                     
                     // Check if teacher is available and can teach the subject
-                    const isNotSick = abbr !== teacherAbbr;
                     const isNotOccupied = !occupiedTeachers[period]?.has(abbr);
                     const canTeachSubject = subjects.includes(subjectLower) || 
                                           subjects.includes(subjectLower.substring(0, 2)) || // Handle abbreviations
