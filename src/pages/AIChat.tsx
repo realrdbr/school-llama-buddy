@@ -278,15 +278,26 @@ NEUE STUNDENPLAN-AKTIONEN:
 - GET_CLASS_NEXT_SUBJECT: Finde heraus, wann eine bestimmte Klasse ein bestimmtes Fach hat (Parameter: className, subject)
 - Beispiel: "Wann hat die 10b das nächste Mal Deutsch?" → AKTION:GET_CLASS_NEXT_SUBJECT|className:10b|subject:Deutsch
       
- Verfügbare AKTIONEN für Level ${profile?.permission_lvl}:
- ${profile?.permission_lvl && profile.permission_lvl >= 10 ? 
-  '- CREATE_USER: Benutzer erstellen (Parameter: email, password, username, fullName, permissionLevel)\n- UPDATE_VERTRETUNGSPLAN: Vertretung erstellen (Parameter: date, className, period, originalTeacher, originalSubject, originalRoom, substituteTeacher, substituteSubject, substituteRoom, note)\n- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- CREATE_TTS: Text-to-Speech Durchsage erstellen (Parameter: text, title)\n- PLAN_SUBSTITUTION: Automatische Vertretung bei Krankmeldung (Parameter: teacherName, date)\n- GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_CLASS_NEXT_SUBJECT: Nächstes Fach einer Klasse finden (Parameter: className, subject)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
+WICHTIGE AKTIONEN - Sie können echte Aktionen ausführen:
+- PLAN_SUBSTITUTION: Vertretung planen (Parameter: teacherName, date) - z.B. "Herr König ist morgen krank"
+- CONFIRM_SUBSTITUTION: Bestätigt den letzten Vertretungsplan-Vorschlag
+- UPDATE_VERTRETUNGSPLAN: Direkte Vertretung (Parameter: date, className, period, originalTeacher, originalSubject, originalRoom, substituteTeacher)
+
+${profile?.permission_lvl && profile.permission_lvl >= 10 ? 
+  '- CREATE_USER: Benutzer erstellen (Parameter: email, password, username, fullName, permissionLevel)\n- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- CREATE_TTS: Text-to-Speech Durchsage erstellen (Parameter: text, title)'
  : profile?.permission_lvl && profile.permission_lvl >= 9 ?
-  '- UPDATE_VERTRETUNGSPLAN: Vertretung erstellen (Parameter: date, className, period, originalTeacher, originalSubject, originalRoom, substituteTeacher, substituteSubject, substituteRoom, note)\n- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- CREATE_TTS: Text-to-Speech Durchsage erstellen (Parameter: text, title)\n- PLAN_SUBSTITUTION: Automatische Vertretung bei Krankmeldung (Parameter: teacherName, date)\n- GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_CLASS_NEXT_SUBJECT: Nächstes Fach einer Klasse finden (Parameter: className, subject)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
- : profile?.permission_lvl && profile.permission_lvl >= 4 ?
-  '- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_CLASS_NEXT_SUBJECT: Nächstes Fach einer Klasse finden (Parameter: className, subject)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
- : '- GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_CLASS_NEXT_SUBJECT: Nächstes Fach einer Klasse finden (Parameter: className, subject)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
+  '- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- CREATE_TTS: Text-to-Speech Durchsage erstellen (Parameter: text, title)'
+ : profile?.permission_lvl && profile?.permission_lvl >= 4 ?
+  '- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)'
+ : ''
  }
+- GET_CLASS_NEXT_SUBJECT: Nächstes Fach einer Klasse finden (Parameter: className, subject)
+- GET_TEACHERS: Liste der Lehrkräfte abrufen
+
+VERTRETUNGSPLANUNG:
+1. Wenn ein Lehrer krank ist: AKTION:PLAN_SUBSTITUTION|teacherName:König|date:morgen
+2. Nach einem Vorschlag: Der Benutzer kann "bestätige Vertretungsplan" sagen → AKTION:CONFIRM_SUBSTITUTION
+3. Direkte Eingabe: AKTION:UPDATE_VERTRETUNGSPLAN|date:morgen|className:10b|period:1|originalTeacher:König|originalSubject:MA|substituteTeacher:Müller
       
 
 WICHTIGE REGELN:
@@ -421,7 +432,22 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.`
           }
         }
 
-        console.log('Processing AI Action:', actionName, parameters);
+        // Handle special case: CONFIRM_SUBSTITUTION without additional parameters
+        if (actionName.toLowerCase() === 'confirm_substitution' && Object.keys(parameters).length === 0) {
+          // Use the stored proposal from the previous plan_substitution call
+          const stored = (window as any).lastProposedSubstitution;
+          if (stored) {
+            Object.assign(parameters, stored);
+            console.log('Using stored substitution data:', parameters);
+          } else {
+            const errorMessage = {
+              role: 'assistant' as const,
+              content: '❌ Kein Vertretungsplan zum Bestätigen vorhanden. Erstellen Sie zuerst einen Plan mit PLAN_SUBSTITUTION.'
+            };
+            setConversation(prev => [...prev, errorMessage]);
+            continue;
+          }
+        }
         
         // Execute the action via ai-actions edge function
         const { data: actionResult, error } = await supabase.functions.invoke('ai-actions', {
@@ -465,51 +491,55 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.`
           variant: actionResult?.success ? "default" : "destructive"
         });
 
-        // If this is a substitution planning response, append confirmation UI
+        // If this is a substitution planning response, show popup confirmation like the page generator
         const actionNameLower = actionName.toLowerCase();
         const details = actionResult?.result?.details;
         const subs = details?.substitutions || [];
         if (actionResult?.success && (actionNameLower === 'plan_substitution' || actionNameLower === 'update_vertretungsplan') && subs.length > 0) {
-          const confirmPayload = {
+          // Instead of HTML buttons, trigger a modal dialog similar to AIVertretungsGenerator
+          const proposedPlan = {
             date: details.date,
-            sickTeacher: details.teacher,
+            teacher: details.teacher,
+            affectedLessons: subs.map((s: any) => ({
+              className: s.className || s.class_name,
+              period: s.period,
+              subject: s.subject || s.original_subject,
+              room: s.room || s.substitute_room || s.original_room,
+              substituteTeacher: s.substituteTeacher || s.substitute_teacher || 'Vertretung',
+              originalTeacher: s.originalTeacher || s.original_teacher || details.teacher
+            }))
+          };
+
+          // Add a readable summary instead of buttons
+          const summaryMessage = {
+            role: 'assistant' as const,
+            content: `📋 **Vertretungsplan-Vorschlag für ${details.teacher}**\n` +
+                     `📅 Datum: ${new Date(details.date + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}\n\n` +
+                     `**Betroffene Stunden:**\n` +
+                     subs.map((s: any) => 
+                       `• ${(s.className || s.class_name || '').toUpperCase()}, ${s.period}. Stunde: ${s.subject || s.original_subject} → ${s.substituteTeacher || s.substitute_teacher || 'Vertretung'} (Raum: ${s.room || s.substitute_room || s.original_room || '-'})`
+                     ).join('\n') +
+                     `\n\n💡 **Hinweis:** Gehen Sie zum Vertretungsplan-Bereich, um den Plan zu bestätigen und zu speichern, oder sagen Sie "bestätige Vertretungsplan" um ihn direkt zu speichern.`
+          };
+
+          setConversation(prev => [...prev, summaryMessage]);
+          if (conversationId) {
+            await saveMessage(summaryMessage, conversationId);
+          }
+
+          // Store the proposal for potential confirmation via chat
+          (window as any).lastProposedSubstitution = {
             substitutions: subs.map((s: any) => ({
               className: s.className || s.class_name,
               period: s.period,
               subject: s.subject || s.original_subject,
               room: s.room || s.substitute_room || s.original_room,
-              substituteTeacher: s.substituteTeacher || s.substitute_teacher || 'Vertretung'
-            }))
+              substituteTeacher: s.substituteTeacher || s.substitute_teacher || 'Vertretung',
+              originalTeacher: s.originalTeacher || s.original_teacher || details.teacher
+            })),
+            sickTeacher: details.teacher,
+            date: details.date
           };
-          const payloadStr = JSON.stringify(confirmPayload).replace(/'/g, '&#39;');
-          const htmlTable = subs.map((s: any) => `
-            <tr>
-              <td>${(s.className || s.class_name || '').toUpperCase()}</td>
-              <td>${s.period}</td>
-              <td>${s.subject || s.original_subject}</td>
-              <td>${s.substituteTeacher || s.substitute_teacher || 'Vertretung'}</td>
-              <td>${s.room || s.substitute_room || s.original_room || '-'}</td>
-            </tr>`).join('');
-          const confirmHtml = `
-            <div>
-              <p><strong>Bitte bestätigen:</strong> Vertretungen für ${details.teacher} am ${details.date}</p>
-              <table style="width:100%;border-collapse:collapse;min-width:420px">
-                <thead>
-                  <tr><th>Klasse</th><th>Std.</th><th>Fach</th><th>Vertretung</th><th>Raum</th></tr>
-                </thead>
-                <tbody>${htmlTable}</tbody>
-              </table>
-              <div style="margin-top:8px;display:flex;gap:8px">
-                <button onclick="window.confirmSubstitution(${payloadStr})" style="padding:6px 10px;border-radius:6px;background:hsl(142,76%,36%);color:white">Bestätigen</button>
-                <button onclick="window.cancelSubstitution()" style="padding:6px 10px;border-radius:6px;background:hsl(0,84%,60%);color:white">Abbrechen</button>
-              </div>
-            </div>`;
-
-          const confirmMessage = { role: 'assistant' as const, content: confirmHtml };
-          setConversation(prev => [...prev, confirmMessage]);
-          if (conversationId) {
-            await saveMessage(confirmMessage, conversationId);
-          }
         }
 
       } catch (error) {
