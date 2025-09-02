@@ -444,91 +444,163 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.`
         {/* Mobile Sidebar Sheet */}
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
           {/* Main Content */}
-          <main className="flex-1 flex flex-col p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-gray-900 overflow-hidden">
+          <div className="flex-1 flex flex-col min-h-0">
             {/* Header */}
-            <header className="flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700">
-              <SheetTrigger asChild className="lg:hidden">
-                <Button variant="ghost" size="icon">
-                  <Menu className="h-6 w-6" />
-                </Button>
-              </SheetTrigger>
-              <div className="flex items-center space-x-2">
-                <Bot className="h-8 w-8 text-primary" />
-                <h1 className="text-xl font-bold">E.D.U.A.R.D. Chat</h1>
+            <header className="border-b bg-card">
+              <div className="container mx-auto px-2 sm:px-4 py-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <SheetTrigger asChild className="lg:hidden">
+                      <Button variant="ghost" size="sm">
+                        <Menu className="h-4 w-4" />
+                      </Button>
+                    </SheetTrigger>
+                    <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="flex-shrink-0">
+                      <ArrowLeft className="h-4 w-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">Zurück</span>
+                    </Button>
+                    <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+                      <Bot className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <h1 className="text-lg sm:text-xl font-bold text-foreground truncate">E.D.U.A.R.D. Chat</h1>
+                        <p className="text-xs sm:text-sm text-muted-foreground hidden md:block truncate">
+                          Education, Data, Utility & Automation for Resource Distribution
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
-                <ArrowLeft className="h-6 w-6" />
-              </Button>
             </header>
 
-            {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto pt-4 pb-20 space-y-4">
-              {conversation.map((msg, index) => (
-                <div key={index} className={`flex items-start gap-4 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                  <div className={`flex flex-col gap-1 p-3 rounded-lg max-w-[70%] ${msg.role === 'user' ? 'bg-primary text-white' : 'bg-secondary text-secondary-foreground'}`}
-                    dangerouslySetInnerHTML={{ __html: msg.content.replace(/\n/g, '<br>') }}
-                  />
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Input Form */}
-            <div className="fixed bottom-0 left-0 right-0 p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 backdrop-blur-sm bg-opacity-70 dark:bg-opacity-70">
-              <Card className="shadow-lg max-w-4xl mx-auto w-full">
-                <CardContent className="pt-6">
-                  <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-                    {uploadedFiles.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {uploadedFiles.map((file, index) => (
-                          <div key={index} className="flex items-center gap-1 rounded-full bg-slate-200 dark:bg-slate-700 px-3 py-1 text-sm">
-                            <Paperclip className="h-3 w-3" />
-                            <span>{file.name}</span>
-                            <X className="h-3 w-3 cursor-pointer hover:text-red-500" onClick={() => removeFile(index)} />
+            {/* Main Content */}
+            <main className="flex-1 container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+              <div className="max-w-4xl mx-auto h-full flex flex-col space-y-4">
+                <Card className="flex-1 min-h-0">
+                  <CardHeader>
+                    <CardTitle>
+                      {currentConversationId ? 'Chat' : 'Neuer Chat'}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="h-full flex flex-col">
+                    {conversation.length === 0 ? (
+                      <div className="flex-1 flex items-center justify-center text-center text-muted-foreground">
+                        <div>
+                          <Bot className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                          <h3 className="text-lg font-medium mb-2">Willkommen bei E.D.U.A.R.D.</h3>
+                          <p>Education, Data, Utility & Automation for Resource Distribution</p>
+                          <p className="text-sm mt-2">Stellen Sie eine Frage oder bitten Sie mich, eine Aktion durchzuführen.</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex-1 space-y-4 overflow-y-auto max-h-[60vh]">
+                        {conversation.map((message, index) => (
+                          <div
+                            key={index}
+                            className={`p-4 rounded-lg ${
+                              message.role === 'user'
+                                ? 'bg-primary text-primary-foreground ml-8'
+                                : 'bg-muted mr-8'
+                            }`}
+                          >
+                            <div
+                              className="prose prose-sm max-w-none dark:prose-invert"
+                              dangerouslySetInnerHTML={{
+                                __html: (() => {
+                                  const raw = message.content;
+                                  const hasHTML = /<[^>]+>/i.test(raw);
+                                  const withLineBreaks = hasHTML ? raw : raw.replace(/\n/g, '<br>');
+                                  return withLineBreaks.replace(/```([^`]+)```/g,
+                                    '<pre style="background:#f5f5f5;padding:8px;border-radius:4px;overflow-x:auto;"><code>$1</code></pre>'
+                                  );
+                                })()
+                              }}
+                            />
                           </div>
                         ))}
+                        {isLoading && (
+                          <div className="flex items-center gap-2 p-4 bg-muted mr-8 rounded-lg">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>KI denkt nach...</span>
+                          </div>
+                        )}
+                        <div ref={messagesEndRef} />
                       </div>
                     )}
-                    <div className="flex items-center gap-2">
-                      <Input
-                        placeholder="Stellen Sie Ihre Frage oder führen Sie eine Aktion aus..."
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        disabled={isLoading}
-                        className="flex-1"
-                      />
-                      <input
-                        type="file"
-                        id="file-upload"
-                        multiple
-                        accept=".png,.jpg,.jpeg,.pdf,.txt"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => document.getElementById('file-upload')?.click()}
-                        disabled={isLoading}
-                      >
-                        <Upload className="h-4 w-4" />
-                      </Button>
-                      <Button type="submit" disabled={(!input.trim() && uploadedFiles.length === 0) || isLoading}>
-                        {isLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Send className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Unterstützte Dateien: PNG, JPG, PDF, TXT (max. 10MB)
-                    </p>
-                  </form>
-                </CardContent>
-              </Card>
-            </div>
-          </main>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    {uploadedFiles.length > 0 && (
+                      <div className="mb-4 p-3 bg-muted rounded-lg">
+                        <p className="text-sm font-medium mb-2">Angehängte Dateien:</p>
+                        <div className="space-y-2">
+                          {uploadedFiles.map((file, index) => (
+                            <div key={index} className="flex items-center justify-between bg-background p-2 rounded">
+                              <div className="flex items-center gap-2">
+                                <Paperclip className="h-4 w-4" />
+                                <span className="text-sm">{file.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  ({(file.size / 1024).toFixed(1)} KB)
+                                </span>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeFile(index)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <form onSubmit={handleSubmit} className="space-y-3">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Stellen Sie hier Ihre Frage oder bitten Sie um eine Aktion..."
+                          value={input}
+                          onChange={(e) => setInput(e.target.value)}
+                          disabled={isLoading}
+                          className="flex-1"
+                        />
+                        <input
+                          type="file"
+                          id="file-upload"
+                          multiple
+                          accept=".png,.jpg,.jpeg,.pdf,.txt"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => document.getElementById('file-upload')?.click()}
+                          disabled={isLoading}
+                        >
+                          <Upload className="h-4 w-4" />
+                        </Button>
+                        <Button type="submit" disabled={(!input.trim() && uploadedFiles.length === 0) || isLoading}>
+                          {isLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Send className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Unterstützte Dateien: PNG, JPG, PDF, TXT (max. 10MB)
+                      </p>
+                    </form>
+                  </CardContent>
+                </Card>
+              </div>
+            </main>
+          </div>
 
           <SheetContent side="left" className="w-80 p-0">
             <ChatSidebar
