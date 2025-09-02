@@ -35,7 +35,12 @@ const AIAssistant = () => {
         <CardContent className="pt-6">
           <div className="flex items-center gap-2 mb-4 text-muted-foreground">
             <ShieldX className="h-5 w-5" />
-            <h3 className="font-semibold">KI-Assistent</h3>
+            <h3 
+              className="font-semibold cursor-pointer hover:text-primary transition-colors" 
+              onClick={() => navigate('/ai-chat')}
+            >
+              KI-Assistent
+            </h3>
           </div>
           <p className="text-sm text-muted-foreground">
             Sie haben keine Berechtigung für den KI-Chat. Wenden Sie sich an einen Administrator.
@@ -50,7 +55,12 @@ const AIAssistant = () => {
       <CardContent className="pt-6">
         <div className="flex items-center gap-2 mb-4">
           <Bot className="h-5 w-5 text-primary" />
-          <h3 className="font-semibold">KI-Assistent</h3>
+          <h3 
+            className="font-semibold cursor-pointer hover:text-primary transition-colors" 
+            onClick={() => navigate('/ai-chat')}
+          >
+            KI-Assistent
+          </h3>
         </div>
         <form onSubmit={handleSubmit} className="flex gap-2">
           <Input
