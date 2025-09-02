@@ -36,9 +36,9 @@ serve(async (req) => {
       : [{ role: 'user', content: requestBody?.prompt || '' }];
     
     const body = {
-      model: requestBody.model || 'Redbear/e.d.u.a.r.d:latest', // Use correct model name from your server
+      model: requestBody.model || 'Redbear/e.d.u.a.r.d.:latest', // Use exact model name with colon like in AIChat.tsx
       messages,
-      stream: true, // Enable streaming like in working curl test
+      stream: true,
       options: requestBody.options || undefined,
     };
 
