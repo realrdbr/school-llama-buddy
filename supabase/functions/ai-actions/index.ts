@@ -42,7 +42,15 @@ const canonicalSubject = (raw: string) => {
 
 const subjectsToSet = (subjects: string) => {
   const set = new Set<string>();
-  (subjects || '')
+  const raw = subjects || '';
+
+  // Special handling for composite subject G/R/W so it doesn't split into G, R, W
+  const rawNorm = normalize(raw);
+  if (/\bg\s*\/\s*r\s*\/\s*w\b/i.test(raw) || /\bgrw\b/i.test(rawNorm) || /\bg\s*-\s*r\s*-\s*w\b/i.test(raw)) {
+    set.add('geschichte');
+  }
+
+  raw
     .split(/[^a-zA-ZäöüÄÖÜß]+/)
     .map(s => s.trim())
     .filter(Boolean)
