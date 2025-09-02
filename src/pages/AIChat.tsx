@@ -843,7 +843,7 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.`
             {chatProposedPlan && (
               <div className="space-y-4">
                 <div className="p-4 bg-muted/50 rounded-lg">
-                  <h3 className="font-medium mb-2">Abwesenheit: Herr/Frau {chatProposedPlan.teacher}</h3>
+                  <h3 className="font-medium mb-2">Abwesenheit: {chatProposedPlan.teacher}</h3>
                   <p className="text-sm text-muted-foreground">
                     Datum: {new Date(chatProposedPlan.date + 'T00:00:00').toLocaleDateString('de-DE', {
                       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'

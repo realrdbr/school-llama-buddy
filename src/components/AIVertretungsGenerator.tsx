@@ -365,7 +365,7 @@ const AIVertretungsGenerator = ({ onGenerated }: AIVertretungsGeneratorProps) =>
             <div className="space-y-4">
               <div className="p-4 bg-muted/50 rounded-lg">
                 <h3 className="font-medium mb-2">
-                  Abwesenheit: Herr/Frau {proposedPlan.teacher}
+                  Abwesenheit: {proposedPlan.teacher}
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   Datum: {new Date(proposedPlan.date + 'T00:00:00').toLocaleDateString('de-DE', {

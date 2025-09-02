@@ -7,6 +7,56 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper utilities for robust matching
+const normalize = (s: string) => (s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+const stripTitles = (s: string) => normalize(s)
+  .replace(/\b(herr|frau|dr|prof|professor|frl|fräulein)\b\.?\s*/g, '')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+// Canonicalize a subject/abbreviation to a common token
+const canonicalSubject = (raw: string) => {
+  const t = normalize(raw).replace(/[^a-z]/g, '');
+  if (!t) return '';
+  if (/^ma(th|t)?/.test(t)) return 'mathematik';
+  if (/^de/.test(t)) return 'deutsch';
+  if (/^en(g|)/.test(t)) return 'englisch';
+  if (/^ru/.test(t)) return 'russisch';
+  if (/^re(l|)/.test(t)) return 'religion';
+  if (/^ph(y|)/.test(t)) return 'physik';
+  if (/^ch(em|)/.test(t)) return 'chemie';
+  if (/^bio/.test(t)) return 'biologie';
+  if (/^(geo|erk|ek)/.test(t)) return 'geografie';
+  if (/^(inf|info|informatik)/.test(t)) return 'informatik';
+  if (/^fr/.test(t)) return 'franzoesisch';
+  if (/^(sp|spa|span)/.test(t)) return 'spanisch';
+  if (/^lat/.test(t)) return 'latein';
+  if (/^ku(nst)?$/.test(t)) return 'kunst';
+  if (/^mu(sik)?$/.test(t)) return 'musik';
+  if (/^sport$/.test(t)) return 'sport';
+  if (/^eth(ik)?$/.test(t)) return 'ethik';
+  return t; // fallback to normalized token
+};
+
+const subjectsToSet = (subjects: string) => {
+  const set = new Set<string>();
+  (subjects || '')
+    .split(/[^a-zA-ZäöüÄÖÜß]+/)
+    .map(s => s.trim())
+    .filter(Boolean)
+    .forEach(token => {
+      const canon = canonicalSubject(token);
+      if (canon) set.add(canon);
+    });
+  return set;
+};
+
+const teacherCanTeachSubject = (teacherSubjects: string, lessonSubject: string) => {
+  const tset = subjectsToSet(teacherSubjects);
+  const canonLesson = canonicalSubject(lessonSubject);
+  return canonLesson ? tset.has(canonLesson) : false;
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -185,9 +235,8 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
                       // find substitute who can teach subject
                       const candidates = (teacherRows || []).filter((t: any) => {
                         const abbr = (t.shortened || '').toLowerCase();
-                        const subs = (t.subjects || '').toLowerCase();
-                        const subjLower = entry.subject.toLowerCase();
-                        const canTeach = subs.includes(subjLower) || subs.includes(subjLower.slice(0,2));
+                        const subs = (t.subjects || '');
+                        const canTeach = teacherCanTeachSubject(subs, entry.subject);
                         return !isSickTeacher(abbr) && !occupied[p]?.has(abbr) && canTeach;
                       });
                       let substituteTeacher = 'Vertretung';
@@ -1088,16 +1137,9 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
                   const subjectLower = entry.subject.toLowerCase();
                   const availableTeachers = (teacherRows || []).filter((t: any) => {
                     const abbr = (t.shortened || '').toLowerCase();
-                    const subjects = (t.subjects || '').toLowerCase();
-                    
-                    // Check if teacher is available and can teach the subject
+                    const subjects = (t.subjects || '');
                     const isNotOccupied = !occupiedTeachers[period]?.has(abbr);
-                    const canTeachSubject = subjects.includes(subjectLower) || 
-                                          subjects.includes(subjectLower.substring(0, 2)) || // Handle abbreviations
-                                          subjectLower.includes('ma') && subjects.includes('mathematik') ||
-                                          subjectLower.includes('de') && subjects.includes('deutsch') ||
-                                          subjectLower.includes('en') && subjects.includes('englisch');
-                    
+                    const canTeachSubject = teacherCanTeachSubject(subjects, entry.subject);
                     return !isSickTeacher(abbr) && isNotOccupied && canTeachSubject;
                   });
 
