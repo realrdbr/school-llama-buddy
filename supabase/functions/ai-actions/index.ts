@@ -259,11 +259,12 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
               }
 
               const dayName = new Date(dateISO + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long' });
+              const teacherDisplay = (teacherRow && teacherRow['last name']) || teacherName;
               result = {
                 message: substitutions.length > 0
-                  ? `Vorschläge für Vertretungen für ${teacherName} am ${dayName} (${dateISO}). Bitte bestätigen.`
-                  : `Keine Stunden für ${teacherName} am ${dayName} (${dateISO}) gefunden.`,
-                details: { date: dateISO, teacher: teacherName, substitutions }
+                  ? `Vorschläge für Vertretungen für ${teacherDisplay} am ${dayName} (${dateISO}). Bitte bestätigen.`
+                  : `Keine Stunden für ${teacherDisplay} am ${dayName} (${dateISO}) gefunden.`,
+                details: { date: dateISO, teacher: teacherDisplay, substitutions }
               };
               success = true;
               break;
@@ -1170,15 +1171,17 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
           console.log('Total substitutions found:', substitutions.length);
 
           if (substitutions.length === 0) {
+            const teacherDisplay = (teacherRow && teacherRow['last name']) || teacherName;
             result = { 
-              details: { date: dateStr, teacher: teacherName, substitutions: [] }, 
-              message: `Keine Stunden für ${teacherName} am ${dateStr} gefunden. Möglicherweise unterrichtet dieser Lehrer an diesem Tag nicht, oder der Name wurde nicht korrekt erkannt.` 
+              details: { date: dateStr, teacher: teacherDisplay, substitutions: [] }, 
+              message: `Keine Stunden für ${teacherDisplay} am ${dateStr} gefunden. Möglicherweise unterrichtet dieser Lehrer an diesem Tag nicht, oder der Name wurde nicht korrekt erkannt.` 
             };
           } else {
             const dayName = new Date(dateStr + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long' });
+            const teacherDisplay = (teacherRow && teacherRow['last name']) || teacherName;
             result = { 
-              details: { date: dateStr, teacher: teacherName, substitutions }, 
-              message: `Vertretungsplan für ${teacherName} am ${dayName} (${dateStr}) erstellt. ${substitutions.length} Stunde(n) betroffen:\n` +
+              details: { date: dateStr, teacher: teacherDisplay, substitutions }, 
+              message: `Vertretungsplan für ${teacherDisplay} am ${dayName} (${dateStr}) erstellt. ${substitutions.length} Stunde(n) betroffen:\n` +
                        substitutions.map(s => `${s.className}, ${s.period}. Stunde: ${s.subject} → ${s.substituteTeacher}`).join('\n')
             };
           }
@@ -1283,36 +1286,84 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
 
 // Helper function to parse German date text to Berlin school day
 function parseDateTextToBerlinSchoolDay(text: string): Date {
-  const now = new Date()
-  const berlinTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + (2 * 3600000)) // Berlin time (UTC+2)
-  
-  console.log('Processing:', text, 'Current Berlin time:', berlinTime)
-  
-  // Handle relative dates in German
-  if (text.includes('heute')) {
-    return berlinTime
-  } else if (text.includes('morgen') && !text.includes('übermorgen')) {
-    const tomorrow = new Date(berlinTime)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    return tomorrow
-  } else if (text.includes('übermorgen')) {
-    const dayAfterTomorrow = new Date(berlinTime)
-    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2)
-    return dayAfterTomorrow
-  } else if (text.includes('gestern')) {
-    const yesterday = new Date(berlinTime)
-    yesterday.setDate(yesterday.getDate() - 1)
-    return yesterday
+  const now = new Date();
+  // Approximate Berlin time (handles offset; DST differences are minor for day calc)
+  const berlinTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + (2 * 3600000));
+
+  const norm = (s: string) => (s || '')
+    .toString()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .trim();
+
+  const t = norm(text);
+  console.log('Processing:', text, 'Normalized:', t, 'Current Berlin time:', berlinTime);
+
+  const isWeekend = (d: Date) => d.getDay() === 0 || d.getDay() === 6;
+  const nextSchoolDay = (d: Date) => {
+    const x = new Date(d);
+    while (isWeekend(x)) x.setDate(x.getDate() + 1);
+    return x;
+  };
+
+  // Relative dates
+  if (t.includes('heute') || t === '') {
+    return nextSchoolDay(berlinTime);
   }
-  
-  // Try to parse as ISO date first
-  const isoMatch = text.match(/(\d{4}-\d{2}-\d{2})/)
+  if ((t.includes('morgen') && !t.includes('ubermorgen')) || t === 'morgen') {
+    const d = new Date(berlinTime);
+    d.setDate(d.getDate() + 1);
+    return nextSchoolDay(d);
+  }
+  if (t.includes('ubermorgen') || t.includes('uebermorgen')) {
+    const d = new Date(berlinTime);
+    d.setDate(d.getDate() + 2);
+    return nextSchoolDay(d);
+  }
+  if (t.includes('gestern')) {
+    const d = new Date(berlinTime);
+    d.setDate(d.getDate() - 1);
+    return nextSchoolDay(d);
+  }
+
+  // Weekday names (German) → next occurrence
+  const weekdayMap: Record<string, number> = {
+    montag: 1,
+    dienstag: 2,
+    mittwoch: 3,
+    donnerstag: 4,
+    freitag: 5,
+  };
+  const keys = Object.keys(weekdayMap);
+  const matchWeekday = keys.find(k => t.includes(k));
+  if (matchWeekday) {
+    const targetDow = weekdayMap[matchWeekday];
+    const d = new Date(berlinTime);
+    const currentDow = d.getDay();
+    let delta: number;
+    if (currentDow === 0) {
+      delta = targetDow; // Sunday → next target this week
+    } else if (currentDow < targetDow) {
+      delta = targetDow - currentDow; // later this week
+    } else {
+      delta = 7 - currentDow + targetDow; // next week
+    }
+    // If same day explicitly mentioned, go to next week
+    if (currentDow === targetDow) delta = 7;
+    d.setDate(d.getDate() + delta);
+    return nextSchoolDay(d);
+  }
+
+  // Try ISO date
+  const isoMatch = t.match(/(\d{4}-\d{2}-\d{2})/);
   if (isoMatch) {
-    return new Date(isoMatch[1] + 'T12:00:00')
+    const d = new Date(isoMatch[1] + 'T12:00:00');
+    return nextSchoolDay(d);
   }
-  
-  // Default to today for any unrecognized input
-  return berlinTime
+
+  // Fallback → next school day from today
+  return nextSchoolDay(berlinTime);
 }
 
 function findNextSubjectLesson(scheduleData: any[], requestedSubject: string) {

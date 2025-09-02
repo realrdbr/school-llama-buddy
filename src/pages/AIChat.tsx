@@ -438,10 +438,24 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.`
         const parameters: any = {};
         if (paramString) {
           const paramPairs = paramString.split('|');
+          const standaloneTokens: string[] = [];
           for (const pair of paramPairs) {
             const [key, value] = pair.split(':');
             if (key && value) {
               parameters[key] = value.trim();
+            } else if (pair && !pair.includes(':')) {
+              standaloneTokens.push(pair.trim());
+            }
+          }
+          // Map standalone tokens like "heute", "morgen", "übermorgen", weekdays to parameters.date
+          if (!parameters.date && standaloneTokens.length > 0) {
+            const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+            for (const tkRaw of standaloneTokens) {
+              const tk = norm(tkRaw);
+              if (['heute','morgen','ubermorgen','uebermorgen','gestern','montag','dienstag','mittwoch','donnerstag','freitag'].includes(tk)) {
+                parameters.date = tkRaw; // keep original token; server normalizes
+                break;
+              }
             }
           }
         }
