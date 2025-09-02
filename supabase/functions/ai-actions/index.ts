@@ -799,6 +799,13 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
         break;
 
       case 'plan_substitution': {
+        // Check permissions - Level 9+ required for substitution planning
+        const userLevel = userProfile?.permission_lvl || 1;
+        if (userLevel < 9) {
+          result = { error: 'Berechtigung Level 9+ erforderlich für Vertretungsplanung' };
+          break;
+        }
+        
         try {
           const teacherName = String(parameters?.teacherName || '').trim();
           
@@ -852,11 +859,10 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
             });
           };
 
-          // First pass: find all lessons for the sick teacher and build occupied teachers map
+          // First pass: Build complete occupied teachers map for all periods
           for (const table of tables) {
             const { data: rows, error: sErr } = await supabase.from(table).select('*');
             if (sErr) throw sErr;
-            const className = table.replace('Stundenplan_','').replace('_A','');
             
             for (const r of rows || []) {
               const period = r['Stunde'];
@@ -870,6 +876,21 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
               entries.forEach(e => {
                 if (e.teacher) occupiedTeachers[period].add(e.teacher.toLowerCase());
               });
+            }
+          }
+
+          // Second pass: Find lessons of sick teacher and plan substitutions
+          for (const table of tables) {
+            const { data: rows, error: sErr } = await supabase.from(table).select('*');
+            if (sErr) throw sErr;
+            const className = table.replace('Stundenplan_','').replace('_A','');
+            
+            for (const r of rows || []) {
+              const period = r['Stunde'];
+              const cell = r[col] as string | null;
+              if (!cell || typeof cell !== 'string') continue;
+              
+              const entries = parseCell(cell);
               
               // Find lessons where sick teacher is teaching
               const match = entries.find(e => e.teacher && e.teacher.toLowerCase().includes(teacherAbbr));
@@ -886,15 +907,19 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
                 if (availableTeachers.length > 0) {
                   const substitute = availableTeachers[0];
                   substituteTeacher = `${substitute['first name']} ${substitute['last name']} (${substitute.shortened})`;
+                  // Mark this teacher as occupied for this period
+                  occupiedTeachers[period].add((substitute.shortened || '').toLowerCase());
                 }
 
                 substitutions.push({
-                  className,
+                  class_name: className, // Use consistent naming
                   period,
-                  subject: match.subject,
-                  room: match.room,
-                  originalTeacher: teacherName,
-                  substituteTeacher
+                  original_subject: match.subject,
+                  original_teacher: teacherName,
+                  original_room: match.room,
+                  substitute_teacher: substituteTeacher,
+                  substitute_subject: match.subject,
+                  substitute_room: match.room
                 });
               }
             }
@@ -921,6 +946,13 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
       }
 
       case 'confirm_substitution': {
+        // Check permissions - Level 9+ required for substitution confirmation
+        const confUserLevel = userProfile?.permission_lvl || 1;
+        if (confUserLevel < 9) {
+          result = { error: 'Berechtigung Level 9+ erforderlich für Vertretungsplan-Bestätigung' };
+          break;
+        }
+        
         try {
           const dateStr: string = parameters?.date;
           const sickTeacher: string = parameters?.sickTeacher;
@@ -933,14 +965,14 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
 
           const rows = subs.map((s) => ({
             date: dateStr,
-            class_name: String(s.className || '').toLowerCase(),
+            class_name: String(s.class_name || s.className || '').toLowerCase(),
             period: Number(s.period) || 1,
-            original_teacher: sickTeacher || s.originalTeacher || 'Unbekannt',
-            original_subject: s.subject || 'Unbekannt',
-            original_room: s.room || 'Unbekannt',
-            substitute_teacher: s.substituteTeacher || 'Vertretung',
-            substitute_subject: s.subject || 'Vertretung',
-            substitute_room: s.room || 'Unbekannt',
+            original_teacher: sickTeacher || s.original_teacher || s.originalTeacher || 'Unbekannt',
+            original_subject: s.original_subject || s.subject || 'Unbekannt',
+            original_room: s.original_room || s.room || 'Unbekannt',
+            substitute_teacher: s.substitute_teacher || s.substituteTeacher || 'Vertretung',
+            substitute_subject: s.substitute_subject || s.subject || 'Vertretung',
+            substitute_room: s.substitute_room || s.room || 'Unbekannt',
             note: 'Automatisch generiert (AI)',
             created_by: null
           }));
@@ -966,7 +998,11 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
           });
           if (annErr) console.error('Announcement insert error:', annErr);
 
-          result = { message: 'Vertretungsplan gespeichert', count: rows.length };
+          result = { 
+            message: 'Vertretungsplan gespeichert und Ankündigung erstellt', 
+            count: rows.length,
+            confirmed: rows.map(r => `${r.class_name} ${r.period}. Std: ${r.substitute_teacher}`)
+          };
           success = true;
         } catch (e: any) {
           console.error('confirm_substitution error:', e);

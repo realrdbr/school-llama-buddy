@@ -193,7 +193,14 @@ const AIVertretungsGenerator = ({ onGenerated }: AIVertretungsGeneratorProps) =>
           subject: sub.original_subject,
           room: sub.original_room,
           substituteTeacher: sub.substitute_teacher,
-          originalTeacher: sub.original_teacher
+          originalTeacher: sub.original_teacher,
+          // Keep both formats for compatibility
+          class_name: sub.class_name,
+          original_subject: sub.original_subject,
+          original_teacher: sub.original_teacher,
+          original_room: sub.original_room,
+          substitute_subject: sub.substitute_subject,
+          substitute_room: sub.substitute_room
         }));
         
         console.log('Mapped substitutions for display:', mappedSubstitutions);
