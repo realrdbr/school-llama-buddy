@@ -339,21 +339,8 @@ const AudioAnnouncements = () => {
     }
   };
 
-  // Check if user has permission (Level 10 required)
-  if (!profile || profile.permission_lvl < 10) {
-    return (
-      <div className="container mx-auto p-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Keine Berechtigung</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Sie benötigen mindestens Berechtigung Level 10 um Audio-Durchsagen zu verwalten.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // This permission check is now handled by the usePermissionGuard or routes
+  // Individual users can be granted the audio_announcements permission even with lower levels
 
   return (
     <div className="container mx-auto p-6 space-y-6">

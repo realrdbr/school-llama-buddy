@@ -827,12 +827,33 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
           const { data: teacherRows, error: tErr } = await supabase
             .from('teachers')
             .select('shortened, "last name", "first name", subjects');
-          if (tErr) throw tErr;
+            
+          if (tErr) {
+            console.error('Teachers query error:', tErr);
+            throw tErr;
+          }
 
-          const teacherRow = (teacherRows || []).find((t: any) =>
-            (t['last name'] || '').toLowerCase().includes(teacherName.toLowerCase())
-          );
-          const teacherAbbr = (teacherRow?.shortened || teacherName).toLowerCase();
+          console.log('Available teachers:', teacherRows?.length || 0);
+
+          // Find the sick teacher in our database
+          const teacherRow = (teacherRows || []).find((t: any) => {
+            const lastName = (t['last name'] || '').toLowerCase();
+            const firstName = (t['first name'] || '').toLowerCase();
+            const fullName = `${firstName} ${lastName}`.trim();
+            
+            return lastName.includes(teacherName.toLowerCase()) || 
+                   firstName.includes(teacherName.toLowerCase()) ||
+                   fullName.includes(teacherName.toLowerCase()) ||
+                   (t.shortened || '').toLowerCase() === teacherName.toLowerCase();
+          });
+
+          if (!teacherRow) {
+            result = { error: `Lehrer "${teacherName}" nicht in der Lehrerdatenbank gefunden. Verfügbare Lehrer: ${(teacherRows || []).map(t => t['last name']).join(', ')}` };
+            break;
+          }
+
+          const teacherAbbr = (teacherRow.shortened || teacherName).toLowerCase();
+          console.log('Found teacher:', teacherRow['last name'], 'with abbreviation:', teacherAbbr);
 
           const weekday = new Date(dateStr + 'T12:00:00').getDay();
           const dayMap: Record<number, string> = { 1:'monday', 2:'tuesday', 3:'wednesday', 4:'thursday', 5:'friday' };
@@ -844,25 +865,35 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
             break;
           }
 
+          console.log('Searching for lessons on:', col);
+
           const tables = ['Stundenplan_10b_A','Stundenplan_10c_A'];
           const substitutions: any[] = [];
           const occupiedTeachers: Record<number, Set<string>> = {}; // period -> set of teacher abbreviations
 
           const parseCell = (cell?: string) => {
             if (!cell) return [] as Array<{subject:string, teacher:string, room:string}>;
+            
+            // Handle multiple lessons in one cell separated by |
             return cell.split('|').map(s => s.trim()).filter(Boolean).map(sub => {
-              const parts = sub.split(/\s+/);
+              // Parse format like "MA Kö 203" or "DE La 226"
+              const parts = sub.split(/\s+/).filter(p => p.trim());
               if (parts.length >= 3) {
-                return { subject: parts[0], teacher: parts[1], room: parts[2] };
+                const subject = parts[0];
+                const teacher = parts[1];
+                const room = parts.slice(2).join(' '); // Handle multi-word room names
+                return { subject, teacher, room };
+              } else if (parts.length === 2) {
+                return { subject: parts[0], teacher: parts[1], room: 'Unbekannt' };
               }
-              return { subject: sub, teacher: '', room: '' } as any;
+              return { subject: sub, teacher: '', room: 'Unbekannt' };
             });
           };
 
           // First pass: Build complete occupied teachers map for all periods
           for (const table of tables) {
             const { data: rows, error: sErr } = await supabase.from(table).select('*');
-            if (sErr) throw sErr;
+            if (sErr) continue; // Skip if table doesn't exist
             
             for (const r of rows || []) {
               const period = r['Stunde'];
@@ -874,16 +905,22 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
               // Track all occupied teachers for this period
               if (!occupiedTeachers[period]) occupiedTeachers[period] = new Set();
               entries.forEach(e => {
-                if (e.teacher) occupiedTeachers[period].add(e.teacher.toLowerCase());
+                if (e.teacher) {
+                  occupiedTeachers[period].add(e.teacher.toLowerCase());
+                }
               });
             }
           }
 
-          // Second pass: Find lessons of sick teacher and plan substitutions
+          console.log('Occupied teachers map:', occupiedTeachers);
+
+          // Second pass: Find ALL lessons of sick teacher and plan substitutions
           for (const table of tables) {
             const { data: rows, error: sErr } = await supabase.from(table).select('*');
-            if (sErr) throw sErr;
+            if (sErr) continue;
+            
             const className = table.replace('Stundenplan_','').replace('_A','');
+            console.log('Checking schedule for class:', className);
             
             for (const r of rows || []) {
               const period = r['Stunde'];
@@ -892,49 +929,66 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
               
               const entries = parseCell(cell);
               
-              // Find lessons where sick teacher is teaching
-              const match = entries.find(e => e.teacher && e.teacher.toLowerCase().includes(teacherAbbr));
-              if (match) {
-                // Try to find an available substitute teacher
-                const availableTeachers = (teacherRows || []).filter((t: any) => {
-                  const abbr = (t.shortened || '').toLowerCase();
-                  return abbr !== teacherAbbr && // Not the sick teacher
-                         !occupiedTeachers[period]?.has(abbr) && // Not already teaching this period
-                         (t.subjects || '').toLowerCase().includes(match.subject.toLowerCase()); // Can teach this subject
-                });
+              // Find ALL lessons where sick teacher is teaching
+              entries.forEach(entry => {
+                if (entry.teacher && entry.teacher.toLowerCase().includes(teacherAbbr)) {
+                  console.log('Found lesson for sick teacher:', entry, 'in period:', period);
+                  
+                  // Try to find an available substitute teacher who can teach this subject
+                  const subjectLower = entry.subject.toLowerCase();
+                  const availableTeachers = (teacherRows || []).filter((t: any) => {
+                    const abbr = (t.shortened || '').toLowerCase();
+                    const subjects = (t.subjects || '').toLowerCase();
+                    
+                    // Check if teacher is available and can teach the subject
+                    const isNotSick = abbr !== teacherAbbr;
+                    const isNotOccupied = !occupiedTeachers[period]?.has(abbr);
+                    const canTeachSubject = subjects.includes(subjectLower) || 
+                                          subjects.includes(subjectLower.substring(0, 2)) || // Handle abbreviations
+                                          subjectLower.includes('ma') && subjects.includes('mathematik') ||
+                                          subjectLower.includes('de') && subjects.includes('deutsch') ||
+                                          subjectLower.includes('en') && subjects.includes('englisch');
+                    
+                    return isNotSick && isNotOccupied && canTeachSubject;
+                  });
 
-                let substituteTeacher = 'Vertretung';
-                if (availableTeachers.length > 0) {
-                  const substitute = availableTeachers[0];
-                  substituteTeacher = `${substitute['first name']} ${substitute['last name']} (${substitute.shortened})`;
-                  // Mark this teacher as occupied for this period
-                  occupiedTeachers[period].add((substitute.shortened || '').toLowerCase());
+                  let substituteTeacher = 'Vertretung';
+                  if (availableTeachers.length > 0) {
+                    const substitute = availableTeachers[0];
+                    substituteTeacher = `${substitute['first name']} ${substitute['last name']} (${substitute.shortened})`;
+                    // Mark this teacher as occupied for this period
+                    occupiedTeachers[period].add((substitute.shortened || '').toLowerCase());
+                    console.log('Found substitute teacher:', substituteTeacher);
+                  } else {
+                    console.log('No suitable substitute found for subject:', entry.subject, 'in period:', period);
+                  }
+
+                  substitutions.push({
+                    className: className, // Use camelCase for consistency with frontend
+                    period,
+                    subject: entry.subject,
+                    originalTeacher: teacherName,
+                    room: entry.room,
+                    substituteTeacher: substituteTeacher
+                  });
                 }
-
-                substitutions.push({
-                  class_name: className, // Use consistent naming
-                  period,
-                  original_subject: match.subject,
-                  original_teacher: teacherName,
-                  original_room: match.room,
-                  substitute_teacher: substituteTeacher,
-                  substitute_subject: match.subject,
-                  substitute_room: match.room
-                });
-              }
+              });
             }
           }
+
+          console.log('Total substitutions found:', substitutions.length);
 
           if (substitutions.length === 0) {
             result = { 
               details: { date: dateStr, teacher: teacherName, substitutions: [] }, 
-              message: `Keine Stunden für ${teacherName} am ${dateStr} gefunden. Bitte überprüfen Sie den Namen und das Datum.` 
+              message: `Keine Stunden für ${teacherName} am ${dateStr} gefunden. Möglicherweise unterrichtet dieser Lehrer an diesem Tag nicht, oder der Name wurde nicht korrekt erkannt.` 
             };
           } else {
             const dayName = new Date(dateStr + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long' });
             result = { 
               details: { date: dateStr, teacher: teacherName, substitutions }, 
-              message: `Vertretungsplan für ${teacherName} am ${dayName} (${dateStr}) erstellt. ${substitutions.length} Stunde(n) betroffen.` 
+              message: `Vertretungsplan für ${teacherName} am ${dayName} (${dateStr}) erstellt. ${substitutions.length} Stunde(n) betroffen:\n` +
+                       substitutions.map(s => `${s.className}, ${s.period}. Stunde: ${s.subject} → ${s.substituteTeacher}`).join('\n')
             };
           }
           success = true;
