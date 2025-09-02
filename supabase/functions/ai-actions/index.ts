@@ -110,12 +110,30 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
                 .select('shortened, "last name", "first name", subjects');
               if (tErr) throw tErr;
 
-              const teacherRow = (teacherRows || []).find((t: any) =>
-                (t['last name'] || '').toLowerCase().includes(teacherName.toLowerCase()) ||
-                (t['first name'] || '').toLowerCase().includes(teacherName.toLowerCase()) ||
-                (t.shortened || '').toLowerCase() === teacherName.toLowerCase()
-              );
-              const teacherAbbr = (teacherRow?.shortened || teacherName).toLowerCase();
+              // Normalize teacher name: remove titles and diacritics
+              const normalize = (s: string) => (s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+              const stripTitles = (s: string) => normalize(s).replace(/\b(herr|frau|dr|prof|prof\.|frl|fr\u00e4ulein)\b/g, '').replace(/\s+/g, ' ').trim();
+              const teacherNameNorm = stripTitles(teacherName);
+
+              const teacherRow = (teacherRows || []).find((t: any) => {
+                const lastName = normalize(t['last name'] || '');
+                const firstName = normalize(t['first name'] || '');
+                const abbr = normalize(t.shortened || '');
+                const full = `${firstName} ${lastName}`.trim();
+                return lastName.includes(teacherNameNorm) || firstName.includes(teacherNameNorm) || full.includes(teacherNameNorm) || abbr === teacherNameNorm;
+              });
+
+              // Build alias matcher
+              const sickAbbr = normalize(teacherRow?.shortened || teacherNameNorm);
+              const sickLast = normalize(teacherRow?.['last name'] || '');
+              const sickFirst = normalize(teacherRow?.['first name'] || '');
+              const sickTwo = sickLast.slice(0, 2);
+              const sickThree = sickLast.slice(0, 3);
+              const sickAliases = [sickAbbr, sickLast, sickFirst, `${sickFirst} ${sickLast}`.trim(), sickTwo, sickThree].filter(Boolean);
+              const isSickTeacher = (abbr: string) => {
+                const t = normalize(abbr);
+                return sickAliases.some(a => a && (t === a || t.startsWith(a) || a.startsWith(t)));
+              };
 
               const weekday = new Date(dateISO + 'T12:00:00').getDay();
               if (weekday === 0 || weekday === 6) {
@@ -163,14 +181,14 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
                   if (!cell) continue;
                   const entries = parseCell(cell);
                   entries.forEach(entry => {
-                    if (entry.teacher && entry.teacher.toLowerCase().includes(teacherAbbr)) {
+                    if (entry.teacher && isSickTeacher(entry.teacher)) {
                       // find substitute who can teach subject
                       const candidates = (teacherRows || []).filter((t: any) => {
                         const abbr = (t.shortened || '').toLowerCase();
                         const subs = (t.subjects || '').toLowerCase();
                         const subjLower = entry.subject.toLowerCase();
                         const canTeach = subs.includes(subjLower) || subs.includes(subjLower.slice(0,2));
-                        return abbr !== teacherAbbr && !occupied[p]?.has(abbr) && canTeach;
+                        return !isSickTeacher(abbr) && !occupied[p]?.has(abbr) && canTeach;
                       });
                       let substituteTeacher = 'Vertretung';
                       if (candidates.length > 0) {
@@ -1073,7 +1091,7 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
                                           subjectLower.includes('de') && subjects.includes('deutsch') ||
                                           subjectLower.includes('en') && subjects.includes('englisch');
                     
-                    return isNotSick && isNotOccupied && canTeachSubject;
+                    return !isSickTeacher(abbr) && isNotOccupied && canTeachSubject;
                   });
 
                   let substituteTeacher = 'Vertretung';
