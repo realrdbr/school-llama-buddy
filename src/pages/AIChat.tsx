@@ -337,53 +337,56 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.`
       const reader = proxyResponse.body.pipeThrough(new TextDecoderStream()).getReader();
       let assistantContent = '';
 
-      const assistantMessageIndex = conversation.length + 1;
-      setConversation(prev => [...prev, { role: 'assistant', content: '' }]);
+              const assistantMessageIndex = conversation.length + 1;
+              setConversation(prev => [...prev, { role: 'assistant', content: '' }]);
 
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
+              while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
 
-        const lines = value.split('\n');
-        for (const line of lines) {
-          if (line.trim() === '') continue;
+                const lines = value.split('\n');
+                for (const line of lines) {
+                  if (line.trim() === '') continue;
 
-          try {
-            const json = JSON.parse(line);
-            if (json.done === false) {
-              const newContent = json.message?.content || '';
-              assistantContent += newContent;
-              setConversation(prev => {
-                const newConversation = [...prev];
-                newConversation[assistantMessageIndex] = {
-                  role: 'assistant',
-                  content: assistantContent
-                };
-                return newConversation;
-              });
-              scrollToBottom();
-            } else if (json.done === true) {
-              if (conversationId) {
-                const finalAssistantResponse = {
-                  role: 'assistant' as const,
-                  content: assistantContent
-                };
-                await saveMessage(finalAssistantResponse, conversationId);
-                const userId = profile?.id?.toString();
-                await supabase.functions.invoke('chat-service', {
-                  body: {
-                    action: 'touch_conversation',
-                    profileId: userId,
-                    conversationId,
+                  try {
+                    const json = JSON.parse(line);
+                    if (json.done === false) {
+                      const newContent = json.message?.content || '';
+                      assistantContent += newContent;
+                      setConversation(prev => {
+                        const newConversation = [...prev];
+                        newConversation[assistantMessageIndex] = {
+                          role: 'assistant',
+                          content: assistantContent
+                        };
+                        return newConversation;
+                      });
+                      scrollToBottom();
+                    } else if (json.done === true) {
+                      // Process AI actions after completion
+                      await processAIActions(assistantContent, conversationId);
+                      
+                      if (conversationId) {
+                        const finalAssistantResponse = {
+                          role: 'assistant' as const,
+                          content: assistantContent
+                        };
+                        await saveMessage(finalAssistantResponse, conversationId);
+                        const userId = profile?.id?.toString();
+                        await supabase.functions.invoke('chat-service', {
+                          body: {
+                            action: 'touch_conversation',
+                            profileId: userId,
+                            conversationId,
+                          }
+                        });
+                      }
+                    }
+                  } catch (e) {
+                    console.error('Failed to parse line as JSON:', e, line);
                   }
-                });
+                }
               }
-            }
-          } catch (e) {
-            console.error('Failed to parse line as JSON:', e, line);
-          }
-        }
-      }
       
     } catch (error) {
       console.error('Ollama error:', error);
@@ -394,6 +397,88 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.`
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Process AI Actions
+  const processAIActions = async (content: string, conversationId: string | null) => {
+    const actionRegex = /AKTION:([A-Z_]+)\|?([^\n]*)/g;
+    const matches = [...content.matchAll(actionRegex)];
+    
+    for (const match of matches) {
+      const [fullMatch, actionName, paramString] = match;
+      
+      try {
+        // Parse parameters
+        const parameters: any = {};
+        if (paramString) {
+          const paramPairs = paramString.split('|');
+          for (const pair of paramPairs) {
+            const [key, value] = pair.split(':');
+            if (key && value) {
+              parameters[key] = value.trim();
+            }
+          }
+        }
+
+        console.log('Processing AI Action:', actionName, parameters);
+        
+        // Execute the action via ai-actions edge function
+        const { data: actionResult, error } = await supabase.functions.invoke('ai-actions', {
+          body: {
+            action: actionName.toLowerCase(),
+            parameters,
+            userProfile: {
+              user_id: profile?.id,
+              name: profile?.username || profile?.name,
+              permission_lvl: profile?.permission_lvl
+            }
+          }
+        });
+
+        if (error) {
+          console.error('Action execution error:', error);
+          continue;
+        }
+
+        // Add result message to conversation
+        const resultMessage = {
+          role: 'assistant' as const,
+          content: actionResult?.success ? 
+            `✅ ${actionResult.result?.message || 'Aktion erfolgreich ausgeführt!'}\n${actionResult.result?.details || ''}` :
+            `❌ ${actionResult?.result?.error || 'Fehler beim Ausführen der Aktion'}`
+        };
+
+        setConversation(prev => [...prev, resultMessage]);
+
+        // Save result message
+        if (conversationId) {
+          await saveMessage(resultMessage, conversationId);
+        }
+
+        // Show toast notification
+        toast({
+          title: actionResult?.success ? "Aktion ausgeführt" : "Fehler",
+          description: actionResult?.success ? 
+            actionResult.result?.message || "Erfolgreich!" :
+            actionResult?.result?.error || "Fehler beim Ausführen",
+          variant: actionResult?.success ? "default" : "destructive"
+        });
+
+      } catch (error) {
+        console.error('Error processing action:', error);
+        
+        const errorMessage = {
+          role: 'assistant' as const,
+          content: `❌ Fehler beim Ausführen der Aktion ${actionName}: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`
+        };
+
+        setConversation(prev => [...prev, errorMessage]);
+        
+        if (conversationId) {
+          await saveMessage(errorMessage, conversationId);
+        }
+      }
     }
   };
 
