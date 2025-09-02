@@ -175,15 +175,7 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
 
               // Build alias matcher
               const sickAbbr = normalize(teacherRow?.shortened || teacherNameNorm);
-              const sickLast = normalize(teacherRow?.['last name'] || '');
-              const sickFirst = normalize(teacherRow?.['first name'] || '');
-              const sickTwo = sickLast.slice(0, 2);
-              const sickThree = sickLast.slice(0, 3);
-              const sickAliases = [sickAbbr, sickLast, sickFirst, `${sickFirst} ${sickLast}`.trim(), sickTwo, sickThree].filter(Boolean);
-              const isSickTeacher = (abbr: string) => {
-                const t = normalize(abbr);
-                return sickAliases.some(a => a && (t === a || t.startsWith(a) || a.startsWith(t)));
-              };
+              const isSickTeacherAbbr = (abbr: string) => normalize(abbr) === sickAbbr;
 
               const weekday = new Date(dateISO + 'T12:00:00').getDay();
               if (weekday === 0 || weekday === 6) {
@@ -217,7 +209,7 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
                   const cell = r[col] as string | null;
                   if (!cell) continue;
                   if (!occupied[p]) occupied[p] = new Set();
-                  parseCell(cell).forEach(e => e.teacher && occupied[p].add(e.teacher.toLowerCase()));
+                  parseCell(cell).forEach(e => e.teacher && occupied[p].add(normalize(e.teacher)));
                 }
               }
 
@@ -231,19 +223,19 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
                   if (!cell) continue;
                   const entries = parseCell(cell);
                   entries.forEach(entry => {
-                    if (entry.teacher && isSickTeacher(entry.teacher)) {
+                    if (entry.teacher && isSickTeacherAbbr(entry.teacher)) {
                       // find substitute who can teach subject
                       const candidates = (teacherRows || []).filter((t: any) => {
-                        const abbr = (t.shortened || '').toLowerCase();
+                        const abbrNorm = normalize(t.shortened || '');
                         const subs = (t.subjects || '');
                         const canTeach = teacherCanTeachSubject(subs, entry.subject);
-                        return !isSickTeacher(abbr) && !occupied[p]?.has(abbr) && canTeach;
+                        return abbrNorm !== sickAbbr && !occupied[p]?.has(abbrNorm) && canTeach;
                       });
                       let substituteTeacher = 'Vertretung';
                       if (candidates.length > 0) {
                         const c = candidates[0];
                         substituteTeacher = `${c['first name']} ${c['last name']} (${c.shortened})`;
-                        occupied[p].add((c.shortened || '').toLowerCase());
+                        occupied[p].add(normalize(c.shortened || ''));
                       }
                       substitutions.push({
                         className,
@@ -1043,17 +1035,9 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
 
           // Build robust alias list for matching the sick teacher
           const normalize = (s: string) => (s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
-          const sickAbbr = normalize(teacherRow.shortened || teacherName);
-          const sickLast = normalize(teacherRow['last name'] || '');
-          const sickFirst = normalize(teacherRow['first name'] || '');
-          const sickTwo = sickLast.slice(0, 2);
-          const sickThree = sickLast.slice(0, 3);
-          const sickAliases = [sickAbbr, sickLast, sickFirst, `${sickFirst} ${sickLast}`.trim(), sickTwo, sickThree].filter(Boolean);
-          const isSickTeacher = (abbr: string) => {
-            const t = normalize(abbr);
-            return sickAliases.some(a => a && (t === a || t.startsWith(a) || a.startsWith(t)));
-          };
-          console.log('Found teacher:', teacherRow['last name'], 'aliases:', sickAliases);
+          const sickAbbr = normalize(teacherRow.shortened || '');
+          const isSickTeacherAbbr = (abbr: string) => normalize(abbr) === sickAbbr;
+          console.log('Found teacher:', teacherRow['last name'], 'abbr:', sickAbbr);
 
           const weekday = new Date(dateStr + 'T12:00:00').getDay();
           const dayMap: Record<number, string> = { 1:'monday', 2:'tuesday', 3:'wednesday', 4:'thursday', 5:'friday' };
@@ -1106,7 +1090,7 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
               if (!occupiedTeachers[period]) occupiedTeachers[period] = new Set();
               entries.forEach(e => {
                 if (e.teacher) {
-                  occupiedTeachers[period].add(e.teacher.toLowerCase());
+                  occupiedTeachers[period].add(normalize(e.teacher));
                 }
               });
             }
@@ -1137,11 +1121,11 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
                   // Try to find an available substitute teacher who can teach this subject
                   const subjectLower = entry.subject.toLowerCase();
                   const availableTeachers = (teacherRows || []).filter((t: any) => {
-                    const abbr = (t.shortened || '').toLowerCase();
+                    const abbrNorm = normalize(t.shortened || '');
                     const subjects = (t.subjects || '');
-                    const isNotOccupied = !occupiedTeachers[period]?.has(abbr);
+                    const isNotOccupied = !occupiedTeachers[period]?.has(abbrNorm);
                     const canTeachSubject = teacherCanTeachSubject(subjects, entry.subject);
-                    return !isSickTeacher(abbr) && isNotOccupied && canTeachSubject;
+                    return abbrNorm !== sickAbbr && isNotOccupied && canTeachSubject;
                   });
 
                   let substituteTeacher = 'Vertretung';
@@ -1149,7 +1133,7 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
                     const substitute = availableTeachers[0];
                     substituteTeacher = `${substitute['first name']} ${substitute['last name']} (${substitute.shortened})`;
                     // Mark this teacher as occupied for this period
-                    occupiedTeachers[period].add((substitute.shortened || '').toLowerCase());
+                    occupiedTeachers[period].add(normalize(substitute.shortened || ''));
                     console.log('Found substitute teacher:', substituteTeacher);
                   } else {
                     console.log('No suitable substitute found for subject:', entry.subject, 'in period:', period);
