@@ -1115,7 +1115,7 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
               
               // Find ALL lessons where sick teacher is teaching
               entries.forEach(entry => {
-                if (entry.teacher && isSickTeacher(entry.teacher)) {
+                if (entry.teacher && isSickTeacherAbbr(entry.teacher)) {
                   console.log('Found lesson for sick teacher:', entry, 'in period:', period);
                   
                   // Try to find an available substitute teacher who can teach this subject
