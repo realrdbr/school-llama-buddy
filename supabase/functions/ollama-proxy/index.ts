@@ -30,15 +30,15 @@ serve(async (req) => {
     const url = 'https://gymolb.eduard.services/ai/api/chat';
     console.log(`Connecting to Ollama at: ${url}`);
 
-    // Always use chat format with messages
+    // Always use chat format with messages, force streaming like in working version
     const messages = Array.isArray(requestBody?.messages)
       ? requestBody.messages
       : [{ role: 'user', content: requestBody?.prompt || '' }];
     
     const body = {
-      model: requestBody.model,
+      model: 'Redbear/e.d.u.a.r.d.:latest', // Use exact model name from working version
       messages,
-      stream: false,
+      stream: true, // Enable streaming like in working version
       options: requestBody.options || undefined,
     };
 
@@ -46,7 +46,7 @@ serve(async (req) => {
 
     const ollamaResponse = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
 
@@ -55,84 +55,16 @@ serve(async (req) => {
     }
 
     console.log(`Successfully connected to Ollama at: ${url}`);
-
-    // Log response details for debugging
-    const contentType = ollamaResponse.headers.get('content-type') || 'unknown'
-    console.log(`Response Content-Type: ${contentType}`)
     
-    // Read raw text first to handle both JSON and NDJSON robustly
-    const raw = await ollamaResponse.text()
-    console.log(`Raw response length: ${raw.length}`)
-    console.log(`Response starts with: ${raw.substring(0, 100)}...`)
-
-    let responseData: any = null
-    try {
-      // Try full JSON first
-      responseData = JSON.parse(raw)
-      console.log('Successfully parsed as single JSON object')
-    } catch (jsonError) {
-      console.log('Single JSON parsing failed, trying NDJSON parsing...')
-      
-      // Handle NDJSON by parsing all valid JSON lines and merging
-      const lines = raw.split(/\r?\n/).filter(Boolean)
-      console.log(`Found ${lines.length} lines to parse`)
-      
-      const parsedLines: any[] = []
-      for (const line of lines) {
-        try {
-          const parsed = JSON.parse(line)
-          parsedLines.push(parsed)
-        } catch (lineError) {
-          console.log(`Failed to parse line: ${line.substring(0, 50)}...`)
-        }
-      }
-
-      if (parsedLines.length > 0) {
-        console.log(`Successfully parsed ${parsedLines.length} NDJSON lines`)
-        
-        // Find the final response object (where done: true)
-        const finalObj = parsedLines.find(obj => obj.done === true) || parsedLines[parsedLines.length - 1]
-        
-        // Concatenate all message content from all lines
-        const completeContent = parsedLines
-          .filter(obj => obj.message?.content) // Only lines with content
-          .map(obj => obj.message.content)
-          .join('')
-        
-        console.log(`Complete content length: ${completeContent.length}`)
-        console.log(`Complete content: ${completeContent.substring(0, 100)}...`)
-        
-        // Build the final response object
-        responseData = {
-          ...finalObj,
-          response: completeContent,
-          message: {
-            role: 'assistant',
-            content: completeContent
-          }
-        }
-      } else {
-        console.log('No valid JSON lines found, using raw content as fallback')
-        // As a last resort, return the raw content as response
-        responseData = { 
-          response: raw,
-          message: { role: 'assistant', content: raw }
-        }
-      }
-    }
-
-    // Normalize to chat-like shape for frontend compatibility
-    const normalized = responseData?.message?.content
-      ? responseData
-      : { ...responseData, message: { role: 'assistant', content: String(responseData?.response ?? '') } }
-
-    return new Response(
-      JSON.stringify(normalized),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      }
-    )
+    // Stream the response directly back to the client
+    return new Response(ollamaResponse.body, {
+      headers: { 
+        ...corsHeaders, 
+        'Content-Type': 'application/x-ndjson',
+        'Transfer-Encoding': 'chunked'
+      },
+      status: 200
+    })
 
   } catch (error) {
     console.error('Ollama proxy error:', error)
