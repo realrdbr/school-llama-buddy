@@ -965,8 +965,19 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
             break;
           }
 
-          const teacherAbbr = (teacherRow.shortened || teacherName).toLowerCase();
-          console.log('Found teacher:', teacherRow['last name'], 'with abbreviation:', teacherAbbr);
+          // Build robust alias list for matching the sick teacher
+          const normalize = (s: string) => (s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+          const sickAbbr = normalize(teacherRow.shortened || teacherName);
+          const sickLast = normalize(teacherRow['last name'] || '');
+          const sickFirst = normalize(teacherRow['first name'] || '');
+          const sickTwo = sickLast.slice(0, 2);
+          const sickThree = sickLast.slice(0, 3);
+          const sickAliases = [sickAbbr, sickLast, sickFirst, `${sickFirst} ${sickLast}`.trim(), sickTwo, sickThree].filter(Boolean);
+          const isSickTeacher = (abbr: string) => {
+            const t = normalize(abbr);
+            return sickAliases.some(a => a && (t === a || t.startsWith(a) || a.startsWith(t)));
+          };
+          console.log('Found teacher:', teacherRow['last name'], 'aliases:', sickAliases);
 
           const weekday = new Date(dateStr + 'T12:00:00').getDay();
           const dayMap: Record<number, string> = { 1:'monday', 2:'tuesday', 3:'wednesday', 4:'thursday', 5:'friday' };
@@ -1044,7 +1055,7 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
               
               // Find ALL lessons where sick teacher is teaching
               entries.forEach(entry => {
-                if (entry.teacher && entry.teacher.toLowerCase().includes(teacherAbbr)) {
+                if (entry.teacher && isSickTeacher(entry.teacher)) {
                   console.log('Found lesson for sick teacher:', entry, 'in period:', period);
                   
                   // Try to find an available substitute teacher who can teach this subject

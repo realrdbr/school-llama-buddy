@@ -188,19 +188,19 @@ const AIVertretungsGenerator = ({ onGenerated }: AIVertretungsGeneratorProps) =>
         // Map server data to component-expected format
         const substitutions = result?.details?.substitutions || [];
         const mappedSubstitutions = substitutions.map((sub: any) => ({
-          className: sub.class_name,
+          className: sub.className || sub.class_name,
           period: sub.period,
-          subject: sub.original_subject,
-          room: sub.original_room,
-          substituteTeacher: sub.substitute_teacher,
-          originalTeacher: sub.original_teacher,
+          subject: sub.subject || sub.original_subject,
+          room: sub.room || sub.original_room || sub.substitute_room,
+          substituteTeacher: sub.substituteTeacher || sub.substitute_teacher,
+          originalTeacher: sub.originalTeacher || sub.original_teacher,
           // Keep both formats for compatibility
-          class_name: sub.class_name,
-          original_subject: sub.original_subject,
-          original_teacher: sub.original_teacher,
-          original_room: sub.original_room,
-          substitute_subject: sub.substitute_subject,
-          substitute_room: sub.substitute_room
+          class_name: sub.className || sub.class_name,
+          original_subject: sub.subject || sub.original_subject,
+          original_teacher: sub.originalTeacher || sub.original_teacher,
+          original_room: sub.room || sub.original_room,
+          substitute_subject: sub.subject || sub.substitute_subject,
+          substitute_room: sub.room || sub.substitute_room
         }));
         
         console.log('Mapped substitutions for display:', mappedSubstitutions);

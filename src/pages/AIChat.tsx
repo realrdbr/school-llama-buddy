@@ -5,11 +5,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, Loader2, Bot, ArrowLeft, Upload, Paperclip, X, Menu } from 'lucide-react';
+import { Send, Loader2, Bot, ArrowLeft, Upload, Paperclip, X, Menu, CheckCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import ChatSidebar from '@/components/ChatSidebar';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -29,6 +29,20 @@ const AIChat = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Modal state for confirming substitutions (same UI as on Vertretungsplan page)
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [chatProposedPlan, setChatProposedPlan] = useState<{
+    date: string;
+    teacher: string;
+    affectedLessons: Array<{
+      className: string;
+      period: number;
+      subject: string;
+      room: string;
+      substituteTeacher?: string;
+      originalTeacher?: string;
+    }>;
+  } | null>(null);
   // Global functions for substitution confirmation buttons
   useEffect(() => {
     (window as any).confirmSubstitution = async (data: any) => {
@@ -510,7 +524,9 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.`
             }))
           };
 
-          // Add a readable summary instead of buttons
+          // Open modal like on the Vertretungsplan page
+          setChatProposedPlan(proposedPlan);
+          setConfirmOpen(true);
           const summaryMessage = {
             role: 'assistant' as const,
             content: `📋 **Vertretungsplan-Vorschlag für ${details.teacher}**\n` +
@@ -559,6 +575,48 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.`
     }
   };
 
+  // Confirm the proposed substitution plan (chat modal)
+  const handleConfirmChatSubstitution = async () => {
+    if (!chatProposedPlan) return;
+    try {
+      const { data: actionResult, error } = await supabase.functions.invoke('ai-actions', {
+        body: {
+          action: 'confirm_substitution',
+          parameters: {
+            substitutions: chatProposedPlan.affectedLessons,
+            sickTeacher: chatProposedPlan.teacher,
+            date: chatProposedPlan.date,
+          },
+          userProfile: {
+            user_id: profile?.id,
+            name: profile?.username || profile?.name,
+            permission_lvl: profile?.permission_lvl
+          }
+        }
+      });
+
+      if (error) throw error;
+
+      const msg = actionResult?.success
+        ? `✅ ${actionResult.result?.message}\n${(actionResult.result?.confirmed || []).map((c: string) => `- ${c}`).join('\n')}`
+        : `❌ ${actionResult?.result?.error || 'Fehler beim Erstellen des Vertretungsplans'}`;
+      const confirmationMessage = { role: 'assistant' as const, content: msg };
+      setConversation(prev => [...prev, confirmationMessage]);
+      if (currentConversationId) await saveMessage(confirmationMessage, currentConversationId);
+
+      toast({
+        title: actionResult?.success ? 'Erfolg' : 'Fehler',
+        description: actionResult?.success ? 'Vertretungsplan wurde erstellt' : 'Fehler beim Erstellen',
+        variant: actionResult?.success ? 'default' : 'destructive'
+      });
+
+      setConfirmOpen(false);
+      setChatProposedPlan(null);
+    } catch (e: any) {
+      console.error('Confirm chat substitution failed:', e);
+      toast({ title: 'Fehler', description: e.message || 'Fehler beim Bestätigen', variant: 'destructive' });
+    }
+  };
 
   const handleConversationSelect = (conversationId: string | null) => {
     if (conversationId) {
@@ -772,6 +830,59 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.`
             />
           </SheetContent>
         </Sheet>
+
+        {/* Confirmation Dialog (matches Vertretungsplan page) */}
+        <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-primary" />
+                Vertretungsplan bestätigen
+              </DialogTitle>
+            </DialogHeader>
+            {chatProposedPlan && (
+              <div className="space-y-4">
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <h3 className="font-medium mb-2">Abwesenheit: Herr/Frau {chatProposedPlan.teacher}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Datum: {new Date(chatProposedPlan.date + 'T00:00:00').toLocaleDateString('de-DE', {
+                      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                    })}
+                  </p>
+                </div>
+                {chatProposedPlan.affectedLessons?.length > 0 && (
+                  <div>
+                    <h4 className="font-medium mb-2">Betroffene Stunden:</h4>
+                    <div className="max-h-64 overflow-y-auto space-y-2">
+                      {chatProposedPlan.affectedLessons.map((lesson, index) => (
+                        <div key={index} className="flex justify-between items-center p-2 bg-muted rounded">
+                          <div>
+                            <span className="font-medium">{lesson.className}</span>
+                            <span className="text-muted-foreground ml-2">
+                              {lesson.period}. Stunde - {lesson.subject} (Raum {lesson.room || '-'})
+                            </span>
+                          </div>
+                          {lesson.substituteTeacher && (
+                            <span className="text-xs px-2 py-1 rounded bg-secondary/60">
+                              Vertretung: {lesson.substituteTeacher}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="flex gap-2 pt-4">
+                  <Button variant="outline" onClick={() => setConfirmOpen(false)} className="flex-1">Abbrechen</Button>
+                  <Button onClick={handleConfirmChatSubstitution} className="flex-1">
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Bestätigen und Speichern
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
