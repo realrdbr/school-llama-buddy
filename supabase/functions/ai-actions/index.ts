@@ -92,51 +92,164 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
           
           // Parse date using robust German parser and ensure school day
           const dateValue = parseDateTextToBerlinSchoolDay(parameters?.date || parameters?.datum || 'today');
-          
-          // Ensure all required fields are present with fallbacks
+          const dateISO = dateValue.toISOString().split('T')[0];
+
+          // If information is incomplete or period is "all", generate proposals like plan_substitution and ask for confirmation
+          const needsPlanning = !parameters.className || !parameters.originalSubject || !parameters.period || String(parameters.period).toLowerCase() === 'all';
+          if (needsPlanning) {
+            try {
+              const teacherName = String(parameters?.originalTeacher || parameters?.teacherName || '').trim();
+              if (!teacherName) {
+                result = { error: 'Bitte geben Sie den erkrankten Lehrer an (z. B. originalTeacher: "König").' };
+                break;
+              }
+
+              // Load teachers to identify substitutes
+              const { data: teacherRows, error: tErr } = await supabase
+                .from('teachers')
+                .select('shortened, "last name", "first name", subjects');
+              if (tErr) throw tErr;
+
+              const teacherRow = (teacherRows || []).find((t: any) =>
+                (t['last name'] || '').toLowerCase().includes(teacherName.toLowerCase()) ||
+                (t['first name'] || '').toLowerCase().includes(teacherName.toLowerCase()) ||
+                (t.shortened || '').toLowerCase() === teacherName.toLowerCase()
+              );
+              const teacherAbbr = (teacherRow?.shortened || teacherName).toLowerCase();
+
+              const weekday = new Date(dateISO + 'T12:00:00').getDay();
+              if (weekday === 0 || weekday === 6) {
+                result = { error: 'Vertretungen können nur an Schultagen (Mo–Fr) geplant werden.' };
+                break;
+              }
+              const dayMap: Record<number, string> = { 1:'monday', 2:'tuesday', 3:'wednesday', 4:'thursday', 5:'friday' };
+              const col = dayMap[weekday] || 'monday';
+
+              const tables = ['Stundenplan_10b_A','Stundenplan_10c_A'];
+              const occupied: Record<number, Set<string>> = {};
+
+              const parseCell = (cell?: string) => {
+                if (!cell) return [] as Array<{subject:string, teacher:string, room:string}>;
+                return cell.split('|').map(s => s.trim()).filter(Boolean).map(sub => {
+                  const parts = sub.split(/\s+/).filter(Boolean);
+                  if (parts.length >= 3) {
+                    return { subject: parts[0], teacher: parts[1], room: parts.slice(2).join(' ') };
+                  } else if (parts.length === 2) {
+                    return { subject: parts[0], teacher: parts[1], room: 'Unbekannt' };
+                  }
+                  return { subject: sub, teacher: '', room: 'Unbekannt' } as any;
+                });
+              };
+
+              // Build occupied map
+              for (const table of tables) {
+                const { data: rows } = await supabase.from(table).select('*');
+                for (const r of rows || []) {
+                  const p = r['Stunde'];
+                  const cell = r[col] as string | null;
+                  if (!cell) continue;
+                  if (!occupied[p]) occupied[p] = new Set();
+                  parseCell(cell).forEach(e => e.teacher && occupied[p].add(e.teacher.toLowerCase()));
+                }
+              }
+
+              const substitutions: any[] = [];
+              for (const table of tables) {
+                const { data: rows } = await supabase.from(table).select('*');
+                const className = table.replace('Stundenplan_','').replace('_A','');
+                for (const r of rows || []) {
+                  const p = r['Stunde'];
+                  const cell = r[col] as string | null;
+                  if (!cell) continue;
+                  const entries = parseCell(cell);
+                  entries.forEach(entry => {
+                    if (entry.teacher && entry.teacher.toLowerCase().includes(teacherAbbr)) {
+                      // find substitute who can teach subject
+                      const candidates = (teacherRows || []).filter((t: any) => {
+                        const abbr = (t.shortened || '').toLowerCase();
+                        const subs = (t.subjects || '').toLowerCase();
+                        const subjLower = entry.subject.toLowerCase();
+                        const canTeach = subs.includes(subjLower) || subs.includes(subjLower.slice(0,2));
+                        return abbr !== teacherAbbr && !occupied[p]?.has(abbr) && canTeach;
+                      });
+                      let substituteTeacher = 'Vertretung';
+                      if (candidates.length > 0) {
+                        const c = candidates[0];
+                        substituteTeacher = `${c['first name']} ${c['last name']} (${c.shortened})`;
+                        occupied[p].add((c.shortened || '').toLowerCase());
+                      }
+                      substitutions.push({
+                        className,
+                        period: p,
+                        subject: entry.subject,
+                        originalTeacher: teacherName,
+                        room: entry.room,
+                        substituteTeacher
+                      });
+                    }
+                  });
+                }
+              }
+
+              const dayName = new Date(dateISO + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long' });
+              result = {
+                message: substitutions.length > 0
+                  ? `Vorschläge für Vertretungen für ${teacherName} am ${dayName} (${dateISO}). Bitte bestätigen.`
+                  : `Keine Stunden für ${teacherName} am ${dayName} (${dateISO}) gefunden.`,
+                details: { date: dateISO, teacher: teacherName, substitutions }
+              };
+              success = true;
+              break;
+            } catch (e: any) {
+              console.error('update_vertretungsplan planning error:', e);
+              result = { error: e.message || 'Fehler bei der automatischen Planung' };
+              break;
+            }
+          }
+
+          // Direct insert path when all data provided explicitly
           const insertData = {
-            date: dateValue.toISOString().split('T')[0],
-            class_name: parameters.className || parameters.class_name || 'Unbekannte Klasse',
-            period: parseInt(parameters.period) || 1,
-            original_teacher: parameters.originalTeacher || parameters.original_teacher || 'Unbekannt',
-            original_subject: parameters.originalSubject || parameters.original_subject || 'Unbekannt', 
+            date: dateISO,
+            class_name: parameters.className || parameters.class_name,
+            period: parseInt(parameters.period),
+            original_teacher: parameters.originalTeacher || parameters.original_teacher,
+            original_subject: parameters.originalSubject || parameters.original_subject,
             original_room: parameters.originalRoom || parameters.original_room || 'Unbekannt',
             substitute_teacher: parameters.substituteTeacher || parameters.substitute_teacher || 'Vertretung',
-            substitute_subject: parameters.substituteSubject || parameters.substitute_subject || 'Vertretung',
-            substitute_room: parameters.substituteRoom || parameters.substitute_room || 'Unbekannt',
-            note: parameters.note || 'Keine Notizen',
+            substitute_subject: parameters.substituteSubject || parameters.substitute_subject || (parameters.originalSubject || parameters.original_subject),
+            substitute_room: parameters.substituteRoom || parameters.substitute_room || (parameters.originalRoom || parameters.original_room) || 'Unbekannt',
+            note: parameters.note || 'Automatisch generiert (AI)',
             created_by: null
+          };
+
+          // Basic validation
+          if (!insertData.class_name || !insertData.original_subject || !insertData.period) {
+            result = { error: 'Unvollständige Daten. Geben Sie mindestens className, period und originalSubject an oder lassen Sie automatisch planen.' };
+            break;
           }
-          
-          console.log('Inserting data:', insertData)
-          
+
+          console.log('Inserting data (direct):', insertData)
           const { data, error } = await supabase
             .from('vertretungsplan')
             .insert(insertData)
             .select()
-            .single()
-          
+            .single();
           if (!error) {
-            console.log('update_vertretungsplan inserted:', data);
-            // Create announcement automatically for visibility across the app
             const dateStrDE = new Date(insertData.date + 'T12:00:00').toLocaleDateString('de-DE');
-            const announcement = {
+            await supabase.from('announcements').insert({
               title: `Vertretungsplan aktualisiert – ${insertData.class_name}`,
-              content: `${dateStrDE}, ${insertData.period}. Stunde: ${insertData.original_subject} bei ${insertData.original_teacher} wird vertreten durch ${insertData.substitute_teacher} (Raum: ${insertData.substitute_room}).`,
+              content: `${dateStrDE}, ${insertData.period}. Stunde: ${insertData.original_subject} bei ${insertData.original_teacher} → ${insertData.substitute_teacher} (Raum: ${insertData.substitute_room}).`,
               author: 'E.D.U.A.R.D.',
               priority: 'high',
               target_class: insertData.class_name,
               target_permission_level: 1,
               created_by: null,
-            };
-            const { error: annErr } = await supabase.from('announcements').insert(announcement);
-            if (annErr) console.error('Announcement insert error:', annErr);
-
-            result = { message: 'Vertretungsplan wurde erfolgreich aktualisiert.', inserted: data }
-            success = true
+            });
+            result = { message: 'Vertretung eingetragen.', inserted: data };
+            success = true;
           } else {
             console.error('update_vertretungsplan error:', error);
-            result = { error: error.message }
+            result = { error: error.message };
           }
         } else {
           result = { error: 'Keine Berechtigung zum Bearbeiten des Vertretungsplans - Level 10 erforderlich' }

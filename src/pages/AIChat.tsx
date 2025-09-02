@@ -465,6 +465,53 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.`
           variant: actionResult?.success ? "default" : "destructive"
         });
 
+        // If this is a substitution planning response, append confirmation UI
+        const actionNameLower = actionName.toLowerCase();
+        const details = actionResult?.result?.details;
+        const subs = details?.substitutions || [];
+        if (actionResult?.success && (actionNameLower === 'plan_substitution' || actionNameLower === 'update_vertretungsplan') && subs.length > 0) {
+          const confirmPayload = {
+            date: details.date,
+            sickTeacher: details.teacher,
+            substitutions: subs.map((s: any) => ({
+              className: s.className || s.class_name,
+              period: s.period,
+              subject: s.subject || s.original_subject,
+              room: s.room || s.substitute_room || s.original_room,
+              substituteTeacher: s.substituteTeacher || s.substitute_teacher || 'Vertretung'
+            }))
+          };
+          const payloadStr = JSON.stringify(confirmPayload).replace(/'/g, '&#39;');
+          const htmlTable = subs.map((s: any) => `
+            <tr>
+              <td>${(s.className || s.class_name || '').toUpperCase()}</td>
+              <td>${s.period}</td>
+              <td>${s.subject || s.original_subject}</td>
+              <td>${s.substituteTeacher || s.substitute_teacher || 'Vertretung'}</td>
+              <td>${s.room || s.substitute_room || s.original_room || '-'}</td>
+            </tr>`).join('');
+          const confirmHtml = `
+            <div>
+              <p><strong>Bitte bestätigen:</strong> Vertretungen für ${details.teacher} am ${details.date}</p>
+              <table style="width:100%;border-collapse:collapse;min-width:420px">
+                <thead>
+                  <tr><th>Klasse</th><th>Std.</th><th>Fach</th><th>Vertretung</th><th>Raum</th></tr>
+                </thead>
+                <tbody>${htmlTable}</tbody>
+              </table>
+              <div style="margin-top:8px;display:flex;gap:8px">
+                <button onclick="window.confirmSubstitution(${payloadStr})" style="padding:6px 10px;border-radius:6px;background:hsl(142,76%,36%);color:white">Bestätigen</button>
+                <button onclick="window.cancelSubstitution()" style="padding:6px 10px;border-radius:6px;background:hsl(0,84%,60%);color:white">Abbrechen</button>
+              </div>
+            </div>`;
+
+          const confirmMessage = { role: 'assistant' as const, content: confirmHtml };
+          setConversation(prev => [...prev, confirmMessage]);
+          if (conversationId) {
+            await saveMessage(confirmMessage, conversationId);
+          }
+        }
+
       } catch (error) {
         console.error('Error processing action:', error);
         
