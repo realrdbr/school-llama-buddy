@@ -26,94 +26,35 @@ serve(async (req) => {
   try {
     const requestBody = await req.json()
 
-    // Normalize payload: convert chat-style messages to generate prompt if necessary
-    let payload: any = requestBody;
-    if (requestBody && Array.isArray(requestBody.messages)) {
-      const prompt = requestBody.messages.map((m: any) => {
-        const role = m.role || 'user'
-        const prefix = role === 'system' ? 'System' : role === 'assistant' ? 'Assistant' : 'User'
-        return `${prefix}: ${m.content}`
-      }).join('\n\n')
-      payload = {
-        model: requestBody.model,
-        prompt,
-        stream: false,
-        options: requestBody.options || undefined,
-      }
+    // Only use chat endpoint with messages format
+    const url = 'https://gymolb.eduard.services/ai/api/chat';
+    console.log(`Connecting to Ollama at: ${url}`);
+
+    // Always use chat format with messages
+    const messages = Array.isArray(requestBody?.messages)
+      ? requestBody.messages
+      : [{ role: 'user', content: requestBody?.prompt || '' }];
+    
+    const body = {
+      model: requestBody.model,
+      messages,
+      stream: false,
+      options: requestBody.options || undefined,
+    };
+
+    console.log(`Request body:`, JSON.stringify(body, null, 2));
+
+    const ollamaResponse = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!ollamaResponse.ok) {
+      throw new Error(`Ollama API error: ${ollamaResponse.status} - ${ollamaResponse.statusText}`);
     }
 
-    // Forward request to Ollama instance - try HTTP first to avoid TLS issues, then HTTPS
-    const endpoints = [
-      { url: 'https://gymolb.eduard.services/ai', paths: ['/api/generate', '/api/chat'] }
-    ];
-    
-    let ollamaResponse: Response | null = null;
-    let lastError: any;
-    let connected = false;
-    
-    for (const endpoint of endpoints) {
-      for (const path of endpoint.paths) {
-        try {
-          const url = `${endpoint.url}${path}`;
-          console.log(`Trying Ollama at: ${url}`);
-          
-          // Choose appropriate body for endpoint - force non-streaming JSON for stability
-          const useGenerate = path.endsWith('/api/generate');
-
-          let body: any;
-          if (useGenerate) {
-            const prompt = requestBody?.prompt
-              ?? (Array.isArray(requestBody?.messages)
-                ? requestBody.messages.map((m: any) => {
-                    const role = m.role || 'user';
-                    const prefix = role === 'system' ? 'System' : role === 'assistant' ? 'Assistant' : 'User';
-                    return `${prefix}: ${m.content}`;
-                  }).join('\n\n')
-                : '');
-            body = {
-              model: requestBody.model,
-              prompt,
-              stream: false,
-              options: requestBody.options || undefined,
-            };
-          } else {
-            const messages = Array.isArray(requestBody?.messages)
-              ? requestBody.messages
-              : [{ role: 'user', content: requestBody?.prompt || '' }];
-            body = {
-              model: requestBody.model,
-              messages,
-              stream: false,
-              options: requestBody.options || undefined,
-            };
-          }
-
-          ollamaResponse = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify(body),
-          });
-    
-          if (ollamaResponse.ok) {
-            console.log(`Successfully connected to Ollama at: ${url}`);
-            connected = true;
-            break;
-          } else {
-            throw new Error(`Ollama API error: ${ollamaResponse.status}`);
-          }
-        } catch (error) {
-          console.error(`Failed to connect to ${endpoint.url}${path}:`, (error as any).message || error);
-          lastError = error;
-          ollamaResponse = null;
-          continue;
-        }
-      }
-      if (connected) break;
-    }
-
-    if (!ollamaResponse) {
-      throw new Error(`Could not connect to Ollama. Last error: ${lastError?.message}`);
-    }
+    console.log(`Successfully connected to Ollama at: ${url}`);
 
     // Log response details for debugging
     const contentType = ollamaResponse.headers.get('content-type') || 'unknown'
