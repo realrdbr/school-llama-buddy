@@ -26,7 +26,7 @@ serve(async (req) => {
   try {
     const requestBody = await req.json()
 
-    // Only use chat endpoint with messages format
+    // Only use the working chat endpoint URL from curl test
     const url = 'https://gymolb.eduard.services/ai/api/chat';
     console.log(`Connecting to Ollama at: ${url}`);
 
@@ -36,9 +36,9 @@ serve(async (req) => {
       : [{ role: 'user', content: requestBody?.prompt || '' }];
     
     const body = {
-      model: 'Redbear/e.d.u.a.r.d.:latest', // Use exact model name from working version
+      model: requestBody.model || 'Redbear/e.d.u.a.r.d:latest', // Use correct model name from your server
       messages,
-      stream: true, // Enable streaming like in working version
+      stream: true, // Enable streaming like in working curl test
       options: requestBody.options || undefined,
     };
 
@@ -56,7 +56,7 @@ serve(async (req) => {
 
     console.log(`Successfully connected to Ollama at: ${url}`);
     
-    // Stream the response directly back to the client
+    // Stream the response directly back to the client - exactly like curl response
     return new Response(ollamaResponse.body, {
       headers: { 
         ...corsHeaders, 
