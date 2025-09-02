@@ -15,6 +15,8 @@ interface ChatMessage {
   content: string;
 }
 
+const OLLAMA_PROXY_URL = 'https://gymolb.eduard.services/ai/api/chat'; // <-- Stelle sicher, dass die URL korrekt ist
+
 const AIChat = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -106,7 +108,7 @@ const AIChat = () => {
 
   // Load conversation when selected
   const loadConversation = async (conversationId: string) => {
-  try {
+    try {
       const userId = getProfileUUID();
       const { data, error } = await supabase.functions.invoke('chat-service', {
         body: {
@@ -154,7 +156,6 @@ const AIChat = () => {
     if (!profile?.id) return null;
 
     try {
-      // First, check if user has auth session and get the real user_id
       const userId = getProfileUUID();
       
       const { data, error } = await supabase.functions.invoke('chat-service', {
@@ -203,21 +204,19 @@ const AIChat = () => {
   const removeFile = (index: number) => {
     setUploadedFiles(prev => prev.filter((_, i) => i !== index));
   };
-
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() && uploadedFiles.length === 0 || isLoading) return;
+    if ((!input.trim() && uploadedFiles.length === 0) || isLoading) return;
 
     let messageContent = input;
-    
-    // Add file information to message if files are uploaded
     if (uploadedFiles.length > 0) {
-      const fileDescriptions = uploadedFiles.map(file => 
+      const fileDescriptions = uploadedFiles.map(file =>
         `📎 ${file.name} (${file.type}, ${(file.size / 1024).toFixed(1)} KB)`
       ).join('\n');
       messageContent = `${input}\n\n--- Angehängte Dateien ---\n${fileDescriptions}`;
     }
-    
+
     const userMessage = { role: 'user' as const, content: messageContent };
     setConversation(prev => [...prev, userMessage]);
     setIsLoading(true);
@@ -226,7 +225,6 @@ const AIChat = () => {
     setInput('');
     setUploadedFiles([]);
 
-    // Create conversation if it doesn't exist
     let conversationId = currentConversationId;
     if (!conversationId) {
       conversationId = await createNewConversation(currentInput || 'Datei-Upload');
@@ -235,43 +233,15 @@ const AIChat = () => {
       }
     }
 
-    // Save user message
     if (conversationId) {
       await saveMessage(userMessage, conversationId);
     }
 
     try {
-      // Process uploaded files for context
-      let fileContext = '';
-      if (currentFiles.length > 0) {
-        fileContext = '\n\nBEIGEFÜGTE DATEIEN:\n';
-        for (const file of currentFiles) {
-          fileContext += `- ${file.name} (${file.type})\n`;
-          
-          // Read file content for context (simplified)
-          if (file.type.startsWith('text/')) {
-            try {
-              const text = await file.text();
-              fileContext += `  Inhalt: ${text.substring(0, 500)}${text.length > 500 ? '...' : ''}\n`;
-            } catch (error) {
-              fileContext += `  (Text konnte nicht gelesen werden)\n`;
-            }
-          } else if (file.type.startsWith('image/')) {
-            fileContext += `  (Bild-Datei - Analyse nicht implementiert)\n`;
-          } else if (file.type === 'application/pdf') {
-            fileContext += `  (PDF-Datei - Analyse nicht implementiert)\n`;
-          }
-        }
-      }
-
-      // Use Supabase Edge Function as proxy to avoid CORS issues
-      const { data: responseData, error: proxyError } = await supabase.functions.invoke('ollama-proxy', {
-        body: {
-          model: 'Redbear/e.d.u.a.r.d.',
-          messages: [
-            {
-              role: 'system',
-              content: `Du bist E.D.U.A.R.D. (Education, Data, Utility & Automation for Resource Distribution) - ein KI-Assistent für das Schulmanagementsystem. Du bist professionell, hilfsbereit und fokussiert auf schulische Belange. Der Benutzer "${profile?.name}" hat Berechtigung Level ${profile?.permission_lvl}.
+      const messages = [
+        {
+          role: 'system',
+          content: `Du bist E.D.U.A.R.D. (Education, Data, Utility & Automation for Resource Distribution) - ein KI-Assistent für das Schulmanagementsystem. Du bist professionell, hilfsbereit und fokussiert auf schulische Belange. Der Benutzer "${profile?.name}" hat Berechtigung Level ${profile?.permission_lvl}.
 
 **WICHTIG: Du bist E.D.U.A.R.D. - stelle dich immer so vor und nutze diese Identität in deinen Antworten.**
 
@@ -307,17 +277,17 @@ KLASSENSPEZIFISCHE KI-UNTERSTÜTZUNG:
 NEUE STUNDENPLAN-AKTIONEN:
 - GET_CLASS_NEXT_SUBJECT: Finde heraus, wann eine bestimmte Klasse ein bestimmtes Fach hat (Parameter: className, subject)
 - Beispiel: "Wann hat die 10b das nächste Mal Deutsch?" → AKTION:GET_CLASS_NEXT_SUBJECT|className:10b|subject:Deutsch
-          
-  Verfügbare AKTIONEN für Level ${profile?.permission_lvl}:
-  ${profile?.permission_lvl && profile.permission_lvl >= 10 ? 
-    '- CREATE_USER: Benutzer erstellen (Parameter: email, password, username, fullName, permissionLevel)\n- UPDATE_VERTRETUNGSPLAN: Vertretung erstellen (Parameter: date, className, period, originalTeacher, originalSubject, originalRoom, substituteTeacher, substituteSubject, substituteRoom, note)\n- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- CREATE_TTS: Text-to-Speech Durchsage erstellen (Parameter: text, title)\n- PLAN_SUBSTITUTION: Automatische Vertretung bei Krankmeldung (Parameter: teacherName, date)\n- GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_CLASS_NEXT_SUBJECT: Nächstes Fach einer Klasse finden (Parameter: className, subject)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
-  : profile?.permission_lvl && profile.permission_lvl >= 9 ?
-    '- UPDATE_VERTRETUNGSPLAN: Vertretung erstellen (Parameter: date, className, period, originalTeacher, originalSubject, originalRoom, substituteTeacher, substituteSubject, substituteRoom, note)\n- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- CREATE_TTS: Text-to-Speech Durchsage erstellen (Parameter: text, title)\n- PLAN_SUBSTITUTION: Automatische Vertretung bei Krankmeldung (Parameter: teacherName, date)\n- GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_CLASS_NEXT_SUBJECT: Nächstes Fach einer Klasse finden (Parameter: className, subject)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
-  : profile?.permission_lvl && profile.permission_lvl >= 4 ?
-    '- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_CLASS_NEXT_SUBJECT: Nächstes Fach einer Klasse finden (Parameter: className, subject)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
-  : '- GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_CLASS_NEXT_SUBJECT: Nächstes Fach einer Klasse finden (Parameter: className, subject)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
-  }
-          
+      
+ Verfügbare AKTIONEN für Level ${profile?.permission_lvl}:
+ ${profile?.permission_lvl && profile.permission_lvl >= 10 ? 
+  '- CREATE_USER: Benutzer erstellen (Parameter: email, password, username, fullName, permissionLevel)\n- UPDATE_VERTRETUNGSPLAN: Vertretung erstellen (Parameter: date, className, period, originalTeacher, originalSubject, originalRoom, substituteTeacher, substituteSubject, substituteRoom, note)\n- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- CREATE_TTS: Text-to-Speech Durchsage erstellen (Parameter: text, title)\n- PLAN_SUBSTITUTION: Automatische Vertretung bei Krankmeldung (Parameter: teacherName, date)\n- GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_CLASS_NEXT_SUBJECT: Nächstes Fach einer Klasse finden (Parameter: className, subject)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
+ : profile?.permission_lvl && profile.permission_lvl >= 9 ?
+  '- UPDATE_VERTRETUNGSPLAN: Vertretung erstellen (Parameter: date, className, period, originalTeacher, originalSubject, originalRoom, substituteTeacher, substituteSubject, substituteRoom, note)\n- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- CREATE_TTS: Text-to-Speech Durchsage erstellen (Parameter: text, title)\n- PLAN_SUBSTITUTION: Automatische Vertretung bei Krankmeldung (Parameter: teacherName, date)\n- GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_CLASS_NEXT_SUBJECT: Nächstes Fach einer Klasse finden (Parameter: className, subject)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
+ : profile?.permission_lvl && profile.permission_lvl >= 4 ?
+  '- CREATE_ANNOUNCEMENT: Ankündigung erstellen (Parameter: title, content, priority, targetClass, targetPermissionLevel)\n- GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_CLASS_NEXT_SUBJECT: Nächstes Fach einer Klasse finden (Parameter: className, subject)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
+ : '- GET_SCHEDULE: Stundenplan abfragen (Parameter: className, day)\n- GET_CLASS_NEXT_SUBJECT: Nächstes Fach einer Klasse finden (Parameter: className, subject)\n- GET_TEACHERS: Liste der Lehrkräfte abrufen'
+ }
+      
 
 WICHTIGE REGELN:
 1. Du kannst ECHTE AKTIONEN ausführen! Wenn ein Benutzer eine Aktion anfordert, führe sie aus.
@@ -344,240 +314,77 @@ BEISPIELE FÜR STUNDENPLAN-ANFRAGEN:
 4. Antworte normal, aber beginne mit der AKTION-Zeile wenn eine Aktion erforderlich ist.
 5. Bei unvollständigen Angaben verwende sinnvolle Standardwerte.
 
-Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
-            },
-            ...conversation,
-            { role: 'user', content: currentInput + fileContext }
-          ],
-          stream: false
-        }
+Antworte auf Deutsch und führe die angeforderten Aktionen aus.`
+        },
+        ...conversation,
+        { role: 'user', content: currentInput }
+      ];
+
+      const proxyResponse = await fetch(OLLAMA_PROXY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'Redbear/e.d.u.a.r.d.:latest',
+          messages,
+          stream: true
+        })
       });
 
-      if (proxyError) {
-        throw new Error(`Proxy error: ${proxyError.message}`);
+      if (!proxyResponse.ok || !proxyResponse.body) {
+        throw new Error(`Proxy error: ${proxyResponse.statusText}`);
       }
 
-      const data = responseData;
-      let assistantContent = data.message.content;
-      
-      // Check if AI wants to perform an action
-      if (assistantContent.includes('AKTION:')) {
-        // Robustly parse the first AKTION line and all key:value pairs
-        const actionLineMatch = assistantContent.match(/AKTION:[^\n\r]+/i);
-        if (actionLineMatch) {
-          const actionLine = actionLineMatch[0];
-          const parts = actionLine.split('|').map(p => p.trim()).filter(Boolean);
-          let actionName = parts.shift()!.replace(/^AKTION:/i, '').trim();
+      const reader = proxyResponse.body.pipeThrough(new TextDecoderStream()).getReader();
+      let assistantContent = '';
 
-          // Parse parameters (support values containing colons)
-          const parameters: any = {};
-          for (const part of parts) {
-            const [rawKey, ...rawValParts] = part.split(':');
-            if (!rawKey || rawValParts.length === 0) continue;
-            const key = rawKey.trim();
-            const value = rawValParts.join(':').trim();
-            if (key) parameters[key] = value;
-          }
+      const assistantMessageIndex = conversation.length + 1;
+      setConversation(prev => [...prev, { role: 'assistant', content: '' }]);
 
-          // Heuristic override: weekly substitution plan requests
-          const asksWeeklySub = /(vertretungsplan|vertretung).*(woche|diese\s*woche|ganze\s*woche)/i.test(currentInput);
-          if (asksWeeklySub) {
-            // Extract class if not provided
-            if (!parameters.className && !parameters.class_name) {
-              const classMatch = currentInput.match(/\b(\d{1,2}[a-zA-Z])\b/);
-              if (classMatch) parameters.className = classMatch[1];
-            }
-            actionName = 'get_class_substitutions_week';
-            delete (parameters as any).subject; // not needed
-          }
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
 
-          // Detect request: next time for each subject ("jedes Fach" / "alle Fächer")
-          const asksNextEachSubject = /(jedes\s*fach|alle\s*fächer|alle\s*faecher)/i.test(currentInput) && /(n(ä|ae)chste?n?\s*mal|n(ä|ae)chste?n?)/i.test(currentInput);
-          if (asksNextEachSubject) {
-            if (!parameters.className && !parameters.class_name) {
-              const classMatch = currentInput.match(/\b(\d{1,2}[a-zA-Z])\b/);
-              if (classMatch) parameters.className = classMatch[1];
-            }
-            actionName = 'get_class_next_subjects_all';
-            delete (parameters as any).subject;
-          }
+        const lines = value.split('\n');
+        for (const line of lines) {
+          if (line.trim() === '') continue;
 
-          // Normalize teacher honorifics early (edge function also normalizes)
-          if (parameters.teacherName) {
-            parameters.teacherName = parameters.teacherName.replace(/\b(fr\.?|herr|frau|hr\.?)\s+/i, '').trim();
-          }
-
-          // Ensure weekly schedule when user didn't ask for a specific day
-          if (actionName.toLowerCase() === 'get_schedule') {
-            const inputLower = currentInput.toLowerCase();
-            const wantsWeek = /(ganze?n?\s*woche|der\s*woche|woche|alle\s*tage)/i.test(inputLower);
-            const mentionsDay = /(montag|dienstag|mittwoch|donnerstag|freitag|\bmo\b|\bdi\b|\bmi\b|\bdo\b|\bfr\b)/i.test(inputLower);
-            if (wantsWeek || !mentionsDay) {
-              delete parameters.day;
-            }
-          }
-          
           try {
-            // Call ai-actions edge function
-            const { data: actionResult, error: actionError } = await supabase.functions.invoke('ai-actions', {
-              body: {
-                action: actionName.toLowerCase(),
-                parameters,
-                userProfile: {
-                  user_id: profile?.id,
-                  name: profile?.username || profile?.name,
-                  username: profile?.username,
-                  user_class: (profile as any)?.user_class,
-                  permission_lvl: profile?.permission_lvl
-                }
+            const json = JSON.parse(line);
+            if (json.done === false) {
+              const newContent = json.message?.content || '';
+              assistantContent += newContent;
+              setConversation(prev => {
+                const newConversation = [...prev];
+                newConversation[assistantMessageIndex] = {
+                  role: 'assistant',
+                  content: assistantContent
+                };
+                return newConversation;
+              });
+              scrollToBottom();
+            } else if (json.done === true) {
+              if (conversationId) {
+                const finalAssistantResponse = {
+                  role: 'assistant' as const,
+                  content: assistantContent
+                };
+                await saveMessage(finalAssistantResponse, conversationId);
+                const userId = profile?.id?.toString();
+                await supabase.functions.invoke('chat-service', {
+                  body: {
+                    action: 'touch_conversation',
+                    profileId: userId,
+                    conversationId,
+                  }
+                });
               }
-            });
-            
-            if (actionError) {
-              assistantContent += `\n\nFehler bei der Ausführung: ${actionError.message}`;
-            } else if (actionResult?.success) {
-              // Render structured data from edge function to avoid Halluzinationen
-              const res = actionResult.result || {};
-              let details = '';
-              switch (actionName.toLowerCase()) {
-                case 'get_teachers': {
-                  const htmlTable = res.htmlTable as string | undefined;
-                  if (htmlTable) {
-                    details = `\n\n<div style="overflow-x:auto;">${htmlTable}</div>`;
-                  } else {
-                    const textList = res.textList as string | undefined;
-                    if (textList) {
-                      details = `\n\nLehrkräfte:\n${textList}`;
-                    }
-                  }
-                  break;
-                }
-                case 'get_schedule': {
-                  const htmlTable = res.htmlTable as string | undefined;
-                  if (htmlTable) {
-                    details = `\n\n<div style="overflow-x:auto;">${htmlTable}</div>`;
-                  } else {
-                    const rows = (res.schedule || []) as Array<any>;
-                    if (rows.length && 'entry' in rows[0]) {
-                      const lines = rows.map((r: any) => `Stunde ${r.period}: ${r.entry || '-'}`).join('\n');
-                      details = `\n\nStundenplan (Tag):\n${lines}`;
-                    } else if (rows.length) {
-                      const lines = rows.map((r: any) => `Stunde ${r.period}: Mo:${r.monday||'-'} Di:${r.tuesday||'-'} Mi:${r.wednesday||'-'} Do:${r.thursday||'-'} Fr:${r.friday||'-'}`).join('\n');
-                      details = `\n\nStundenplan (Woche):\n${lines}`;
-                    }
-                  }
-                  break;
-                }
-                case 'plan_substitution': {
-                  const conf = (res.confirmations || []) as Array<string>;
-                  const subs = res.details?.substitutions;
-                  if (conf.length) {
-                    details = `\n\nVertretungsplan vorgeschlagen:\n- ${conf.join('\n- ')}`;
-                    
-                    // Add confirmation buttons for substitution planning
-                    if (subs && Array.isArray(subs)) {
-                      details += `\n\n<div style="margin-top: 16px;">
-                        <button 
-                          onclick="window.confirmSubstitution({substitutions: ${JSON.stringify(subs).replace(/"/g, '&quot;')}, sickTeacher: '${res.details?.sickTeacher}', date: '${res.details?.dateISO || res.details?.date}'})" 
-                          style="background: #22c55e; color: white; padding: 8px 16px; border: none; border-radius: 4px; margin-right: 8px; cursor: pointer;">
-                          Vertretungsplan erstellen
-                        </button>
-                        <button 
-                          onclick="window.cancelSubstitution()" 
-                          style="background: #ef4444; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">
-                          Abbrechen
-                        </button>
-                      </div>`;
-                    }
-                  }
-                  break;
-                }
-                case 'get_class_substitutions_week': {
-                  const htmlTable = res.htmlTable as string | undefined;
-                  if (htmlTable) {
-                    details = `\n\n<div style="overflow-x:auto;">${htmlTable}</div>`;
-                  } else {
-                    const subs = (res.substitutions || []) as Array<any>;
-                    if (subs.length) {
-                      const lines = subs.map((s: any) => `${s.date} - ${s.period}. Stunde: ${s.original_subject} → ${s.substitute_teacher || 'Entfall'}`).join('\n');
-                      details = `\n\nVertretungen:\n${lines}`;
-                    } else {
-                      details = `\n\nKeine Vertretungen für diese Woche gefunden.`;
-                    }
-                  }
-                  break;
-                }
-                case 'get_class_next_subjects_all': {
-                  const htmlTable = res.htmlTable as string | undefined;
-                  if (htmlTable) {
-                    details = `\n\n<div style="overflow-x:auto;">${htmlTable}</div>`;
-                  }
-                  break;
-                }
-                default: {
-                  // No special rendering
-                }
-              }
-              assistantContent = `\n\n✅ ${res.message || 'Aktion erfolgreich ausgeführt!'}${details}`;
-            } else {
-              assistantContent += `\n\n❌ ${actionResult?.result?.error || 'Aktion fehlgeschlagen'}`;
             }
-
-            // Make sure we don't keep earlier LLM hallucinations around
-            assistantContent = assistantContent.trim();
-          } catch (error) {
-            console.error('Action execution error:', error);
-            assistantContent += `\n\nFehler bei der Ausführung: ${error}`;
+          } catch (e) {
+            console.error('Failed to parse line as JSON:', e, line);
           }
         }
       }
       
-      // Fallback: Lehrerlisten-Anfrage ohne Aktion -> DB-gestützt laden
-      if (/lehrerliste|liste.*lehr|alle\s+lehrer/i.test(currentInput)) {
-        try {
-          const { data: actionResult } = await supabase.functions.invoke('ai-actions', {
-            body: {
-              action: 'get_teachers',
-              parameters: {},
-              userProfile: {
-                user_id: profile?.id,
-                name: profile?.username || profile?.name,
-                permission_lvl: profile?.permission_lvl
-              }
-            }
-          });
-          if (actionResult?.success) {
-            const res = actionResult.result || {};
-            const htmlTable = res.htmlTable as string | undefined;
-            const details = htmlTable ? `\n\n<div style="overflow-x:auto;">${htmlTable}</div>` : '';
-            assistantContent = `\n\n✅ ${res.message || 'Lehrerliste geladen.'}${details}`;
-          }
-        } catch (e) {
-          console.error('Fallback get_teachers error:', e);
-        }
-      }
-      
-      const assistantResponse = {
-        role: 'assistant' as const,
-        content: assistantContent
-      };
-      
-      setConversation(prev => [...prev, assistantResponse]);
-
-      // Save assistant message
-      if (conversationId) {
-        await saveMessage(assistantResponse, conversationId);
-        
-        // Update conversation timestamp
-          const userId = profile?.id?.toString();
-          await supabase.functions.invoke('chat-service', {
-            body: {
-              action: 'touch_conversation',
-              profileId: userId,
-              conversationId,
-            }
-          });
-      }
     } catch (error) {
       console.error('Ollama error:', error);
       toast({
@@ -589,6 +396,7 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
       setIsLoading(false);
     }
   };
+
 
   const handleConversationSelect = (conversationId: string | null) => {
     if (conversationId) {
@@ -645,124 +453,54 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
         </Sheet>
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col min-h-0">
-        {/* Header */}
-        <header className="border-b bg-card">
-          <div className="px-2 sm:px-4 py-3 sm:py-4">
-            <div className="flex items-center gap-2 sm:gap-4">
-              {/* Mobile Hamburger Menu */}
-              <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="sm" className="lg:hidden flex-shrink-0">
-                    <Menu className="h-4 w-4" />
-                  </Button>
-                </SheetTrigger>
-              </Sheet>
-              
-              <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="flex-shrink-0">
-                <ArrowLeft className="h-4 w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Zurück</span>
+        <main className="flex-1 flex flex-col p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-gray-900 overflow-hidden">
+          {/* Header */}
+          <header className="flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700">
+            <SheetTrigger asChild className="lg:hidden">
+              <Button variant="ghost" size="icon">
+                <Menu className="h-6 w-6" />
               </Button>
-              <div className="flex items-center gap-1 sm:gap-2 min-w-0">
-                <Bot className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
-                <h1 className="text-lg sm:text-2xl font-bold text-foreground truncate">E.D.U.A.R.D.</h1>
-                <p className="text-xs sm:text-sm text-muted-foreground hidden md:block truncate">Education, Data, Utility & Automation for Resource Distribution</p>
-              </div>
+            </SheetTrigger>
+            <div className="flex items-center space-x-2">
+              <Bot className="h-8 w-8 text-primary" />
+              <h1 className="text-xl font-bold">E.D.U.A.R.D. Chat</h1>
             </div>
+            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
+              <ArrowLeft className="h-6 w-6" />
+            </Button>
+          </header>
+
+          {/* Chat Messages */}
+          <div className="flex-1 overflow-y-auto pt-4 pb-20 space-y-4">
+            {conversation.map((msg, index) => (
+              <div key={index} className={`flex items-start gap-4 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+                <div className={`flex flex-col gap-1 p-3 rounded-lg max-w-[70%] ${msg.role === 'user' ? 'bg-primary text-white' : 'bg-secondary text-secondary-foreground'}`}
+                  dangerouslySetInnerHTML={{ __html: msg.content.replace(/\n/g, '<br>') }}
+                />
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
           </div>
-        </header>
 
-        {/* Chat Area */}
-        <main className="flex-1 p-4">
-          <div className="max-w-4xl mx-auto h-full flex flex-col space-y-4">
-            {/* Conversation */}
-            <Card className="flex-1 min-h-0">
-              <CardHeader>
-                <CardTitle>
-                  {currentConversationId ? 'Chat' : 'Neuer Chat'}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="h-full flex flex-col">
-                {conversation.length === 0 ? (
-                  <div className="flex-1 flex items-center justify-center text-center text-muted-foreground">
-                    <div>
-                      <Bot className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                      <h3 className="text-lg font-medium mb-2">Willkommen bei E.D.U.A.R.D.</h3>
-                      <p>Education, Data, Utility & Automation for Resource Distribution</p>
-                      <p className="text-sm mt-2">Stellen Sie eine Frage oder bitten Sie mich, eine Aktion durchzuführen.</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex-1 space-y-4 overflow-y-auto max-h-[60vh]">
-                    {conversation.map((message, index) => (
-                      <div
-                        key={index}
-                        className={`p-4 rounded-lg ${
-                          message.role === 'user'
-                            ? 'bg-primary text-primary-foreground ml-8'
-                            : 'bg-muted mr-8'
-                        }`}
-                      >
-                         <div 
-                           className="prose prose-sm max-w-none dark:prose-invert"
-                           dangerouslySetInnerHTML={{ 
-                             __html: (() => {
-                               const raw = message.content;
-                               const hasHTML = /<[^>]+>/i.test(raw);
-                               const withLineBreaks = hasHTML ? raw : raw.replace(/\n/g, '<br>');
-                               return withLineBreaks.replace(/```([^`]+)```/g, '<pre style="background:#f5f5f5;padding:8px;border-radius:4px;overflow-x:auto;"><code>$1</code></pre>');
-                             })()
-                           }}
-                         />
-                      </div>
-                    ))}
-                     {isLoading && (
-                       <div className="flex items-center gap-2 p-4 bg-muted mr-8 rounded-lg">
-                         <Loader2 className="h-4 w-4 animate-spin" />
-                         <span>KI denkt nach...</span>
-                       </div>
-                     )}
-                     <div ref={messagesEndRef} />
-                   </div>
-                 )}
-              </CardContent>
-            </Card>
-
-            {/* Input */}
-            <Card>
+          {/* Input Form */}
+          <div className="fixed bottom-0 left-0 right-0 p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 backdrop-blur-sm bg-opacity-70 dark:bg-opacity-70">
+            <Card className="shadow-lg max-w-4xl mx-auto w-full">
               <CardContent className="pt-6">
-                {/* File Upload Area */}
-                {uploadedFiles.length > 0 && (
-                  <div className="mb-4 p-3 bg-muted rounded-lg">
-                    <p className="text-sm font-medium mb-2">Angehängte Dateien:</p>
-                    <div className="space-y-2">
+                <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+                  {uploadedFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
                       {uploadedFiles.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between bg-background p-2 rounded">
-                          <div className="flex items-center gap-2">
-                            <Paperclip className="h-4 w-4" />
-                            <span className="text-sm">{file.name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              ({(file.size / 1024).toFixed(1)} KB)
-                            </span>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeFile(index)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
+                        <div key={index} className="flex items-center gap-1 rounded-full bg-slate-200 dark:bg-slate-700 px-3 py-1 text-sm">
+                          <Paperclip className="h-3 w-3" />
+                          <span>{file.name}</span>
+                          <X className="h-3 w-3 cursor-pointer hover:text-red-500" onClick={() => removeFile(index)} />
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
-                
-                <form onSubmit={handleSubmit} className="space-y-3">
-                  <div className="flex gap-2">
+                  )}
+                  <div className="flex items-center gap-2">
                     <Input
-                      placeholder="Stellen Sie hier Ihre Frage oder bitten Sie um eine Aktion..."
+                      placeholder="Stellen Sie Ihre Frage oder führen Sie eine Aktion aus..."
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       disabled={isLoading}
@@ -800,7 +538,6 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.${fileContext}`
             </Card>
           </div>
         </main>
-        </div>
       </div>
     </div>
   );
