@@ -443,6 +443,93 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.`
 
         {/* Mobile Sidebar Sheet */}
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          {/* Main Content */}
+          <main className="flex-1 flex flex-col p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-gray-900 overflow-hidden">
+            {/* Header */}
+            <header className="flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700">
+              <SheetTrigger asChild className="lg:hidden">
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-6 w-6" />
+                </Button>
+              </SheetTrigger>
+              <div className="flex items-center space-x-2">
+                <Bot className="h-8 w-8 text-primary" />
+                <h1 className="text-xl font-bold">E.D.U.A.R.D. Chat</h1>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
+                <ArrowLeft className="h-6 w-6" />
+              </Button>
+            </header>
+
+            {/* Chat Messages */}
+            <div className="flex-1 overflow-y-auto pt-4 pb-20 space-y-4">
+              {conversation.map((msg, index) => (
+                <div key={index} className={`flex items-start gap-4 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+                  <div className={`flex flex-col gap-1 p-3 rounded-lg max-w-[70%] ${msg.role === 'user' ? 'bg-primary text-white' : 'bg-secondary text-secondary-foreground'}`}
+                    dangerouslySetInnerHTML={{ __html: msg.content.replace(/\n/g, '<br>') }}
+                  />
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input Form */}
+            <div className="fixed bottom-0 left-0 right-0 p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 backdrop-blur-sm bg-opacity-70 dark:bg-opacity-70">
+              <Card className="shadow-lg max-w-4xl mx-auto w-full">
+                <CardContent className="pt-6">
+                  <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+                    {uploadedFiles.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {uploadedFiles.map((file, index) => (
+                          <div key={index} className="flex items-center gap-1 rounded-full bg-slate-200 dark:bg-slate-700 px-3 py-1 text-sm">
+                            <Paperclip className="h-3 w-3" />
+                            <span>{file.name}</span>
+                            <X className="h-3 w-3 cursor-pointer hover:text-red-500" onClick={() => removeFile(index)} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Input
+                        placeholder="Stellen Sie Ihre Frage oder führen Sie eine Aktion aus..."
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        disabled={isLoading}
+                        className="flex-1"
+                      />
+                      <input
+                        type="file"
+                        id="file-upload"
+                        multiple
+                        accept=".png,.jpg,.jpeg,.pdf,.txt"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => document.getElementById('file-upload')?.click()}
+                        disabled={isLoading}
+                      >
+                        <Upload className="h-4 w-4" />
+                      </Button>
+                      <Button type="submit" disabled={(!input.trim() && uploadedFiles.length === 0) || isLoading}>
+                        {isLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Unterstützte Dateien: PNG, JPG, PDF, TXT (max. 10MB)
+                    </p>
+                  </form>
+                </CardContent>
+              </Card>
+            </div>
+          </main>
+
           <SheetContent side="left" className="w-80 p-0">
             <ChatSidebar
               currentConversationId={currentConversationId}
@@ -451,93 +538,6 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.`
             />
           </SheetContent>
         </Sheet>
-
-        {/* Main Content */}
-        <main className="flex-1 flex flex-col p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-gray-900 overflow-hidden">
-          {/* Header */}
-          <header className="flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700">
-            <SheetTrigger asChild className="lg:hidden">
-              <Button variant="ghost" size="icon">
-                <Menu className="h-6 w-6" />
-              </Button>
-            </SheetTrigger>
-            <div className="flex items-center space-x-2">
-              <Bot className="h-8 w-8 text-primary" />
-              <h1 className="text-xl font-bold">E.D.U.A.R.D. Chat</h1>
-            </div>
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
-              <ArrowLeft className="h-6 w-6" />
-            </Button>
-          </header>
-
-          {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto pt-4 pb-20 space-y-4">
-            {conversation.map((msg, index) => (
-              <div key={index} className={`flex items-start gap-4 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                <div className={`flex flex-col gap-1 p-3 rounded-lg max-w-[70%] ${msg.role === 'user' ? 'bg-primary text-white' : 'bg-secondary text-secondary-foreground'}`}
-                  dangerouslySetInnerHTML={{ __html: msg.content.replace(/\n/g, '<br>') }}
-                />
-              </div>
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input Form */}
-          <div className="fixed bottom-0 left-0 right-0 p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 backdrop-blur-sm bg-opacity-70 dark:bg-opacity-70">
-            <Card className="shadow-lg max-w-4xl mx-auto w-full">
-              <CardContent className="pt-6">
-                <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-                  {uploadedFiles.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {uploadedFiles.map((file, index) => (
-                        <div key={index} className="flex items-center gap-1 rounded-full bg-slate-200 dark:bg-slate-700 px-3 py-1 text-sm">
-                          <Paperclip className="h-3 w-3" />
-                          <span>{file.name}</span>
-                          <X className="h-3 w-3 cursor-pointer hover:text-red-500" onClick={() => removeFile(index)} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <Input
-                      placeholder="Stellen Sie Ihre Frage oder führen Sie eine Aktion aus..."
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      disabled={isLoading}
-                      className="flex-1"
-                    />
-                    <input
-                      type="file"
-                      id="file-upload"
-                      multiple
-                      accept=".png,.jpg,.jpeg,.pdf,.txt"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => document.getElementById('file-upload')?.click()}
-                      disabled={isLoading}
-                    >
-                      <Upload className="h-4 w-4" />
-                    </Button>
-                    <Button type="submit" disabled={(!input.trim() && uploadedFiles.length === 0) || isLoading}>
-                      {isLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Unterstützte Dateien: PNG, JPG, PDF, TXT (max. 10MB)
-                  </p>
-                </form>
-              </CardContent>
-            </Card>
-          </div>
-        </main>
       </div>
     </div>
   );
