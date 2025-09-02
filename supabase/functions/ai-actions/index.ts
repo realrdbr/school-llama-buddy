@@ -22,7 +22,7 @@ const canonicalSubject = (raw: string) => {
   if (/^de/.test(t)) return 'deutsch';
   if (/^en(g|)/.test(t)) return 'englisch';
   if (/^ru/.test(t)) return 'russisch';
-  if (/^re(l|)/.test(t)) return 'religion';
+  if (/^re(l|i)/.test(t)) return 'religion'; // Added 'reli' pattern
   if (/^ph(y|)/.test(t)) return 'physik';
   if (/^ch(em|)/.test(t)) return 'chemie';
   if (/^bio/.test(t)) return 'biologie';
@@ -35,6 +35,8 @@ const canonicalSubject = (raw: string) => {
   if (/^mu(sik)?$/.test(t)) return 'musik';
   if (/^sport$/.test(t)) return 'sport';
   if (/^eth(ik)?$/.test(t)) return 'ethik';
+  if (/^grw$/.test(t)) return 'geschichte'; // G/R/W becomes grw -> Geschichte
+  if (/^p$/.test(t)) return 'profil'; // P -> Profil
   return t; // fallback to normalized token
 };
 
