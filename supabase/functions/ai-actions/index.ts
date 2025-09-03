@@ -64,6 +64,7 @@ const subjectsToSet = (subjects: string) => {
 const teacherCanTeachSubject = (teacherSubjects: string, lessonSubject: string) => {
   const tset = subjectsToSet(teacherSubjects);
   const canonLesson = canonicalSubject(lessonSubject);
+  console.log(`teacherCanTeachSubject: subjects="${teacherSubjects}" -> set=[${Array.from(tset).join(', ')}], lesson="${lessonSubject}" -> canonical="${canonLesson}", result=${canonLesson ? tset.has(canonLesson) : false}`);
   return canonLesson ? tset.has(canonLesson) : false;
 };
 
@@ -1130,14 +1131,26 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
                   
                   // Try to find an available substitute teacher who can teach this subject
                   const subjectLower = entry.subject.toLowerCase();
+                  console.log('Looking for substitute for subject:', entry.subject, 'canonical:', canonicalSubject(entry.subject));
+                  
                   const availableTeachers = (teacherRows || []).filter((t: any) => {
                     const abbrNorm = normalize(t.shortened || '');
                     const subjects = (t.subjects || '');
                     const isNotOccupied = !occupiedTeachers[period]?.has(abbrNorm);
                     const canTeachSubject = teacherCanTeachSubject(subjects, entry.subject);
+                    
+                    console.log(`Teacher ${t['last name']} (${t.shortened}):`, {
+                      subjects: subjects,
+                      isNotOccupied: isNotOccupied,
+                      canTeachSubject: canTeachSubject,
+                      sickTeacher: abbrNorm !== sickAbbr
+                    });
+                    
                     return abbrNorm !== sickAbbr && isNotOccupied && canTeachSubject;
                   });
 
+                  console.log('Available teachers found:', availableTeachers.length);
+                  
                   let substituteTeacher = 'Vertretung';
                   if (availableTeachers.length > 0) {
                     const substitute = availableTeachers[0];
