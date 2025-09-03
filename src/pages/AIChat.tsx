@@ -288,11 +288,12 @@ KLASSENSPEZIFISCHE KI-UNTERSTÜTZUNG:
 - Bei Fragen wie "Habe ich morgen Deutsch?" prüfe den Stundenplan der Benutzerklasse
 - Bei Vertretungsplan-Anfragen zeige nur die Änderungen für die Benutzerklasse
 
-NEUE STUNDENPLAN-AKTIONEN:
-- GET_CLASS_NEXT_SUBJECT: Finde heraus, wann eine bestimmte Klasse ein bestimmtes Fach hat (Parameter: className, subject)
-- Beispiel: "Wann hat die 10b das nächste Mal Deutsch?" → AKTION:GET_CLASS_NEXT_SUBJECT|className:10b|subject:Deutsch
-      
-WICHTIGE AKTIONEN - Sie können echte Aktionen ausführen:
+STUNDENPLAN UND VERTRETUNGSPLAN AKTIONEN:
+- SHOW_SCHEDULE: Normalen Stundenplan anzeigen (Parameter: className, day optional)
+- SHOW_SUBSTITUTION_PLAN: Vertretungsplan mit markierten Vertretungen anzeigen (Parameter: className, date optional)
+- GET_CLASS_NEXT_SUBJECT: Nächstes Fach einer Klasse finden (Parameter: className, subject)
+
+VERTRETUNGSPLANUNG-AKTIONEN:
 - PLAN_SUBSTITUTION: Vertretung planen (Parameter: teacherName, date) - z.B. "Herr König ist morgen krank"
 - CONFIRM_SUBSTITUTION: Bestätigt den letzten Vertretungsplan-Vorschlag
 - UPDATE_VERTRETUNGSPLAN: Direkte Vertretung (Parameter: date, className, period, originalTeacher, originalSubject, originalRoom, substituteTeacher)
@@ -329,12 +330,18 @@ BEISPIELE FÜR VERTRETUNGSPLAN-ÄNDERUNGEN:
 - "Frau Schmidt braucht Vertretung am Mittwoch" → AKTION:PLAN_SUBSTITUTION|teacherName:Schmidt|date:Mittwoch
 
 BEISPIELE FÜR STUNDENPLAN-ANFRAGEN:
-- "Zeig mir den Stundenplan der 10c am Montag" → AKTION:GET_SCHEDULE|className:10c|day:Montag (nur Montag)
-- "Stundenplan der 10c" → AKTION:GET_SCHEDULE|className:10c (ganze Woche)
-- "Zeig mir den Stundenplan der 10b für die ganze Woche" → AKTION:GET_SCHEDULE|className:10b (ganze Woche)
-- "Stundenplan 10c Mittwoch" → AKTION:GET_SCHEDULE|className:10c|day:Mittwoch (nur Mittwoch)
+- "Zeig mir den Stundenplan der 10c" → AKTION:SHOW_SCHEDULE|className:10c
+- "Stundenplan der 10b am Montag" → AKTION:SHOW_SCHEDULE|className:10b|day:Montag
+- "Stundenplan 10c" → AKTION:SHOW_SCHEDULE|className:10c
+- "Zeig mir den Stundenplan der 10b für die ganze Woche" → AKTION:SHOW_SCHEDULE|className:10b
 - "Wann hat die 10b das nächste Mal Deutsch?" → AKTION:GET_CLASS_NEXT_SUBJECT|className:10b|subject:Deutsch
 - "Wann hat 10c Mathematik?" → AKTION:GET_CLASS_NEXT_SUBJECT|className:10c|subject:Mathematik
+
+BEISPIELE FÜR VERTRETUNGSPLAN-ANFRAGEN:
+- "Zeig mir den Vertretungsplan der 10b" → AKTION:SHOW_SUBSTITUTION_PLAN|className:10b
+- "Vertretungsplan 10c heute" → AKTION:SHOW_SUBSTITUTION_PLAN|className:10c|date:heute
+- "Vertretungsplan der 10b für morgen" → AKTION:SHOW_SUBSTITUTION_PLAN|className:10b|date:morgen
+- "Vertretungsplan 10c am Mittwoch" → AKTION:SHOW_SUBSTITUTION_PLAN|className:10c|date:Mittwoch
 
 4. Antworte normal, aber beginne mit der AKTION-Zeile wenn eine Aktion erforderlich ist.
 5. Bei unvollständigen Angaben verwende sinnvolle Standardwerte.

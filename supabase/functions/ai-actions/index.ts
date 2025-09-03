@@ -1354,7 +1354,7 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
               <tbody>
                 ${rows.map((r: any) => `
                 <tr>
-                  <td style="border:1px solid #ddd; padding:8px; text-align:center; font-weight:bold;">${r.Stunde}</td>
+                  <td style="border:1px solid #ddd; padding:8px; text-align:center; font-weight:bold; background:#f5f5f5;">${r.Stunde}</td>
                   <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.monday)}</td>
                   <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.tuesday)}</td>
                   <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.wednesday)}</td>
@@ -1459,12 +1459,12 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
             const substitution = isCurrentDay && period ? subMap[period] : null;
             
             if (substitution) {
-              // Show substitution in red
-              return `<div style="text-align:center; font-size:13px; background:#ffebee; border:1px solid #f44336; border-radius:4px; padding:4px;">
-                <div style="font-weight:500; color:#d32f2f; margin-bottom:2px;">${substitution.substitute_subject || substitution.original_subject}</div>
-                <div style="color:#d32f2f; font-size:11px;">${substitution.substitute_teacher}</div>
-                <div style="color:#d32f2f; font-size:11px;">${substitution.substitute_room || substitution.original_room}</div>
-                <div style="font-size:10px; color:#666; margin-top:2px;">Vertretung</div>
+              // Show substitution in red background with border
+              return `<div style="padding:8px; min-height:60px; display:flex; flex-direction:column; justify-content:center; background:#ffebee; border:1px solid #f44336; border-radius:4px; color:#d32f2f;">
+                <div style="font-weight:500; margin-bottom:2px;">${substitution.substitute_subject || substitution.original_subject}</div>
+                <div style="font-size:11px; margin-bottom:1px;">${substitution.substitute_teacher}</div>
+                <div style="font-size:11px; margin-bottom:2px;">${substitution.substitute_room || substitution.original_room}</div>
+                <div style="font-size:10px; font-style:italic;">Vertretung</div>
               </div>`;
             }
 
@@ -1482,7 +1482,7 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
               ).join('')}</div>`;
             } else {
               const e = entries[0];
-              return `<div style="text-align:center; font-size:13px;">
+              return `<div style="text-align:center; font-size:13px; padding:8px; min-height:60px; display:flex; flex-direction:column; justify-content:center;">
                 <div style="font-weight:500; margin-bottom:2px;">${e.subject}</div>
                 <div style="color:#666; font-size:11px;">${e.teacher}</div>
                 <div style="color:#666; font-size:11px;">${e.room}</div>
@@ -1506,12 +1506,12 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
               <tbody>
                 ${(scheduleRows || []).map((r: any) => `
                 <tr>
-                  <td style="border:1px solid #ddd; padding:8px; text-align:center; font-weight:bold;">${r.Stunde}</td>
-                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.monday, r.Stunde, currentDayColumn === 'monday')}</td>
-                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.tuesday, r.Stunde, currentDayColumn === 'tuesday')}</td>
-                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.wednesday, r.Stunde, currentDayColumn === 'wednesday')}</td>
-                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.thursday, r.Stunde, currentDayColumn === 'thursday')}</td>
-                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.friday, r.Stunde, currentDayColumn === 'friday')}</td>
+                  <td style="border:1px solid #ddd; padding:8px; text-align:center; font-weight:bold; background:#f5f5f5;">${r.Stunde}</td>
+                  <td style="border:1px solid #ddd; padding:1px;">${formatCellHTML(r.monday, r.Stunde, currentDayColumn === 'monday')}</td>
+                  <td style="border:1px solid #ddd; padding:1px;">${formatCellHTML(r.tuesday, r.Stunde, currentDayColumn === 'tuesday')}</td>
+                  <td style="border:1px solid #ddd; padding:1px;">${formatCellHTML(r.wednesday, r.Stunde, currentDayColumn === 'wednesday')}</td>
+                  <td style="border:1px solid #ddd; padding:1px;">${formatCellHTML(r.thursday, r.Stunde, currentDayColumn === 'thursday')}</td>
+                  <td style="border:1px solid #ddd; padding:1px;">${formatCellHTML(r.friday, r.Stunde, currentDayColumn === 'friday')}</td>
                 </tr>`).join('')}
               </tbody>
             </table>`;
