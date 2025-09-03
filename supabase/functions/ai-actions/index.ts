@@ -1253,6 +1253,285 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
         break;
       }
 
+      case 'show_schedule': {
+        // Display normal schedule for a class
+        try {
+          const className = parameters.className || parameters.class_name;
+          const dayParam = parameters.day;
+          
+          if (!className) {
+            result = { error: 'Klasse muss angegeben werden (z.B. "10b").' };
+            break;
+          }
+
+          // Build table mapping
+          const availableTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
+          const tableMap: Record<string, string> = {};
+          const availableClasses: string[] = [];
+          
+          for (const tableName of availableTables) {
+            const raw = tableName.replace('Stundenplan_', '').replace('_A', '');
+            const rawLower = raw.toLowerCase();
+            const keyVariants = [rawLower, rawLower.replace(/[_\s]/g, '')];
+            keyVariants.forEach(k => tableMap[k] = tableName);
+            availableClasses.push(raw);
+          }
+
+          const normalizedInput = className.toLowerCase().replace(/[_\s]/g, '');
+          let table = tableMap[normalizedInput];
+
+          if (!table) {
+            const entry = Object.entries(tableMap).find(([k]) => 
+              k === normalizedInput || k.startsWith(normalizedInput) || normalizedInput.startsWith(k)
+            );
+            if (entry) table = entry[1];
+          }
+
+          if (!table) {
+            result = { 
+              error: `Stundenplan für Klasse "${className}" nicht gefunden. Verfügbare Klassen: ${availableClasses.join(', ')}` 
+            };
+            break;
+          }
+
+          const { data: rows, error } = await supabase.from(table).select('*').order('Stunde');
+          if (error) throw error;
+          
+          if (!rows || rows.length === 0) {
+            result = { 
+              error: `Keine Stundenplandaten für Klasse "${className}" gefunden.` 
+            };
+            break;
+          }
+
+          // Parse helper
+          const parseEntry = (cell?: string) => {
+            if (!cell) return [];
+            return cell.split('|').map(s => s.trim()).filter(Boolean).map(sub => {
+              const parts = sub.split(/\s+/);
+              if (parts.length >= 3) {
+                return { subject: parts[0], teacher: parts[1], room: parts[2] };
+              }
+              return { subject: sub, teacher: '', room: '' };
+            });
+          };
+
+          const formatCellHTML = (entry?: string) => {
+            const entries = parseEntry(entry);
+            if (entries.length === 0) return '<div style="text-align:center; color:#666;">-</div>';
+            
+            if (entries.length > 1) {
+              return `<div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">${entries.map(e => 
+                `<div style="padding:4px; background:#f5f5f5; border-radius:4px; font-size:12px; border:1px solid #ddd;">
+                  <div style="font-weight:500;">${e.subject}</div>
+                  <div style="color:#666;">${e.teacher}</div>
+                  <div style="color:#666;">${e.room}</div>
+                </div>`
+              ).join('')}</div>`;
+            } else {
+              const e = entries[0];
+              return `<div style="text-align:center; font-size:13px;">
+                <div style="font-weight:500; margin-bottom:2px;">${e.subject}</div>
+                <div style="color:#666; font-size:11px;">${e.teacher}</div>
+                <div style="color:#666; font-size:11px;">${e.room}</div>
+              </div>`;
+            }
+          };
+
+          // Build HTML table
+          const htmlTable = `
+            <table style="border-collapse:collapse; width:100%; font-family:Arial,sans-serif;">
+              <thead style="background:#f0f0f0;">
+                <tr>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Stunde</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Montag</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Dienstag</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Mittwoch</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Donnerstag</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Freitag</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows.map((r: any) => `
+                <tr>
+                  <td style="border:1px solid #ddd; padding:8px; text-align:center; font-weight:bold;">${r.Stunde}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.monday)}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.tuesday)}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.wednesday)}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.thursday)}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.friday)}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>`;
+
+          result = {
+            message: `Stundenplan für Klasse ${className.toUpperCase()}`,
+            htmlTable
+          };
+          success = true;
+        } catch (e: any) {
+          console.error('show_schedule error:', e);
+          result = { error: e.message || 'Fehler beim Laden des Stundenplans' };
+        }
+        break;
+      }
+
+      case 'show_substitution_plan': {
+        // Display substitution plan with normal schedule but substitutions highlighted in red
+        try {
+          const className = parameters.className || parameters.class_name;
+          let targetDate = parameters.date ? parseDateTextToBerlinSchoolDay(parameters.date) : new Date();
+          
+          if (!className) {
+            result = { error: 'Klasse muss angegeben werden (z.B. "10b").' };
+            break;
+          }
+
+          const dateStr = targetDate.toISOString().split('T')[0];
+          const weekday = targetDate.getDay();
+          const dayMap: Record<number, string> = { 1:'monday', 2:'tuesday', 3:'wednesday', 4:'thursday', 5:'friday' };
+          const currentDayColumn = dayMap[weekday];
+
+          if (weekday === 0 || weekday === 6) {
+            result = { error: `Vertretungsplan ist nur für Schultage verfügbar. ${dateStr} ist ein Wochenende.` };
+            break;
+          }
+
+          // Get schedule table
+          const availableTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
+          const tableMap: Record<string, string> = {};
+          
+          for (const tableName of availableTables) {
+            const raw = tableName.replace('Stundenplan_', '').replace('_A', '');
+            const rawLower = raw.toLowerCase();
+            const keyVariants = [rawLower, rawLower.replace(/[_\s]/g, '')];
+            keyVariants.forEach(k => tableMap[k] = tableName);
+          }
+
+          const normalizedInput = className.toLowerCase().replace(/[_\s]/g, '');
+          let table = tableMap[normalizedInput];
+
+          if (!table) {
+            const entry = Object.entries(tableMap).find(([k]) => 
+              k === normalizedInput || k.startsWith(normalizedInput) || normalizedInput.startsWith(k)
+            );
+            if (entry) table = entry[1];
+          }
+
+          if (!table) {
+            result = { error: `Stundenplan für Klasse "${className}" nicht gefunden.` };
+            break;
+          }
+
+          // Get normal schedule
+          const { data: scheduleRows, error: scheduleError } = await supabase.from(table).select('*').order('Stunde');
+          if (scheduleError) throw scheduleError;
+
+          // Get substitutions for this date and class
+          const { data: substitutions, error: subError } = await supabase
+            .from('vertretungsplan')
+            .select('*')
+            .eq('date', dateStr)
+            .ilike('class_name', className);
+          
+          if (subError) throw subError;
+
+          // Build substitution map: period -> substitution info
+          const subMap: Record<number, any> = {};
+          (substitutions || []).forEach(sub => {
+            subMap[sub.period] = sub;
+          });
+
+          // Parse helper
+          const parseEntry = (cell?: string) => {
+            if (!cell) return [];
+            return cell.split('|').map(s => s.trim()).filter(Boolean).map(sub => {
+              const parts = sub.split(/\s+/);
+              if (parts.length >= 3) {
+                return { subject: parts[0], teacher: parts[1], room: parts[2] };
+              }
+              return { subject: sub, teacher: '', room: '' };
+            });
+          };
+
+          const formatCellHTML = (entry?: string, period?: number, isCurrentDay?: boolean) => {
+            // Check if there's a substitution for this period on current day
+            const substitution = isCurrentDay && period ? subMap[period] : null;
+            
+            if (substitution) {
+              // Show substitution in red
+              return `<div style="text-align:center; font-size:13px; background:#ffebee; border:1px solid #f44336; border-radius:4px; padding:4px;">
+                <div style="font-weight:500; color:#d32f2f; margin-bottom:2px;">${substitution.substitute_subject || substitution.original_subject}</div>
+                <div style="color:#d32f2f; font-size:11px;">${substitution.substitute_teacher}</div>
+                <div style="color:#d32f2f; font-size:11px;">${substitution.substitute_room || substitution.original_room}</div>
+                <div style="font-size:10px; color:#666; margin-top:2px;">Vertretung</div>
+              </div>`;
+            }
+
+            // Normal entry
+            const entries = parseEntry(entry);
+            if (entries.length === 0) return '<div style="text-align:center; color:#666;">-</div>';
+            
+            if (entries.length > 1) {
+              return `<div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">${entries.map(e => 
+                `<div style="padding:4px; background:#f5f5f5; border-radius:4px; font-size:12px; border:1px solid #ddd;">
+                  <div style="font-weight:500;">${e.subject}</div>
+                  <div style="color:#666;">${e.teacher}</div>
+                  <div style="color:#666;">${e.room}</div>
+                </div>`
+              ).join('')}</div>`;
+            } else {
+              const e = entries[0];
+              return `<div style="text-align:center; font-size:13px;">
+                <div style="font-weight:500; margin-bottom:2px;">${e.subject}</div>
+                <div style="color:#666; font-size:11px;">${e.teacher}</div>
+                <div style="color:#666; font-size:11px;">${e.room}</div>
+              </div>`;
+            }
+          };
+
+          // Build HTML table with substitutions highlighted
+          const htmlTable = `
+            <table style="border-collapse:collapse; width:100%; font-family:Arial,sans-serif;">
+              <thead style="background:#f0f0f0;">
+                <tr>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Stunde</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Montag</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Dienstag</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Mittwoch</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Donnerstag</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Freitag</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(scheduleRows || []).map((r: any) => `
+                <tr>
+                  <td style="border:1px solid #ddd; padding:8px; text-align:center; font-weight:bold;">${r.Stunde}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.monday, r.Stunde, currentDayColumn === 'monday')}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.tuesday, r.Stunde, currentDayColumn === 'tuesday')}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.wednesday, r.Stunde, currentDayColumn === 'wednesday')}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.thursday, r.Stunde, currentDayColumn === 'thursday')}</td>
+                  <td style="border:1px solid #ddd; padding:4px;">${formatCellHTML(r.friday, r.Stunde, currentDayColumn === 'friday')}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>`;
+
+          const dayName = targetDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' });
+          const substitutionCount = substitutions?.length || 0;
+
+          result = {
+            message: `Vertretungsplan für Klasse ${className.toUpperCase()} am ${dayName}${substitutionCount > 0 ? ` (${substitutionCount} Vertretung${substitutionCount > 1 ? 'en' : ''})` : ' (keine Vertretungen)'}`,
+            htmlTable,
+            substitutions: substitutions || []
+          };
+          success = true;
+        } catch (e: any) {
+          console.error('show_substitution_plan error:', e);
+          result = { error: e.message || 'Fehler beim Laden des Vertretungsplans' };
+        }
+        break;
+      }
+
       default:
         result = { error: 'Unbekannte Aktion' };
         break;
