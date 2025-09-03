@@ -503,11 +503,13 @@ Antworte auf Deutsch und führe die angeforderten Aktionen aus.`
         }
 
         // Add result message to conversation
+        const htmlTable = actionResult?.result?.htmlTable;
+        const resultContent = actionResult?.success
+          ? `${actionResult.result?.message || 'Aktion erfolgreich ausgeführt!'}${htmlTable ? '<br/>' + htmlTable : ''}`
+          : `❌ ${actionResult?.result?.error || 'Fehler beim Ausführen der Aktion'}`;
         const resultMessage = {
           role: 'assistant' as const,
-          content: actionResult?.success ? 
-            `✅ ${actionResult.result?.message || 'Aktion erfolgreich ausgeführt!'}\n${actionResult.result?.details || ''}` :
-            `❌ ${actionResult?.result?.error || 'Fehler beim Ausführen der Aktion'}`
+          content: resultContent
         };
 
         setConversation(prev => [...prev, resultMessage]);

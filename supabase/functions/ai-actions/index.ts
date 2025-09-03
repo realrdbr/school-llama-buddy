@@ -1387,20 +1387,21 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
             break;
           }
 
-          const dateStr = targetDate.toISOString().split('T')[0];
-          const weekday = targetDate.getDay();
-          const dayMap: Record<number, string> = { 1:'monday', 2:'tuesday', 3:'wednesday', 4:'thursday', 5:'friday' };
-          const currentDayColumn = dayMap[weekday];
-
-          if (weekday === 0 || weekday === 6) {
-            result = { error: `Vertretungsplan ist nur für Schultage verfügbar. ${dateStr} ist ein Wochenende.` };
-            break;
-          }
+          // Determine week range (Monday to Friday) around targetDate
+          const getISO = (d: Date) => d.toISOString().split('T')[0];
+          const ref = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+          const dow = ref.getDay(); // 0=Sun..6=Sat
+          const diffToMonday = (dow === 0 ? -6 : 1 - dow);
+          const monday = new Date(ref);
+          monday.setDate(ref.getDate() + diffToMonday);
+          const nextMonday = new Date(monday);
+          nextMonday.setDate(monday.getDate() + 7);
+          const mondayISO = getISO(monday);
+          const nextMondayISO = getISO(nextMonday);
 
           // Get schedule table
           const availableTables = ['Stundenplan_10b_A', 'Stundenplan_10c_A'];
           const tableMap: Record<string, string> = {};
-          
           for (const tableName of availableTables) {
             const raw = tableName.replace('Stundenplan_', '').replace('_A', '');
             const rawLower = raw.toLowerCase();
@@ -1410,117 +1411,119 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
 
           const normalizedInput = className.toLowerCase().replace(/[_\s]/g, '');
           let table = tableMap[normalizedInput];
-
           if (!table) {
             const entry = Object.entries(tableMap).find(([k]) => 
               k === normalizedInput || k.startsWith(normalizedInput) || normalizedInput.startsWith(k)
             );
             if (entry) table = entry[1];
           }
+          if (!table) { result = { error: `Stundenplan für Klasse "${className}" nicht gefunden.` }; break; }
 
-          if (!table) {
-            result = { error: `Stundenplan für Klasse "${className}" nicht gefunden.` };
-            break;
-          }
-
-          // Get normal schedule
+          // Get normal schedule (for layout)
           const { data: scheduleRows, error: scheduleError } = await supabase.from(table).select('*').order('Stunde');
           if (scheduleError) throw scheduleError;
 
-          // Get substitutions for this date and class
+          // Get ALL substitutions for the whole week for this class
           const { data: substitutions, error: subError } = await supabase
             .from('vertretungsplan')
             .select('*')
-            .eq('date', dateStr)
-            .ilike('class_name', className);
-          
+            .ilike('class_name', className)
+            .gte('date', mondayISO)
+            .lt('date', nextMondayISO);
           if (subError) throw subError;
 
-          // Build substitution map: period -> substitution info
-          const subMap: Record<number, any> = {};
+          // Map substitutions by date+period => substitution
+          const subMap: Record<string, any> = {};
           (substitutions || []).forEach(sub => {
-            subMap[sub.period] = sub;
+            const key = `${sub.date}-${sub.period}`;
+            if (!subMap[key]) subMap[key] = sub; // first wins
           });
 
-          // Parse helper
+          // Helper to parse schedule cell
           const parseEntry = (cell?: string) => {
-            if (!cell) return [];
+            if (!cell) return [] as Array<{subject:string, teacher:string, room:string}>;
             return cell.split('|').map(s => s.trim()).filter(Boolean).map(sub => {
               const parts = sub.split(/\s+/);
-              if (parts.length >= 3) {
-                return { subject: parts[0], teacher: parts[1], room: parts[2] };
-              }
+              if (parts.length >= 3) return { subject: parts[0], teacher: parts[1], room: parts[2] };
               return { subject: sub, teacher: '', room: '' };
             });
           };
 
-          const formatCellHTML = (entry?: string, period?: number, isCurrentDay?: boolean) => {
-            // Check if there's a substitution for this period on current day
-            const substitution = isCurrentDay && period ? subMap[period] : null;
-            
-            if (substitution) {
-              // Show substitution in red background with border
+          // Dates for columns
+          const colDates: Record<'monday'|'tuesday'|'wednesday'|'thursday'|'friday', string> = {
+            monday: getISO(monday),
+            tuesday: getISO(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 1)),
+            wednesday: getISO(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 2)),
+            thursday: getISO(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 3)),
+            friday: getISO(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 4)),
+          };
+
+          const formatCellHTML = (entry?: string, period?: number, column?: keyof typeof colDates) => {
+            const dateISO = (column && period) ? colDates[column] : undefined;
+            const sub = (dateISO && period) ? subMap[`${dateISO}-${period}`] : null;
+
+            if (sub) {
               return `<div style="padding:8px; min-height:60px; display:flex; flex-direction:column; justify-content:center; background:#ffebee; border:1px solid #f44336; border-radius:4px; color:#d32f2f;">
-                <div style="font-weight:500; margin-bottom:2px;">${substitution.substitute_subject || substitution.original_subject}</div>
-                <div style="font-size:11px; margin-bottom:1px;">${substitution.substitute_teacher}</div>
-                <div style="font-size:11px; margin-bottom:2px;">${substitution.substitute_room || substitution.original_room}</div>
+                <div style="font-weight:500; margin-bottom:2px;">${sub.substitute_subject || sub.original_subject}</div>
+                <div style="font-size:11px; margin-bottom:1px;">${sub.substitute_teacher || 'Vertretung'}</div>
+                <div style="font-size:11px; margin-bottom:2px;">${sub.substitute_room || sub.original_room || '-'}</div>
                 <div style="font-size:10px; font-style:italic;">Vertretung</div>
               </div>`;
             }
 
-            // Normal entry
             const entries = parseEntry(entry);
             if (entries.length === 0) return '<div style="text-align:center; color:#666;">-</div>';
-            
             if (entries.length > 1) {
               return `<div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">${entries.map(e => 
-                `<div style="padding:4px; background:#f5f5f5; border-radius:4px; font-size:12px; border:1px solid #ddd;">
-                  <div style="font-weight:500;">${e.subject}</div>
-                  <div style="color:#666;">${e.teacher}</div>
-                  <div style="color:#666;">${e.room}</div>
+                `<div style=\"padding:4px; background:#f5f5f5; border-radius:4px; font-size:12px; border:1px solid #ddd;\">
+                  <div style=\"font-weight:500;\">${e.subject}</div>
+                  <div style=\"color:#666;\">${e.teacher}</div>
+                  <div style=\"color:#666;\">${e.room}</div>
                 </div>`
               ).join('')}</div>`;
-            } else {
-              const e = entries[0];
-              return `<div style="text-align:center; font-size:13px; padding:8px; min-height:60px; display:flex; flex-direction:column; justify-content:center;">
-                <div style="font-weight:500; margin-bottom:2px;">${e.subject}</div>
-                <div style="color:#666; font-size:11px;">${e.teacher}</div>
-                <div style="color:#666; font-size:11px;">${e.room}</div>
-              </div>`;
             }
+            const e = entries[0];
+            return `<div style="text-align:center; font-size:13px; padding:8px; min-height:60px; display:flex; flex-direction:column; justify-content:center;">
+              <div style="font-weight:500; margin-bottom:2px;">${e.subject}</div>
+              <div style="color:#666; font-size:11px;">${e.teacher}</div>
+              <div style="color:#666; font-size:11px;">${e.room}</div>
+            </div>`;
           };
 
-          // Build HTML table with substitutions highlighted
+          // Build HTML table (weekly view with red substitutions)
           const htmlTable = `
             <table style="border-collapse:collapse; width:100%; font-family:Arial,sans-serif;">
               <thead style="background:#f0f0f0;">
                 <tr>
                   <th style="border:1px solid #ddd; padding:8px; text-align:center;">Stunde</th>
-                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Montag</th>
-                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Dienstag</th>
-                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Mittwoch</th>
-                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Donnerstag</th>
-                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Freitag</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Montag<br/><span style=\"font-weight:normal; font-size:11px; color:#666;\">${colDates.monday}</span></th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Dienstag<br/><span style=\"font-weight:normal; font-size:11px; color:#666;\">${colDates.tuesday}</span></th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Mittwoch<br/><span style=\"font-weight:normal; font-size:11px; color:#666;\">${colDates.wednesday}</span></th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Donnerstag<br/><span style=\"font-weight:normal; font-size:11px; color:#666;\">${colDates.thursday}</span></th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:center;">Freitag<br/><span style=\"font-weight:normal; font-size:11px; color:#666;\">${colDates.friday}</span></th>
                 </tr>
               </thead>
               <tbody>
                 ${(scheduleRows || []).map((r: any) => `
                 <tr>
                   <td style="border:1px solid #ddd; padding:8px; text-align:center; font-weight:bold; background:#f5f5f5;">${r.Stunde}</td>
-                  <td style="border:1px solid #ddd; padding:1px;">${formatCellHTML(r.monday, r.Stunde, currentDayColumn === 'monday')}</td>
-                  <td style="border:1px solid #ddd; padding:1px;">${formatCellHTML(r.tuesday, r.Stunde, currentDayColumn === 'tuesday')}</td>
-                  <td style="border:1px solid #ddd; padding:1px;">${formatCellHTML(r.wednesday, r.Stunde, currentDayColumn === 'wednesday')}</td>
-                  <td style="border:1px solid #ddd; padding:1px;">${formatCellHTML(r.thursday, r.Stunde, currentDayColumn === 'thursday')}</td>
-                  <td style="border:1px solid #ddd; padding:1px;">${formatCellHTML(r.friday, r.Stunde, currentDayColumn === 'friday')}</td>
+                  <td style="border:1px solid #ddd; padding:1px;">${formatCellHTML(r.monday, r.Stunde, 'monday')}</td>
+                  <td style="border:1px solid #ddd; padding:1px;">${formatCellHTML(r.tuesday, r.Stunde, 'tuesday')}</td>
+                  <td style="border:1px solid #ddd; padding:1px;">${formatCellHTML(r.wednesday, r.Stunde, 'wednesday')}</td>
+                  <td style="border:1px solid #ddd; padding:1px;">${formatCellHTML(r.thursday, r.Stunde, 'thursday')}</td>
+                  <td style="border:1px solid #ddd; padding:1px;">${formatCellHTML(r.friday, r.Stunde, 'friday')}</td>
                 </tr>`).join('')}
               </tbody>
             </table>`;
 
-          const dayName = targetDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' });
-          const substitutionCount = substitutions?.length || 0;
+          // Message with week range and count
+          const fmtDE = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit' });
+          const fmtDEFull = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+          const weekRange = `${fmtDE.format(monday)} – ${fmtDEFull.format(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 4))}`;
+          const substitutionCount = (substitutions || []).length;
 
           result = {
-            message: `Vertretungsplan für Klasse ${className.toUpperCase()} am ${dayName}${substitutionCount > 0 ? ` (${substitutionCount} Vertretung${substitutionCount > 1 ? 'en' : ''})` : ' (keine Vertretungen)'}`,
+            message: `Vertretungsplan für Klasse ${className.toUpperCase()} – Woche ${weekRange} (${substitutionCount} Vertretung${substitutionCount === 1 ? '' : 'en'})`,
             htmlTable,
             substitutions: substitutions || []
           };
