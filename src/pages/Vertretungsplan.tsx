@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import RoleBasedLayout from '@/components/RoleBasedLayout';
 import AIVertretungsGenerator from '@/components/AIVertretungsGenerator';
 import DebugVertretungsplan from '@/components/DebugVertretungsplan';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface SubstitutionEntry {
   id: string;
@@ -74,6 +75,7 @@ const formatWeekRange = (start: Date) => {
 const Vertretungsplan = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
+  const isMobile = useIsMobile();
   const [substitutions, setSubstitutions] = useState<SubstitutionEntry[]>([]);
   const [schedules, setSchedules] = useState<{ [key: string]: ScheduleEntry[] }>({});
   const [showSubstitutionDialog, setShowSubstitutionDialog] = useState(false);
@@ -436,9 +438,9 @@ const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="h-10">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Zurück zum Dashboard
+              <Button variant="ghost" size={isMobile ? "icon" : "sm"} onClick={() => navigate('/')} className="h-10">
+                <ArrowLeft className="h-4 w-4" />
+                {!isMobile && <span className="ml-2">Zurück zum Dashboard</span>}
               </Button>
               <div className="flex items-center gap-3">
                 <Calendar className="h-6 w-6 text-primary" />
@@ -450,54 +452,56 @@ const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >
                 </div>
               </div>
             </div>
-            <div className="flex items-end gap-4">
-              <div className="flex flex-col items-center">
-                <div className="hidden md:block mb-2 text-center">
-                  <Label>Woche</Label>
-                  <div className="text-sm text-muted-foreground">{formatWeekRange(__weekStart)}</div>
+            {!isMobile && (
+              <div className="flex items-end gap-4">
+                <div className="flex flex-col items-center">
+                  <div className="hidden md:block mb-2 text-center">
+                    <Label>Woche</Label>
+                    <div className="text-sm text-muted-foreground">{formatWeekRange(__weekStart)}</div>
+                  </div>
+                  <div className="flex items-center justify-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePrevWeek}
+                      className="relative h-10 w-40"
+                    >
+                      <ChevronLeft className="absolute left-3 h-4 w-4" />
+                      <span className="block w-full text-center">Vorherige Woche</span>
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleThisWeek}
+                      className="h-10 w-32"
+                    >
+                      Diese Woche
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleNextWeek}
+                      className="relative h-10 w-40"
+                    >
+                      <span className="block w-full text-center">Nächste Woche</span>
+                      <ChevronRight className="absolute right-3 h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center justify-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handlePrevWeek}
-                    className="relative h-10 w-40"
-                  >
-                    <ChevronLeft className="absolute left-3 h-4 w-4" />
-                    <span className="block w-full text-center">Vorherige Woche</span>
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleThisWeek}
-                    className="h-10 w-32"
-                  >
-                    Diese Woche
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleNextWeek}
-                    className="relative h-10 w-40"
-                  >
-                    <span className="block w-full text-center">Nächste Woche</span>
-                    <ChevronRight className="absolute right-3 h-4 w-4" />
-                  </Button>
+                <div>
+                  <Label htmlFor="class">Klasse</Label>
+                  <Select value={selectedClass} onValueChange={setSelectedClass}>
+                    <SelectTrigger className="w-32 h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10b">10b</SelectItem>
+                      <SelectItem value="10c">10c</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-              <div>
-                <Label htmlFor="class">Klasse</Label>
-                <Select value={selectedClass} onValueChange={setSelectedClass}>
-                  <SelectTrigger className="w-32 h-10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10b">10b</SelectItem>
-                    <SelectItem value="10c">10c</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </header>
@@ -510,6 +514,59 @@ const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >
           <RoleBasedLayout requiredPermission={10}>
             <AIVertretungsGenerator onGenerated={fetchSubstitutions} />
           </RoleBasedLayout>
+
+          {/* Mobile Navigation Controls */}
+          {isMobile && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="mobile-class">Klasse</Label>
+                    <Select value={selectedClass} onValueChange={setSelectedClass}>
+                      <SelectTrigger className="w-full h-10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10b">10b</SelectItem>
+                        <SelectItem value="10c">10c</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="block mb-2">Woche: {formatWeekRange(__weekStart)}</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handlePrevWeek}
+                        className="flex-1"
+                      >
+                        <ChevronLeft className="h-4 w-4 mr-1" />
+                        Vorherige
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleThisWeek}
+                        className="flex-1"
+                      >
+                        Diese Woche
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleNextWeek}
+                        className="flex-1"
+                      >
+                        Nächste
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           {/* Schedule Table */}
           <Card>
             <CardHeader>
