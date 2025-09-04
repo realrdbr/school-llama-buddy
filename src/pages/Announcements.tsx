@@ -199,18 +199,19 @@ const handleCreateAnnouncement = async () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
+        <div className="container mx-auto px-2 sm:px-4 py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="self-start">
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Zurück zum Dashboard
+                <span className="hidden sm:inline">Zurück zum Dashboard</span>
+                <span className="sm:hidden">Zurück</span>
               </Button>
               <div className="flex items-center gap-3">
-                <Megaphone className="h-6 w-6 text-primary" />
+                <Megaphone className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
                 <div>
-                  <h1 className="text-2xl font-bold text-foreground">Ankündigungen</h1>
-                  <p className="text-muted-foreground">Aktuelle Schulnachrichten</p>
+                  <h1 className="text-xl sm:text-2xl font-bold text-foreground">Ankündigungen</h1>
+                  <p className="text-sm sm:text-base text-muted-foreground">Aktuelle Schulnachrichten</p>
                 </div>
               </div>
             </div>
@@ -221,7 +222,7 @@ const handleCreateAnnouncement = async () => {
               </Button>
             )}
             {canCreateAnnouncements && (
-              <Button onClick={() => setShowCreateForm(!showCreateForm)} className="sm:hidden" size="sm">
+              <Button onClick={() => setShowCreateForm(!showCreateForm)} className="sm:hidden self-start" size="sm">
                 <Plus className="h-4 w-4" />
               </Button>
             )}
@@ -230,7 +231,7 @@ const handleCreateAnnouncement = async () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
         <div className="space-y-6">
           {/* Create Form */}
           {showCreateForm && canCreateAnnouncements && (
@@ -287,13 +288,13 @@ const handleCreateAnnouncement = async () => {
             {announcements.map((announcement) => (
               <Card key={announcement.id} className={`border-l-4 ${getPriorityColor(announcement.priority)}`}>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <Megaphone className="h-4 w-4" />
-                      {announcement.title}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                      <Megaphone className="h-4 w-4 flex-shrink-0" />
+                      <span className="break-words">{announcement.title}</span>
                     </CardTitle>
-                    <div className="flex items-center gap-2">
-                      <div className="text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2 self-start sm:self-center">
+                      <div className="text-xs sm:text-sm text-muted-foreground">
                         {getPriorityText(announcement.priority)}
                       </div>
                       {canCreateAnnouncements && (
@@ -301,8 +302,9 @@ const handleCreateAnnouncement = async () => {
                           variant="ghost" 
                           size="sm"
                           onClick={() => handleDeleteAnnouncement(announcement.id)}
+                          className="h-8 w-8 p-0"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                         </Button>
                       )}
                     </div>
