@@ -209,23 +209,19 @@ const handleCreateAnnouncement = async () => {
               </Button>
               <div className="flex items-center gap-3">
                 <Megaphone className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-foreground">Ankündigungen</h1>
-                  <p className="text-sm sm:text-base text-muted-foreground">Aktuelle Schulnachrichten</p>
+                <div className="flex items-center gap-3">
+                  <div>
+                    <h1 className="text-xl sm:text-2xl font-bold text-foreground">Ankündigungen</h1>
+                    <p className="text-sm sm:text-base text-muted-foreground">Aktuelle Schulnachrichten</p>
+                  </div>
+                  {canCreateAnnouncements && (
+                    <Button onClick={() => setShowCreateForm(!showCreateForm)} size="sm">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
-            {canCreateAnnouncements && (
-              <Button onClick={() => setShowCreateForm(!showCreateForm)} className="hidden sm:flex">
-                <Plus className="h-4 w-4 mr-2" />
-                Neue Ankündigung
-              </Button>
-            )}
-            {canCreateAnnouncements && (
-              <Button onClick={() => setShowCreateForm(!showCreateForm)} className="sm:hidden self-start" size="sm">
-                <Plus className="h-4 w-4" />
-              </Button>
-            )}
           </div>
         </div>
       </header>

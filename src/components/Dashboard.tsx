@@ -158,7 +158,7 @@ const Dashboard = () => {
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:text-right w-full sm:w-auto">
                 {/* Mobile Layout */}
                 <div className="sm:hidden w-full">
-                  <div className="flex items-center gap-3 mb-2">
+                  <div className="flex items-center justify-center gap-3 mb-2">
                     <p className="font-medium text-foreground text-sm">{profile?.name || user?.email}</p>
                     <Badge variant={getPermissionBadgeVariant(profile?.permission_lvl || 1)} className="text-xs">
                       {profile?.permission_lvl >= 10 ? "Schulleitung" : profile?.permission_lvl >= 8 ? "Verwaltung" : profile?.permission_lvl >= 5 ? "Lehrkraft" : profile?.permission_lvl > 1 ? "Schüler" : "Besucher"}
