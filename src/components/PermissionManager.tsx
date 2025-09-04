@@ -206,7 +206,7 @@ const PermissionManager = () => {
         <CardContent className="p-6 text-center">
           <Settings className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <h3 className="text-lg font-medium mb-2">Zugriff verweigert</h3>
-          <p className="text-muted-foreground">Sie benötigen Level 10 Berechtigung, um Berechtigungen zu verwalten.</p>
+          <p className="text-muted-foreground">Sie benötigen Schulleitung-Berechtigung, um Berechtigungen zu verwalten.</p>
         </CardContent>
       </Card>
     );
@@ -230,9 +230,12 @@ const PermissionManager = () => {
           <h2 className="text-2xl font-bold">Berechtigungsverwaltung</h2>
           <p className="text-muted-foreground">Verwalten Sie Benutzerberechtigungen individuell oder nach Level</p>
         </div>
-        <Button onClick={handleReloadPermissions}>
+        <Button onClick={handleReloadPermissions} className="hidden sm:inline-flex">
           <RefreshCw className="h-4 w-4 mr-2" />
           Neu laden
+        </Button>
+        <Button onClick={handleReloadPermissions} className="sm:hidden" size="sm">
+          <RefreshCw className="h-4 w-4" />
         </Button>
       </div>
 

@@ -89,7 +89,7 @@ const OfflineTTS: React.FC<OfflineTTSProps> = ({ text, voiceId, onComplete }) =>
         )}
       </Button>
       {text && (
-        <span className="text-xs text-muted-foreground">
+        <span className="hidden text-xs text-muted-foreground">
           Offline TTS bereit
         </span>
       )}

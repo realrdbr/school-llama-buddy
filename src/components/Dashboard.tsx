@@ -155,15 +155,19 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
-              <div className="flex flex-col sm:text-right">
-                <p className="font-medium text-foreground text-sm sm:text-base">{profile?.name || user?.email}</p>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:text-right">
+                <div className="flex items-center gap-2">
+                  <p className="font-medium text-foreground text-sm sm:text-base">{profile?.name || user?.email}</p>
+                  {hasPermission('user_management') && (
+                    <Button variant="outline" size="sm" onClick={() => setShowCreateUser(true)} className="sm:hidden text-xs">
+                      <UserPlus className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant={getPermissionBadgeVariant(profile?.permission_lvl || 1)} className="text-xs">
                     {profile?.permission_lvl >= 10 ? "Schulleitung" : profile?.permission_lvl >= 8 ? "Verwaltung" : profile?.permission_lvl >= 5 ? "Lehrkraft" : profile?.permission_lvl > 1 ? "Schüler" : "Besucher"}
                   </Badge>
-                  <span className={`text-xs sm:text-sm ${getPermissionColor(profile?.permission_lvl || 1)}`}>
-                    Level {profile?.permission_lvl || 1}
-                  </span>
                 </div>
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
@@ -174,7 +178,7 @@ const Dashboard = () => {
                     <span className="sm:hidden">Erstellen</span>
                   </Button>
                 )}
-                <Button variant="outline" size="sm" onClick={handleSignOut} className="flex-1 sm:flex-none text-xs sm:text-sm">
+                <Button variant="outline" size="sm" onClick={handleSignOut} className="hidden sm:flex flex-1 sm:flex-none text-xs sm:text-sm">
                   <LogOut className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   Abmelden
                 </Button>

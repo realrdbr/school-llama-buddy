@@ -504,7 +504,7 @@ const AudioAnnouncements = () => {
                   </p>
                 </div>
                 
-                <div className="flex items-center gap-2">
+                <div className="flex sm:flex-row flex-col sm:items-center items-start gap-2">
                   <Button
                     size="sm"
                     variant="outline"

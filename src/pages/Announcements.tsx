@@ -215,9 +215,14 @@ const handleCreateAnnouncement = async () => {
               </div>
             </div>
             {canCreateAnnouncements && (
-              <Button onClick={() => setShowCreateForm(!showCreateForm)}>
+              <Button onClick={() => setShowCreateForm(!showCreateForm)} className="hidden sm:flex">
                 <Plus className="h-4 w-4 mr-2" />
                 Neue Ankündigung
+              </Button>
+            )}
+            {canCreateAnnouncements && (
+              <Button onClick={() => setShowCreateForm(!showCreateForm)} className="sm:hidden" size="sm">
+                <Plus className="h-4 w-4" />
               </Button>
             )}
           </div>

@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Upload, FileText, MessageSquare, Trash2, Eye, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -211,11 +212,30 @@ const DocumentAnalysis = () => {
       </div>
 
       <Tabs defaultValue="upload" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="upload">Hochladen</TabsTrigger>
-          <TabsTrigger value="documents">Meine Dokumente</TabsTrigger>
-          <TabsTrigger value="qa">Fragen & Antworten</TabsTrigger>
-        </TabsList>
+        <div className="hidden sm:block">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="upload">Hochladen</TabsTrigger>
+            <TabsTrigger value="documents">Meine Dokumente</TabsTrigger>
+            <TabsTrigger value="qa">Fragen & Antworten</TabsTrigger>
+          </TabsList>
+        </div>
+        <div className="sm:hidden">
+          <Select value="upload" onValueChange={(value) => {
+            // Handle tab switching for mobile
+            const tabs = ['upload', 'documents', 'qa'];
+            const event = new CustomEvent('tabChange', { detail: value });
+            document.dispatchEvent(event);
+          }}>
+            <SelectTrigger className="w-full mb-4">
+              <SelectValue placeholder="Bereich auswählen" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="upload">Hochladen</SelectItem>
+              <SelectItem value="documents">Meine Dokumente</SelectItem>
+              <SelectItem value="qa">Fragen & Antworten</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
         <TabsContent value="upload">
           <Card>

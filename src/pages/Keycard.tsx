@@ -166,12 +166,35 @@ const Keycard = () => {
     }
   };
 
-  const handleDeleteKeycard = (id: string) => {
-    setKeycards(keycards.filter(card => card.id !== id));
-    toast({
-      title: "Keycard gelöscht",
-      description: "Die Keycard wurde erfolgreich entfernt."
-    });
+  const handleDeleteKeycard = async (id: string) => {
+    if (!confirm('Keycard wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('permissions')
+        .update({
+          keycard_number: null,
+          keycard_active: false
+        })
+        .eq('id', parseInt(id));
+
+      if (error) throw error;
+
+      await fetchKeycards();
+      toast({
+        title: "Keycard gelöscht",
+        description: "Die Keycard wurde erfolgreich entfernt."
+      });
+    } catch (error) {
+      console.error('Error deleting keycard:', error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Keycard konnte nicht gelöscht werden."
+      });
+    }
   };
 
   const toggleKeycard = (id: string) => {
@@ -214,7 +237,7 @@ const Keycard = () => {
             {canManageKeycards && (
               <Dialog open={showCreateKeycard} onOpenChange={setShowCreateKeycard}>
                 <DialogTrigger asChild>
-                  <Button>
+                  <Button className="hidden sm:flex">
                     <Plus className="h-4 w-4 mr-2" />
                     Keycard registrieren
                   </Button>
@@ -265,6 +288,11 @@ const Keycard = () => {
                 </DialogContent>
               </Dialog>
             )}
+            {canManageKeycards && (
+              <Button onClick={() => setShowCreateKeycard(true)} className="sm:hidden" size="sm">
+                <Plus className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -305,7 +333,7 @@ const Keycard = () => {
                     </div>
                   )}
 
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-1 sm:gap-2">
                     {canManageKeycards && (
                       <>
                         <Button 
@@ -315,22 +343,28 @@ const Keycard = () => {
                             setSelectedKeycard(keycard);
                             setShowEditKeycard(true);
                           }}
+                          className="text-xs"
                         >
-                          <Edit className="h-4 w-4" />
+                          <Edit className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
+                          <span className="hidden sm:inline">Bearbeiten</span>
                         </Button>
                         <Button 
                           variant="outline" 
                           size="sm" 
                           onClick={() => toggleKeycard(keycard.id)}
+                          className="text-xs"
                         >
-                          {keycard.isActive ? 'Deaktivieren' : 'Aktivieren'}
+                          <span className="hidden sm:inline">{keycard.isActive ? 'Deaktivieren' : 'Aktivieren'}</span>
+                          <span className="sm:hidden">{keycard.isActive ? '❌' : '✅'}</span>
                         </Button>
                         <Button 
                           variant="destructive" 
                           size="sm"
                           onClick={() => handleDeleteKeycard(keycard.id)}
+                          className="text-xs"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
+                          <span className="hidden sm:inline">Löschen</span>
                         </Button>
                       </>
                     )}
