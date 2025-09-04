@@ -430,7 +430,31 @@ Antworte stets höflich, professionell und schulgerecht auf Deutsch.`;
         if (teacherError) {
           result = { error: teacherError.message }
         } else {
-          result = { teachers: teachers || [] }
+          // Create HTML table for teachers list
+          const htmlTable = `
+            <table style="border-collapse:collapse; width:100%; font-family:Arial,sans-serif; margin:10px 0;">
+              <thead style="background:#f0f0f0;">
+                <tr>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:left;">Kürzel</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:left;">Name</th>
+                  <th style="border:1px solid #ddd; padding:8px; text-align:left;">Fächer</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(teachers || []).map((teacher: any) => `
+                <tr>
+                  <td style="border:1px solid #ddd; padding:8px; font-weight:bold; text-align:center;">${teacher.shortened || '-'}</td>
+                  <td style="border:1px solid #ddd; padding:8px;">${teacher['first name']} ${teacher['last name']}</td>
+                  <td style="border:1px solid #ddd; padding:8px;">${teacher.subjects || '-'}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>`;
+          
+          result = { 
+            message: `📋 **Lehrerliste** (${(teachers || []).length} Lehrkräfte)`,
+            htmlTable,
+            teachers: teachers || [] 
+          }
           success = true
         }
         break
