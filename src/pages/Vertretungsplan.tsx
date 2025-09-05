@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import RoleBasedLayout from '@/components/RoleBasedLayout';
 import AIVertretungsGenerator from '@/components/AIVertretungsGenerator';
 import DebugVertretungsplan from '@/components/DebugVertretungsplan';
+import { EditSubstitutionDialog } from '@/components/EditSubstitutionDialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface SubstitutionEntry {
@@ -81,10 +82,12 @@ const Vertretungsplan = () => {
   const [showSubstitutionDialog, setShowSubstitutionDialog] = useState(false);
   const [selectedScheduleEntry, setSelectedScheduleEntry] = useState<{
     class: string;
-    day: string;
+    day: string; 
     period: number;
     entry: ParsedScheduleEntry;
     targetDate?: string;
+    isEdit?: boolean;
+    substitutionId?: string;
   } | null>(null);
   const [substitutionData, setSubstitutionData] = useState({
     substituteTeacher: '',
@@ -303,115 +306,159 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
     targetDay.setDate(targetDay.getDate() + dayMapping[day as keyof typeof dayMapping]);
     const targetDateString = toISODateLocal(targetDay);
     
-    // Only allow editing if there's no existing substitution for this specific date/class/period
-    if (hasSubstitution(classname, day, period)) {
-      toast({
-        title: "Vertretung bereits vorhanden",
-        description: "Für diese Stunde ist bereits eine Vertretung eingetragen."
+    // Check if there's an existing substitution
+    const existingSubstitution = getSubstitution(classname, day, period);
+    
+    if (existingSubstitution) {
+      // Edit existing substitution
+      setSelectedScheduleEntry({ 
+        class: classname, 
+        day, 
+        period, 
+        entry, 
+        targetDate: targetDateString,
+        isEdit: true,
+        substitutionId: existingSubstitution.id
       });
-      return;
+      setSubstitutionData({ 
+        substituteTeacher: existingSubstitution.substituteTeacher || '', 
+        substituteSubject: existingSubstitution.subject,
+        substituteRoom: existingSubstitution.room,
+        note: existingSubstitution.note || ''
+      });
+    } else {
+      // Create new substitution
+      setSelectedScheduleEntry({ class: classname, day, period, entry, targetDate: targetDateString, isEdit: false });
+      setSubstitutionData({ 
+        substituteTeacher: '', 
+        substituteSubject: entry.subject,
+        substituteRoom: entry.room,
+        note: '' 
+      });
     }
     
-    setSelectedScheduleEntry({ class: classname, day, period, entry, targetDate: targetDateString });
-    setSubstitutionData({ 
-      substituteTeacher: '', 
-      substituteSubject: entry.subject,
-      substituteRoom: entry.room,
-      note: '' 
-    });
     setShowSubstitutionDialog(true);
   };
 
   const handleCreateSubstitution = async () => {
     if (!selectedScheduleEntry) return;
 
-    // Use the target date calculated in handleCellClick
     const targetDate = selectedScheduleEntry.targetDate || selectedDate;
     
-    const substitution: SubstitutionEntry = {
-      id: Date.now().toString(),
-      date: targetDate,
-      class: selectedScheduleEntry.class,
-      period: selectedScheduleEntry.period,
-      subject: substitutionData.substituteSubject,
-      teacher: selectedScheduleEntry.entry.teacher,
-      substituteTeacher: substitutionData.substituteTeacher,
-      room: substitutionData.substituteRoom,
-      note: substitutionData.note
-    };
-
-    // Save to database first
     try {
-      const { error } = await supabase.from('vertretungsplan').insert({
-        date: targetDate,
-        class_name: selectedScheduleEntry.class,
-        period: selectedScheduleEntry.period,
-        original_subject: selectedScheduleEntry.entry.subject,
-        original_teacher: selectedScheduleEntry.entry.teacher,
-        original_room: selectedScheduleEntry.entry.room,
-        substitute_teacher: substitutionData.substituteTeacher,
-        substitute_subject: substitutionData.substituteSubject,
-        substitute_room: substitutionData.substituteRoom,
-        note: substitutionData.note
-      });
+      if (selectedScheduleEntry.isEdit && selectedScheduleEntry.substitutionId) {
+        // Update existing substitution
+        const { error } = await supabase
+          .from('vertretungsplan')
+          .update({
+            substitute_teacher: substitutionData.substituteTeacher,
+            substitute_subject: substitutionData.substituteSubject,
+            substitute_room: substitutionData.substituteRoom,
+            note: substitutionData.note
+          })
+          .eq('id', selectedScheduleEntry.substitutionId);
 
-      if (error) {
-        console.error('Database error:', error);
-        throw error;
+        if (error) throw error;
+        
+        toast({
+          title: "Vertretung aktualisiert",
+          description: "Die Vertretung wurde erfolgreich aktualisiert."
+        });
+      } else {
+        // Create new substitution
+        const { error } = await supabase.from('vertretungsplan').insert({
+          date: targetDate,
+          class_name: selectedScheduleEntry.class,
+          period: selectedScheduleEntry.period,
+          original_subject: selectedScheduleEntry.entry.subject,
+          original_teacher: selectedScheduleEntry.entry.teacher,
+          original_room: selectedScheduleEntry.entry.room,
+          substitute_teacher: substitutionData.substituteTeacher,
+          substitute_subject: substitutionData.substituteSubject,
+          substitute_room: substitutionData.substituteRoom,
+          note: substitutionData.note
+        });
+
+        if (error) throw error;
+        
+        toast({
+          title: "Vertretung erstellt",
+          description: "Die Vertretung wurde erfolgreich erstellt."
+        });
       }
 
-      // Create automatic announcement for ALL users
-      const targetDateFormatted = formatDate(targetDate);
-      const { error: announcementError } = await supabase.from('announcements').insert({
-        title: `Vertretungsplan geändert - ${targetDateFormatted}`,
-        content: `Klasse ${selectedScheduleEntry.class}, ${getDayName(selectedScheduleEntry.day)} ${selectedScheduleEntry.period}. Stunde: ${substitutionData.substituteSubject} wird von ${substitutionData.substituteTeacher || 'ENTFALL'} vertreten (Raum: ${substitutionData.substituteRoom})`,
-        author: profile?.name || 'Lehrkraft',
-        priority: 'high'
-      });
-
-      if (announcementError) console.error('Error creating announcement:', announcementError);
-
-      // Add to local state
-      setSubstitutions([...substitutions, substitution]);
-      
-      // Refresh substitutions to show the new one
-      await fetchSubstitutions();
-      
+      // Refresh data and close dialog
+      await fetchSubstitutions(startOfWeekLocal(new Date(selectedDate)), endOfWeekLocal(new Date(selectedDate)));
       setShowSubstitutionDialog(false);
-      toast({
-        title: "Vertretung erstellt",
-        description: `Die Vertretung wurde erfolgreich für ${getDayName(selectedScheduleEntry.day)} gespeichert.`
-      });
+      setSelectedScheduleEntry(null);
+      
     } catch (error) {
-      console.error('Error saving substitution:', error);
+      console.error('Error handling substitution:', error);
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Vertretung konnte nicht gespeichert werden."
+        description: "Die Vertretung konnte nicht gespeichert werden."
       });
     }
   };
 
-  const handleDeleteSubstitution = async (id: string) => {
+  const handleDeleteSubstitution = async () => {
+    if (!selectedScheduleEntry?.substitutionId) return;
+
     try {
       const { error } = await supabase
         .from('vertretungsplan')
         .delete()
-        .eq('id', id);
+        .eq('id', selectedScheduleEntry.substitutionId);
 
       if (error) throw error;
 
-      setSubstitutions(substitutions.filter(sub => sub.id !== id));
       toast({
         title: "Vertretung gelöscht",
-        description: "Die Vertretung wurde entfernt."
+        description: "Die Vertretung wurde erfolgreich gelöscht."
       });
+
+      // Refresh data and close dialog
+      await fetchSubstitutions(startOfWeekLocal(new Date(selectedDate)), endOfWeekLocal(new Date(selectedDate)));
+      setShowSubstitutionDialog(false);
+      setSelectedScheduleEntry(null);
+      
     } catch (error) {
       console.error('Error deleting substitution:', error);
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Vertretung konnte nicht gelöscht werden."
+        description: "Die Vertretung konnte nicht gelöscht werden."
+      });
+  };
+
+  const handleDeleteSubstitution = async () => {
+    if (!selectedScheduleEntry?.substitutionId) return;
+
+    try {
+      const { error } = await supabase
+        .from('vertretungsplan')
+        .delete()
+        .eq('id', selectedScheduleEntry.substitutionId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Vertretung gelöscht",
+        description: "Die Vertretung wurde erfolgreich gelöscht."
+      });
+
+      // Refresh data and close dialog
+      await fetchSubstitutions(startOfWeekLocal(new Date(selectedDate)), endOfWeekLocal(new Date(selectedDate)));
+      setShowSubstitutionDialog(false);
+      setSelectedScheduleEntry(null);
+      
+    } catch (error) {
+      console.error('Error deleting substitution:', error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Die Vertretung konnte nicht gelöscht werden."
       });
     }
   };
@@ -782,12 +829,23 @@ Stundenplan {selectedClass} - Woche {formatWeekRange(__weekStart)}
                   placeholder="Zusätzliche Informationen"
                 />
               </div>
-              
               <div className="flex gap-2">
-                <Button onClick={handleCreateSubstitution}>Vertretung erstellen</Button>
-                <Button variant="outline" onClick={() => setShowSubstitutionDialog(false)}>
-                  Abbrechen
-                </Button>
+                {selectedScheduleEntry?.isEdit ? (
+                  <>
+                    <Button onClick={handleCreateSubstitution}>Änderungen speichern</Button>
+                    <Button variant="destructive" onClick={handleDeleteSubstitution}>Vertretung löschen</Button>
+                    <Button variant="outline" onClick={() => setShowSubstitutionDialog(false)}>
+                      Abbrechen
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button onClick={handleCreateSubstitution}>Vertretung erstellen</Button>
+                    <Button variant="outline" onClick={() => setShowSubstitutionDialog(false)}>
+                      Abbrechen
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           )}
