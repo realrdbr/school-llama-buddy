@@ -4,11 +4,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Calendar, RefreshCw, Wifi } from 'lucide-react';
+import { ArrowLeft, Calendar } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { useNetworkStatus } from '@/hooks/useNetworkStatus';
-import { useOfflineStorage } from '@/hooks/useOfflineStorage';
-import { OfflineIndicator } from '@/components/OfflineIndicator';
 
 interface ScheduleEntry {
   Stunde: number;
@@ -23,19 +20,16 @@ const Stundenplan = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const [searchParams] = useSearchParams();
-  const { isOnline } = useNetworkStatus();
-  const { saveData, getData } = useOfflineStorage();
   const [schedule10bA, setSchedule10bA] = useState<ScheduleEntry[]>([]);
   const [schedule10cA, setSchedule10cA] = useState<ScheduleEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
   useEffect(() => {
     if (!user) {
       navigate('/auth');
       return;
     }
-    loadScheduleData();
+    fetchSchedules();
 
     // Handle scroll to specific class
     const scrollToClass = searchParams.get('scrollTo');
@@ -49,54 +43,15 @@ const Stundenplan = () => {
     }
   }, [user, navigate, searchParams]);
 
-  // Auto-sync when coming back online
-  useEffect(() => {
-    if (isOnline && lastSyncTime) {
-      const timeSinceLastSync = Date.now() - lastSyncTime.getTime();
-      if (timeSinceLastSync > 5 * 60 * 1000) { // 5 minutes
-        fetchSchedules();
-      }
-    }
-  }, [isOnline]);
-
-  const loadScheduleData = async () => {
-    // Try to load from cache first
-    const cached10b = await getData('schedule_10b');
-    const cached10c = await getData('schedule_10c');
-    
-    if (cached10b) setSchedule10bA(cached10b);
-    if (cached10c) setSchedule10cA(cached10c);
-    
-    // If we have cached data, show it immediately
-    if (cached10b || cached10c) {
-      setLoading(false);
-    }
-    
-    // Then fetch fresh data if online
-    if (isOnline) {
-      await fetchSchedules();
-    } else if (!cached10b && !cached10c) {
-      setLoading(false);
-      toast({
-        title: "Offline-Modus",
-        description: "Stundenpläne werden geladen wenn eine Internetverbindung besteht."
-      });
-    }
-  };
-
   const fetchSchedules = async () => {
-    if (!isOnline) return;
-    
     try {
-      setLoading(true);
-      
       // Fetch 10b_A schedule
       const { data: data10bA, error: error10bA } = await supabase
         .from('Stundenplan_10b_A')
         .select('*')
         .order('Stunde');
 
-      // Fetch 10c_A schedule  
+      // Fetch 10c_A schedule
       const { data: data10cA, error: error10cA } = await supabase
         .from('Stundenplan_10c_A')
         .select('*')
@@ -109,32 +64,11 @@ const Stundenplan = () => {
           description: "Stundenplan konnte nicht geladen werden."
         });
       } else {
-        const scheduleData10b = data10bA || [];
-        const scheduleData10c = data10cA || [];
-        
-        setSchedule10bA(scheduleData10b);
-        setSchedule10cA(scheduleData10c);
-        
-        // Cache the data for offline use
-        await saveData('schedule_10b', scheduleData10b, 24 * 60); // 24 hours
-        await saveData('schedule_10c', scheduleData10c, 24 * 60);
-        
-        setLastSyncTime(new Date());
-        
-        if (isOnline) {
-          toast({
-            title: "Daten aktualisiert",
-            description: "Stundenpläne wurden erfolgreich synchronisiert."
-          });
-        }
+        setSchedule10bA(data10bA || []);
+        setSchedule10cA(data10cA || []);
       }
     } catch (error) {
       console.error('Error fetching schedules:', error);
-      toast({
-        variant: "destructive", 
-        title: "Fehler",
-        description: "Verbindung zum Server fehlgeschlagen."
-      });
     } finally {
       setLoading(false);
     }
@@ -239,36 +173,17 @@ const Stundenplan = () => {
       {/* Header */}
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Zurück zum Dashboard
-              </Button>
-              <div className="flex items-center gap-3">
-                <Calendar className="h-6 w-6 text-primary" />
-                <div>
-                  <h1 className="text-2xl font-bold text-foreground">Stundenplan</h1>
-                  <p className="text-muted-foreground">Aktuelle Stundenpläne</p>
-                </div>
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Zurück zum Dashboard
+            </Button>
+            <div className="flex items-center gap-3">
+              <Calendar className="h-6 w-6 text-primary" />
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">Stundenplan</h1>
+                <p className="text-muted-foreground">Aktuelle Stundenpläne</p>
               </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              {lastSyncTime && (
-                <span className="text-sm text-muted-foreground">
-                  Aktualisiert: {lastSyncTime.toLocaleTimeString()}
-                </span>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={fetchSchedules}
-                disabled={!isOnline || loading}
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                {loading ? 'Wird geladen...' : 'Aktualisieren'}
-              </Button>
             </div>
           </div>
         </div>
@@ -276,8 +191,6 @@ const Stundenplan = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        <OfflineIndicator />
-        
         <div className="space-y-8">
           {/* Class 10b */}
           <Card id="schedule-10b">
