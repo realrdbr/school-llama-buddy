@@ -472,7 +472,7 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
     });
   };
 
-const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >= 10;
+  const canEditSubstitutions = profile?.permission_lvl && profile.permission_lvl >= 10;
 
   // Compute week range info for UI
   const __selectedDateObj = new Date(selectedDate + 'T00:00:00');
