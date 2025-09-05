@@ -7,13 +7,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Calendar, Plus, Edit, Trash2, Clock, Bot, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Calendar, Plus, Edit, Trash2, Clock, Bot, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import RoleBasedLayout from '@/components/RoleBasedLayout';
 import AIVertretungsGenerator from '@/components/AIVertretungsGenerator';
 import DebugVertretungsplan from '@/components/DebugVertretungsplan';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { useOfflineStorage } from '@/hooks/useOfflineStorage';
+import { OfflineIndicator } from '@/components/OfflineIndicator';
 
 interface SubstitutionEntry {
   id: string;
@@ -76,9 +79,13 @@ const Vertretungsplan = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const isMobile = useIsMobile();
+  const { isOnline } = useNetworkStatus();
+  const { saveData, getData } = useOfflineStorage();
   const [substitutions, setSubstitutions] = useState<SubstitutionEntry[]>([]);
   const [schedules, setSchedules] = useState<{ [key: string]: ScheduleEntry[] }>({});
   const [showSubstitutionDialog, setShowSubstitutionDialog] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [selectedScheduleEntry, setSelectedScheduleEntry] = useState<{
     class: string;
     day: string; 
@@ -130,11 +137,51 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
       return;
     }
     
-    fetchSchedules();
-    fetchSubstitutions();
+    loadVertretungsData();
   }, [user, profile, navigate, selectedDate]);
 
+  // Auto-sync when coming back online
+  useEffect(() => {
+    if (isOnline && lastSyncTime) {
+      const timeSinceLastSync = Date.now() - lastSyncTime.getTime();
+      if (timeSinceLastSync > 2 * 60 * 1000) { // 2 minutes for substitutions (more critical)
+        fetchSubstitutions();
+        fetchSchedules();
+      }
+    }
+  }, [isOnline]);
+
+  const loadVertretungsData = async () => {
+    setIsLoading(true);
+    
+    // Try to load from cache first
+    const cacheKey = `substitutions_${selectedDate}`;
+    const cachedSubs = await getData(cacheKey);
+    const cachedSchedules = await getData('schedules');
+    
+    if (cachedSubs) setSubstitutions(cachedSubs);
+    if (cachedSchedules) setSchedules(cachedSchedules);
+    
+    // If we have cached data, show it immediately
+    if (cachedSubs || cachedSchedules) {
+      setIsLoading(false);
+    }
+    
+    // Then fetch fresh data if online
+    if (isOnline) {
+      await Promise.all([fetchSubstitutions(), fetchSchedules()]);
+    } else if (!cachedSubs && !cachedSchedules) {
+      setIsLoading(false);
+      toast({
+        title: "Offline-Modus",
+        description: "Vertretungsdaten werden geladen wenn eine Internetverbindung besteht."
+      });
+    }
+  };
+
   const fetchSubstitutions = async () => {
+    if (!isOnline) return;
+    
     try {
       // Get the week range for the selected date
       const selectedDateObj = new Date(selectedDate + 'T00:00:00');
@@ -181,12 +228,33 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
 
       console.log('Processed substitution data:', substitutionData);
       setSubstitutions(substitutionData);
+      
+      // Cache the data for offline use
+      const cacheKey = `substitutions_${selectedDate}`;
+      await saveData(cacheKey, substitutionData, 30); // 30 minutes cache
+      
+      setLastSyncTime(new Date());
     } catch (error) {
       console.error('Error fetching substitutions:', error);
+      
+      // Try to load from cache if network failed
+      const cacheKey = `substitutions_${selectedDate}`;
+      const cachedData = await getData(cacheKey);
+      if (cachedData) {
+        setSubstitutions(cachedData);
+        toast({
+          title: "Offline-Daten geladen",
+          description: "Zuletzt gespeicherte Vertretungsdaten werden angezeigt."
+        });
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const fetchSchedules = async () => {
+    if (!isOnline) return;
+    
     try {
       const { data: schedule10b } = await supabase.from('Stundenplan_10b_A').select('*');
       const { data: schedule10c } = await supabase.from('Stundenplan_10c_A').select('*');
@@ -201,12 +269,23 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
         friday: item.friday
       }));
       
-      setSchedules({
+      const schedulesData = {
         '10b': transform(schedule10b || []),
         '10c': transform(schedule10c || [])
-      });
+      };
+      
+      setSchedules(schedulesData);
+      
+      // Cache the schedules
+      await saveData('schedules', schedulesData, 12 * 60); // 12 hours cache
     } catch (error) {
       console.error('Error fetching schedules:', error);
+      
+      // Try to load from cache if network failed
+      const cachedSchedules = await getData('schedules');
+      if (cachedSchedules) {
+        setSchedules(cachedSchedules);
+      }
     }
   };
 
@@ -495,6 +574,23 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
             </div>
             {!isMobile && (
               <div className="flex items-end gap-4">
+                {lastSyncTime && (
+                  <span className="text-sm text-muted-foreground">
+                    Aktualisiert: {lastSyncTime.toLocaleTimeString()}
+                  </span>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    fetchSubstitutions();
+                    fetchSchedules();
+                  }}
+                  disabled={!isOnline || isLoading}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                  {isLoading ? 'Wird geladen...' : 'Aktualisieren'}
+                </Button>
                 <div className="flex flex-col items-center">
                   <div className="hidden md:block mb-2 text-center">
                     <Label>Woche</Label>
@@ -549,6 +645,8 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
+        <OfflineIndicator />
+        
         <div className="space-y-6">
           
           {/* AI Generator - nur für Schulleitung */}
