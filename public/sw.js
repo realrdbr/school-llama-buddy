@@ -2,12 +2,10 @@ const CACHE_NAME = 'school-app-v1';
 const STATIC_CACHE = 'static-v1';
 const DATA_CACHE = 'data-v1';
 
-// Static assets to cache
+// Static assets to cache (routes only; built assets are cached at runtime)
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/src/main.tsx',
-  '/src/App.tsx',
   '/vertretungsplan',
   '/stundenplan'
 ];
