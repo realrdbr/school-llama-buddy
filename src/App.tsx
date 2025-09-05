@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
+import { TimeoutProvider } from "@/hooks/useTimeout";
 import { useSessionStorage } from "@/hooks/useSessionStorage";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
@@ -162,15 +163,17 @@ const SessionAwareApp = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <ThemeProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <SessionAwareApp />
-          </BrowserRouter>
-        </TooltipProvider>
-      </ThemeProvider>
+      <TimeoutProvider>
+        <ThemeProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <SessionAwareApp />
+            </BrowserRouter>
+          </TooltipProvider>
+        </ThemeProvider>
+      </TimeoutProvider>
     </AuthProvider>
   </QueryClientProvider>
 );
