@@ -256,7 +256,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const { data: existing } = await supabase
           .from('user_themes')
           .select('id')
-        .eq('user_id', profile.user_id || profile.id) // Fix: Use correct user_id
+          .eq('user_id', profile.id)
           .eq('name', theme.name)
           .maybeSingle();
 
@@ -299,7 +299,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const { data, error } = await supabase
         .from('user_themes')
         .insert({
-          user_id: profile.user_id || profile.id, // Fix: Use correct user_id
+          user_id: profile.id,
           name,
           colors: colors as any,
           is_preset: false,
@@ -336,7 +336,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         .from('user_themes')
         .update({ colors: colors as any })
         .eq('id', themeId)
-        .eq('user_id', profile.user_id || profile.id); // Fix: Use correct user_id
+        .eq('user_id', profile.id);
 
       if (error) throw error;
 

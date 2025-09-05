@@ -11,7 +11,7 @@ const TimeoutContext = createContext<TimeoutContextType | undefined>(undefined);
 export const TimeoutProvider = ({ children }: { children: ReactNode }) => {
   const { signOut } = useAuth();
 
-  const withTimeout = async <T,>(promise: Promise<T>, timeoutMs = 10000): Promise<T> => {
+  const withTimeout = async <T,>(promise: Promise<T>, timeoutMs = 30000): Promise<T> => {
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => {
         reject(new Error('TIMEOUT'));

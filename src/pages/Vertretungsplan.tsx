@@ -13,7 +13,6 @@ import { supabase } from '@/integrations/supabase/client';
 import RoleBasedLayout from '@/components/RoleBasedLayout';
 import AIVertretungsGenerator from '@/components/AIVertretungsGenerator';
 import DebugVertretungsplan from '@/components/DebugVertretungsplan';
-import { EditSubstitutionDialog } from '@/components/EditSubstitutionDialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface SubstitutionEntry {
@@ -388,7 +387,7 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
       }
 
       // Refresh data and close dialog
-      await fetchSubstitutions(startOfWeekLocal(new Date(selectedDate)), endOfWeekLocal(new Date(selectedDate)));
+      await fetchSubstitutions();
       setShowSubstitutionDialog(false);
       setSelectedScheduleEntry(null);
       
@@ -419,7 +418,7 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
       });
 
       // Refresh data and close dialog
-      await fetchSubstitutions(startOfWeekLocal(new Date(selectedDate)), endOfWeekLocal(new Date(selectedDate)));
+      await fetchSubstitutions();
       setShowSubstitutionDialog(false);
       setSelectedScheduleEntry(null);
       
@@ -430,16 +429,15 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
         title: "Fehler",
         description: "Die Vertretung konnte nicht gelöscht werden."
       });
+    }
   };
 
-  const handleDeleteSubstitution = async () => {
-    if (!selectedScheduleEntry?.substitutionId) return;
-
+  const handleDeleteSubstitutionById = async (id: string) => {
     try {
       const { error } = await supabase
         .from('vertretungsplan')
         .delete()
-        .eq('id', selectedScheduleEntry.substitutionId);
+        .eq('id', id);
 
       if (error) throw error;
 
@@ -448,13 +446,9 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
         description: "Die Vertretung wurde erfolgreich gelöscht."
       });
 
-      // Refresh data and close dialog
-      await fetchSubstitutions(startOfWeekLocal(new Date(selectedDate)), endOfWeekLocal(new Date(selectedDate)));
-      setShowSubstitutionDialog(false);
-      setSelectedScheduleEntry(null);
-      
+      await fetchSubstitutions();
     } catch (error) {
-      console.error('Error deleting substitution:', error);
+      console.error('Error deleting substitution by id:', error);
       toast({
         variant: "destructive",
         title: "Fehler",
@@ -752,7 +746,7 @@ Stundenplan {selectedClass} - Woche {formatWeekRange(__weekStart)}
                               variant="ghost" 
                               size="sm" 
                               className="text-destructive"
-                              onClick={() => handleDeleteSubstitution(substitution.id)}
+                              onClick={() => handleDeleteSubstitutionById(substitution.id)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
