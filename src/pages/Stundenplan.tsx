@@ -81,7 +81,8 @@ const Stundenplan = () => {
     const subjects = entry.split('|').map(s => s.trim());
     
     return subjects.map(subject => {
-      const parts = subject.split(' ');
+      // Filter out empty strings from multiple spaces
+      const parts = subject.split(' ').filter(part => part.trim() !== '');
       if (parts.length >= 3) {
         return {
           subject: parts[0],
