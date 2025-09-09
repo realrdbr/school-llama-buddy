@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Calendar } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
@@ -23,6 +24,7 @@ const Stundenplan = () => {
   const [schedule10bA, setSchedule10bA] = useState<ScheduleEntry[]>([]);
   const [schedule10cA, setSchedule10cA] = useState<ScheduleEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedClass, setSelectedClass] = useState<string>('10b');
 
   useEffect(() => {
     if (!user) {
@@ -192,37 +194,44 @@ const Stundenplan = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        <div className="space-y-8">
-          {/* Class 10b */}
-          <Card id="schedule-10b">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Klasse 10b
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {schedule10bA.length > 0 ? (
-                renderScheduleTable(schedule10bA, "10b")
-              ) : (
-                <p className="text-muted-foreground">Kein Stundenplan verfügbar.</p>
-              )}
-            </CardContent>
-          </Card>
+        <div className="space-y-6">
+          {/* Class Selection */}
+          <div className="flex items-center gap-4">
+            <label htmlFor="class-select" className="text-sm font-medium">
+              Klasse auswählen:
+            </label>
+            <Select value={selectedClass} onValueChange={setSelectedClass}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Klasse wählen" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10b">Klasse 10b</SelectItem>
+                <SelectItem value="10c">Klasse 10c</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-          {/* Class 10c */}
-          <Card id="schedule-10c">
+          {/* Schedule Display */}
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5" />
-                Klasse 10c
+                {selectedClass === '10b' ? 'Klasse 10b' : 'Klasse 10c'}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {schedule10cA.length > 0 ? (
-                renderScheduleTable(schedule10cA, "10c")
+              {selectedClass === '10b' ? (
+                schedule10bA.length > 0 ? (
+                  renderScheduleTable(schedule10bA, "10b")
+                ) : (
+                  <p className="text-muted-foreground">Kein Stundenplan verfügbar.</p>
+                )
               ) : (
-                <p className="text-muted-foreground">Kein Stundenplan verfügbar.</p>
+                schedule10cA.length > 0 ? (
+                  renderScheduleTable(schedule10cA, "10c")
+                ) : (
+                  <p className="text-muted-foreground">Kein Stundenplan verfügbar.</p>
+                )
               )}
             </CardContent>
           </Card>
