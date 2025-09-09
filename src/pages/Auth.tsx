@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, School, Eye, EyeOff } from 'lucide-react';
+import { Loader2, School } from 'lucide-react';
 import ChangePasswordModal from '@/components/ChangePasswordModal';
 
 const Auth = () => {
@@ -14,7 +14,6 @@ const Auth = () => {
   const { signInWithUsername, user, loading, profile } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     password: ''
@@ -128,28 +127,12 @@ const Auth = () => {
                   <Input
                     id="password"
                     name="password"
-                    type={showPassword ? "text" : "password"}
+                    type="password"
                     value={formData.password}
                     onChange={handleInputChange}
                     required
                     autoComplete="current-password"
-                    className="pr-20 appearance-none"
                   />
-                  <div
-                    className="absolute inset-y-0 right-0 w-12 bg-background rounded-r-md pointer-events-none z-[9]"
-                    aria-hidden="true"
-                  />
-                  <div className="password-toggle-overlay" style={{ right: '-28px' }}>
-                    <button
-                      type="button"
-                      disabled
-                      aria-hidden="true"
-                      className="absolute inset-y-0 right-0 flex items-center justify-center w-10 h-full opacity-0 pointer-events-none"
-                      tabIndex={-1}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
                 </div>
               </div>
               <Button 
