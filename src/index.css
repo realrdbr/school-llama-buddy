@@ -143,8 +143,20 @@ All colors MUST be HSL.
   }
 
   @media (max-width: 640px) {
-    .grid-cols-1.md\\:grid-cols-4 {
+    .grid-cols-1.md\:grid-cols-4 {
       @apply grid-cols-2;
     }
   }
+}
+
+/* Hide native password reveal/clear buttons in Edge/IE and some WebKit */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
+
+input[type="password"]::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  display: none;
+  pointer-events: none;
 }

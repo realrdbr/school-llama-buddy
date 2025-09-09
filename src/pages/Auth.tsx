@@ -132,6 +132,7 @@ const Auth = () => {
                     value={formData.password}
                     onChange={handleInputChange}
                     required
+                    autoComplete="current-password"
                     className="pr-12"
                   />
                   <button
