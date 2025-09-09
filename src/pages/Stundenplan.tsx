@@ -17,21 +17,26 @@ interface ScheduleEntry {
   friday?: string;
 }
 
+interface ClassSchedule {
+  className: string;
+  tableName: string;
+  schedule: ScheduleEntry[];
+}
+
 const Stundenplan = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const [searchParams] = useSearchParams();
-  const [schedule10bA, setSchedule10bA] = useState<ScheduleEntry[]>([]);
-  const [schedule10cA, setSchedule10cA] = useState<ScheduleEntry[]>([]);
+  const [classSchedules, setClassSchedules] = useState<ClassSchedule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedClass, setSelectedClass] = useState<string>('10b');
+  const [selectedClass, setSelectedClass] = useState<string>('');
 
   useEffect(() => {
     if (!user) {
       navigate('/auth');
       return;
     }
-    fetchSchedules();
+    fetchAvailableSchedules();
 
     // Handle scroll to specific class
     const scrollToClass = searchParams.get('scrollTo');
@@ -45,32 +50,46 @@ const Stundenplan = () => {
     }
   }, [user, navigate, searchParams]);
 
-  const fetchSchedules = async () => {
+  const fetchAvailableSchedules = async () => {
     try {
-      // Fetch 10b_A schedule
-      const { data: data10bA, error: error10bA } = await supabase
-        .from('Stundenplan_10b_A')
-        .select('*')
-        .order('Stunde');
+      const schedules: ClassSchedule[] = [];
+      
+      // Define known schedule tables and their class names
+      const knownTables = [
+        { tableName: 'Stundenplan_10b_A' as const, className: '10b' },
+        { tableName: 'Stundenplan_10c_A' as const, className: '10c' }
+      ];
 
-      // Fetch 10c_A schedule
-      const { data: data10cA, error: error10cA } = await supabase
-        .from('Stundenplan_10c_A')
-        .select('*')
-        .order('Stunde');
+      for (const { tableName, className } of knownTables) {
+        try {
+          const { data, error } = await supabase
+            .from(tableName)
+            .select('*')
+            .order('Stunde');
 
-      if (error10bA || error10cA) {
-        toast({
-          variant: "destructive",
-          title: "Fehler",
-          description: "Stundenplan konnte nicht geladen werden."
-        });
-      } else {
-        setSchedule10bA(data10bA || []);
-        setSchedule10cA(data10cA || []);
+          if (!error && data) {
+            schedules.push({
+              className,
+              tableName,
+              schedule: data
+            });
+          }
+        } catch (tableError) {
+          console.warn(`Table ${tableName} not accessible:`, tableError);
+        }
+      }
+
+      setClassSchedules(schedules);
+      if (!selectedClass && schedules.length > 0) {
+        setSelectedClass(schedules[0].className);
       }
     } catch (error) {
       console.error('Error fetching schedules:', error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Stundenplan konnte nicht geladen werden."
+      });
     } finally {
       setLoading(false);
     }
@@ -176,66 +195,66 @@ const Stundenplan = () => {
       {/* Header */}
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Zurück zum Dashboard
-            </Button>
-            <div className="flex items-center gap-3">
-              <Calendar className="h-6 w-6 text-primary" />
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Stundenplan</h1>
-                <p className="text-muted-foreground">Aktuelle Stundenpläne</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Zurück zum Dashboard
+              </Button>
+              <div className="flex items-center gap-3">
+                <Calendar className="h-6 w-6 text-primary" />
+                <div>
+                  <h1 className="text-2xl font-bold text-foreground">Stundenplan</h1>
+                  <p className="text-muted-foreground">Aktuelle Stundenpläne</p>
+                </div>
               </div>
             </div>
+            
+            {/* Class Selection in Header */}
+            {classSchedules.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Klasse:</span>
+                <Select value={selectedClass} onValueChange={setSelectedClass}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Wählen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {classSchedules.map((classSchedule) => (
+                      <SelectItem key={classSchedule.className} value={classSchedule.className}>
+                        {classSchedule.className}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        <div className="space-y-6">
-          {/* Class Selection */}
-          <div className="flex items-center gap-4">
-            <label htmlFor="class-select" className="text-sm font-medium">
-              Klasse auswählen:
-            </label>
-            <Select value={selectedClass} onValueChange={setSelectedClass}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Klasse wählen" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10b">Klasse 10b</SelectItem>
-                <SelectItem value="10c">Klasse 10c</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Schedule Display */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                {selectedClass === '10b' ? 'Klasse 10b' : 'Klasse 10c'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {selectedClass === '10b' ? (
-                schedule10bA.length > 0 ? (
-                  renderScheduleTable(schedule10bA, "10b")
-                ) : (
-                  <p className="text-muted-foreground">Kein Stundenplan verfügbar.</p>
-                )
-              ) : (
-                schedule10cA.length > 0 ? (
-                  renderScheduleTable(schedule10cA, "10c")
-                ) : (
-                  <p className="text-muted-foreground">Kein Stundenplan verfügbar.</p>
-                )
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        {/* Schedule Display */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              {selectedClass ? `Klasse ${selectedClass}` : 'Stundenplan'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              const currentSchedule = classSchedules.find(cs => cs.className === selectedClass);
+              if (!currentSchedule) {
+                return <p className="text-muted-foreground">Kein Stundenplan verfügbar.</p>;
+              }
+              
+              return currentSchedule.schedule.length > 0 
+                ? renderScheduleTable(currentSchedule.schedule, selectedClass)
+                : <p className="text-muted-foreground">Kein Stundenplan verfügbar.</p>;
+            })()}
+          </CardContent>
+        </Card>
       </main>
     </div>
   );
