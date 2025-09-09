@@ -132,21 +132,20 @@ const Auth = () => {
                     value={formData.password}
                     onChange={handleInputChange}
                     required
-                    className="pr-10"
+                    className="pr-12"
                   />
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    className="absolute inset-y-0 right-0 flex items-center justify-center w-10 h-full text-muted-foreground hover:text-foreground focus:outline-none focus:text-foreground transition-colors"
                     onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
                   >
                     {showPassword ? (
                       <EyeOff className="h-4 w-4" />
                     ) : (
                       <Eye className="h-4 w-4" />
                     )}
-                  </Button>
+                  </button>
                 </div>
               </div>
               <Button 
