@@ -133,9 +133,13 @@ const Auth = () => {
                     onChange={handleInputChange}
                     required
                     autoComplete="current-password"
-                    className="pr-16 appearance-none"
+                    className="pr-20 appearance-none"
                   />
-                  <div className="password-toggle-overlay" style={{ right: '-20px' }}>
+                  <div
+                    className="absolute inset-y-0 right-0 w-12 bg-background rounded-r-md pointer-events-none z-[9]"
+                    aria-hidden="true"
+                  />
+                  <div className="password-toggle-overlay" style={{ right: '-28px' }}>
                     <button
                       type="button"
                       disabled
