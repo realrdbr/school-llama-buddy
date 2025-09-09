@@ -138,8 +138,9 @@ const Auth = () => {
                   <div className="password-toggle-overlay">
                     <button
                       type="button"
-                      className="absolute inset-y-0 right-0 flex items-center justify-center w-10 h-full text-muted-foreground hover:text-foreground focus:outline-none focus:text-foreground transition-colors"
-                      onClick={() => setShowPassword(!showPassword)}
+                      disabled
+                      aria-hidden="true"
+                      className="absolute inset-y-0 right-0 flex items-center justify-center w-10 h-full opacity-0 pointer-events-none"
                       tabIndex={-1}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
