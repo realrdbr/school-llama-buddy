@@ -149,14 +149,41 @@ All colors MUST be HSL.
   }
 }
 
-/* Hide native password reveal/clear buttons in Edge/IE and some WebKit */
+/* Comprehensive cross-browser hiding of native password reveal/clear buttons */
 input[type="password"]::-ms-reveal,
 input[type="password"]::-ms-clear {
-  display: none;
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
-input[type="password"]::-webkit-credentials-auto-fill-button {
-  visibility: hidden;
-  display: none;
+input[type="password"]::-webkit-credentials-auto-fill-button,
+input[type="password"]::-webkit-strong-password-auto-fill-button,
+input[type="password"]::-webkit-textfield-decoration-container {
+  visibility: hidden !important;
+  display: none !important;
+  pointer-events: none !important;
+}
+
+/* Remove native appearance for password inputs */
+input[type="password"] {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+}
+
+/* Ensure our custom button stays visible and clickable */
+.password-toggle-overlay {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  background: transparent;
+  z-index: 10;
   pointer-events: none;
+}
+
+.password-toggle-overlay button {
+  pointer-events: auto;
 }
