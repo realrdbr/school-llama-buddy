@@ -158,12 +158,13 @@ input[type="password"]::-ms-clear {
 }
 
 input[type="password"]::-webkit-credentials-auto-fill-button,
-input[type="password"]::-webkit-strong-password-auto-fill-button,
-input[type="password"]::-webkit-textfield-decoration-container {
+input[type="password"]::-webkit-strong-password-auto-fill-button {
   visibility: hidden !important;
   display: none !important;
   pointer-events: none !important;
 }
+
+/* Do NOT hide the decoration container to avoid iOS/Safari focus issues */
 
 /* Remove native appearance for password inputs */
 input[type="password"] {
