@@ -124,7 +124,7 @@ const Auth = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Passwort</Label>
-                <div className="relative">
+                <div className="flex items-center">
                   <Input
                     id="password"
                     name="password"
@@ -133,20 +133,21 @@ const Auth = () => {
                     onChange={handleInputChange}
                     required
                     autoComplete="current-password"
-                    className="pr-10"
                   />
-                  <button
+                  <Button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    tabIndex={-1}
+                    variant="ghost"
+                    size="icon"
+                    aria-label={showPassword ? "Passwort verbergen" : "Passwort anzeigen"}
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="ml-2"
                   >
                     {showPassword ? (
                       <EyeOff className="h-4 w-4 text-muted-foreground" />
                     ) : (
                       <Eye className="h-4 w-4 text-muted-foreground" />
                     )}
-                  </button>
+                  </Button>
                 </div>
               </div>
               <Button 
