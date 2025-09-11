@@ -7,37 +7,40 @@ const corsHeaders = {
 }
 
 // TTS generation using PiperTTS server or browser fallback
-async function generateTTSAudio(text: string, voiceId: string = 'alloy', usePiper: boolean = true): Promise<{ audioBuffer: ArrayBuffer, filename: string }> {
-  console.log('TTS Generation:', { text: text.substring(0, 100), voiceId, usePiper })
+async function generateTTSAudio(text: string, voiceId: string = 'alloy', usePiper: boolean = true): Promise<{ audioBuffer: ArrayBuffer, filename: string, usedPiper: boolean }> {
+  console.log('TTS Generation:', { sample: text.substring(0, 60), voiceId, usePiper })
   
   if (usePiper) {
-    try {
-      // Try PiperTTS first - correct API format
-      console.log('Attempting PiperTTS generation...')
-      const piperResponse = await fetch('https://gymolb.eduard.services/pipertts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: text
+    const endpoints = [
+      'https://gymolb.eduard.services/pipertts',
+      'http://gymolb.eduard.services/pipertts'
+    ]
+
+    for (const url of endpoints) {
+      try {
+        console.log('Attempting PiperTTS generation via', url)
+        const piperResponse = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'audio/wav',
+          },
+          body: JSON.stringify({ text })
         })
-      })
-      
-      if (piperResponse.ok) {
-        const audioBuffer = await piperResponse.arrayBuffer()
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-        const filename = `piper-tts-${timestamp}.wav`
         
-        console.log('PiperTTS generation successful:', filename)
-        return { audioBuffer, filename }
-      } else {
-        const errorText = await piperResponse.text()
-        console.warn('PiperTTS failed:', piperResponse.status, errorText)
-        throw new Error(`PiperTTS Server Error: ${piperResponse.status}`)
+        if (piperResponse.ok) {
+          const audioBuffer = await piperResponse.arrayBuffer()
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+          const filename = `piper-tts-${timestamp}.wav`
+          console.log('PiperTTS generation successful at', url)
+          return { audioBuffer, filename, usedPiper: true }
+        } else {
+          const errorText = await piperResponse.text().catch(() => '')
+          console.warn('PiperTTS failed', { url, status: piperResponse.status, errorText })
+        }
+      } catch (error) {
+        console.warn('PiperTTS request error', { url, error })
       }
-    } catch (error) {
-      console.warn('PiperTTS unavailable, falling back to simple audio:', error)
     }
   }
   
@@ -87,7 +90,7 @@ async function generateTTSAudio(text: string, voiceId: string = 'alloy', usePipe
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
   const filename = `fallback-tts-${timestamp}.wav`
   
-  return { audioBuffer: buffer, filename }
+  return { audioBuffer: buffer, filename, usedPiper: false }
 }
 
 serve(async (req) => {
@@ -128,7 +131,7 @@ serve(async (req) => {
 
     // Generate TTS audio
     console.log('Generating TTS audio...')
-    const { audioBuffer, filename } = await generateTTSAudio(text, voice_id, use_piper)
+    const { audioBuffer, filename, usedPiper } = await generateTTSAudio(text, voice_id, use_piper)
     
     // Upload to Supabase Storage
     const { data: uploadData, error: uploadError } = await supabase.storage
@@ -173,7 +176,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         announcement,
-        message: use_piper ? 'TTS-Durchsage wurde erfolgreich mit PiperTTS erstellt' : 'TTS-Durchsage wurde mit Fallback-Audio erstellt',
+        message: usedPiper ? 'TTS-Durchsage wurde erfolgreich mit PiperTTS erstellt' : 'TTS-Durchsage wurde mit Fallback-Audio erstellt',
         audioFile: audioFilePath
       }),
       { 
