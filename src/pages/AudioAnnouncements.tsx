@@ -208,29 +208,13 @@ const AudioAnnouncements = () => {
         currentAudio.currentTime = 0;
       }
 
-      let audioUrl = '';
-
-      if (announcement.is_tts && announcement.tts_text) {
-        // For TTS, use the saved voice_id or fallback to browser default
-        const voiceId = announcement.voice_id || defaultVoiceId || '';
-        setPlayingId(announcement.id);
-        try {
-          await speakWithVoice(announcement.tts_text, voiceId);
-        } finally {
-          setPlayingId(null);
-        }
-        return;
-      } else if (announcement.audio_file_path) {
-        // For uploaded audio files (use audio-files bucket)
+      if (announcement.audio_file_path) {
+        // All announcements now have audio files (TTS or uploaded)
         const { data } = supabase.storage
           .from('audio-files')
           .getPublicUrl(announcement.audio_file_path);
         
-        audioUrl = data.publicUrl;
-      }
-
-      if (audioUrl) {
-        const audio = new Audio(audioUrl);
+        const audio = new Audio(data.publicUrl);
         audio.onplay = () => setPlayingId(announcement.id);
         audio.onended = () => setPlayingId(null);
         audio.onerror = () => {
@@ -244,13 +228,19 @@ const AudioAnnouncements = () => {
 
         setCurrentAudio(audio);
         await audio.play();
-      }
 
-      // Mark as played
-      await supabase
-        .from('audio_announcements')
-        .update({ played_at: new Date().toISOString() })
-        .eq('id', announcement.id);
+        // Mark as played
+        await supabase
+          .from('audio_announcements')
+          .update({ played_at: new Date().toISOString() })
+          .eq('id', announcement.id);
+      } else {
+        toast({
+          title: "Fehler",
+          description: "Keine Audio-Datei gefunden",
+          variant: "destructive"
+        });
+      }
 
     } catch (error: any) {
       console.error('Playback error:', error);
@@ -487,18 +477,32 @@ const AudioAnnouncements = () => {
                     <p className="text-sm text-muted-foreground mb-2">{announcement.description}</p>
                   )}
                   
-                  {announcement.is_tts && announcement.tts_text && (
-                    <div className="mb-2 flex items-center gap-2">
-                      <OfflineTTS 
-                        text={announcement.tts_text} 
-                        voiceId={announcement.voice_id}
-                        showVoiceSettings={false}
-                      />
+                   {announcement.is_tts && announcement.tts_text && (
+                    <div className="mb-2">
+                      <p className="text-sm bg-muted p-2 rounded">
+                        <strong>TTS-Text:</strong> {announcement.tts_text}
+                      </p>
                       {announcement.voice_id && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs text-muted-foreground mt-1 block">
                           Stimme: {browserVoices.find(v => v.voiceURI === announcement.voice_id || v.name === announcement.voice_id)?.name || 'Standard'}
                         </span>
                       )}
+                    </div>
+                  )}
+                  
+                  {announcement.audio_file_path && (
+                    <div className="mb-2">
+                      <audio 
+                        controls 
+                        className="w-full h-8"
+                        preload="metadata"
+                      >
+                        <source 
+                          src={`${supabase.storage.from('audio-files').getPublicUrl(announcement.audio_file_path).data.publicUrl}`} 
+                          type="audio/wav" 
+                        />
+                        Ihr Browser unterstützt das Audio-Element nicht.
+                      </audio>
                     </div>
                   )}
                   
