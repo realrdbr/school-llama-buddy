@@ -1,19 +1,13 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { pipeline, Pipeline } from '@huggingface/transformers';
-import { useToast } from '@/hooks/use-toast';
+import { useCallback } from 'react';
+import { TTSVoice } from '@/hooks/useTTS';
 
-export interface TTSVoice {
-  id: string;
-  name: string;
-  language: string;
-  modelId: string;
-  type: 'web-speech' | 'transformers';
-  description: string;
-  gender?: 'male' | 'female' | 'neutral';
+interface UseTTSWithVoiceReturn {
+  speakWithVoice: (text: string, voiceId: string) => Promise<void>;
 }
 
-const AVAILABLE_VOICES: TTSVoice[] = [
-  {
+// Available voices list - same as in useTTS but as a lookup
+const AVAILABLE_VOICES: { [key: string]: TTSVoice } = {
+  'web-speech-de-female': {
     id: 'web-speech-de-female',
     name: 'Browser Deutsch (Weiblich)',
     language: 'de-DE',
@@ -22,7 +16,7 @@ const AVAILABLE_VOICES: TTSVoice[] = [
     description: 'Standard weibliche Browser-Stimme',
     gender: 'female'
   },
-  {
+  'web-speech-de-male': {
     id: 'web-speech-de-male',
     name: 'Browser Deutsch (Männlich)',
     language: 'de-DE',
@@ -31,7 +25,7 @@ const AVAILABLE_VOICES: TTSVoice[] = [
     description: 'Männliche Browser-Stimme',
     gender: 'male'
   },
-  {
+  'enhanced-web-speech-female': {
     id: 'enhanced-web-speech-female',
     name: 'Erweitert Weiblich',
     language: 'de-DE',
@@ -40,7 +34,7 @@ const AVAILABLE_VOICES: TTSVoice[] = [
     description: 'Optimierte weibliche Stimme mit besserer Qualität',
     gender: 'female'
   },
-  {
+  'enhanced-web-speech-male': {
     id: 'enhanced-web-speech-male',
     name: 'Erweitert Männlich',
     language: 'de-DE',
@@ -49,7 +43,7 @@ const AVAILABLE_VOICES: TTSVoice[] = [
     description: 'Optimierte männliche Stimme mit besserer Qualität',
     gender: 'male'
   },
-  {
+  'web-speech-slow': {
     id: 'web-speech-slow',
     name: 'Langsam & Deutlich',
     language: 'de-DE',
@@ -58,37 +52,10 @@ const AVAILABLE_VOICES: TTSVoice[] = [
     description: 'Langsame, deutliche Aussprache für wichtige Durchsagen',
     gender: 'neutral'
   }
-];
+};
 
-interface UseTTSReturn {
-  voices: TTSVoice[];
-  selectedVoice: TTSVoice;
-  setSelectedVoice: (voice: TTSVoice) => void;
-  isLoading: boolean;
-  isPlaying: boolean;
-  speak: (text: string) => Promise<void>;
-  stop: () => void;
-  loadingProgress: number;
-}
-
-export const useTTS = (): UseTTSReturn => {
-  const [selectedVoice, setSelectedVoice] = useState<TTSVoice>(AVAILABLE_VOICES[0]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [loadingProgress, setLoadingProgress] = useState(0);
-  const { toast } = useToast();
-  
-  const ttsRef = useRef<Pipeline | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Removed transformer model loading since the models don't exist
-  // We'll focus on enhancing the web speech API instead
-  const loadTransformerModel = useCallback(async (voice: TTSVoice) => {
-    // No longer needed - all voices use web speech API
-    return;
-  }, []);
-
-  const speakWithWebSpeech = useCallback((text: string, voice: TTSVoice) => {
+export const useTTSWithVoice = (): UseTTSWithVoiceReturn => {
+  const speakWithVoice = useCallback((text: string, voiceId: string) => {
     return new Promise<void>((resolve, reject) => {
       if (!('speechSynthesis' in window)) {
         reject(new Error('Speech synthesis not supported'));
@@ -97,6 +64,7 @@ export const useTTS = (): UseTTSReturn => {
 
       speechSynthesis.cancel();
       
+      const voice = AVAILABLE_VOICES[voiceId] || AVAILABLE_VOICES['web-speech-de-female'];
       const utterance = new SpeechSynthesisUtterance(text);
       
       // Enhanced voice selection based on voice type
@@ -105,7 +73,6 @@ export const useTTS = (): UseTTSReturn => {
       
       // Voice selection based on gender and quality preferences
       if (voice.gender === 'male') {
-        // Try to find male German voices
         selectedVoice = voices.find(v => 
           v.lang.includes('de') && (
             v.name.toLowerCase().includes('male') || 
@@ -116,10 +83,9 @@ export const useTTS = (): UseTTSReturn => {
             v.name.toLowerCase().includes('david')
           )
         ) || voices.find(v => 
-          v.lang.includes('de') && v.name.includes('2')  // Often male voices have numbers
+          v.lang.includes('de') && v.name.includes('2')
         );
       } else if (voice.gender === 'female') {
-        // Try to find female German voices (most default ones)
         selectedVoice = voices.find(v => 
           v.lang.includes('de') && (
             v.name.toLowerCase().includes('female') ||
@@ -131,7 +97,6 @@ export const useTTS = (): UseTTSReturn => {
           )
         ) || voices.find(v => v.lang === 'de-DE');
       } else {
-        // Neutral or any German voice
         selectedVoice = voices.find(v => v.lang.includes('de'));
       }
       
@@ -150,7 +115,6 @@ export const useTTS = (): UseTTSReturn => {
         }
       }
       
-      // Fallback to any German voice if nothing specific found
       if (!selectedVoice) {
         selectedVoice = voices.find(v => 
           v.lang.includes('de') || v.name.includes('German')
@@ -165,11 +129,11 @@ export const useTTS = (): UseTTSReturn => {
       
       // Adjust speech parameters based on voice type
       if (voice.id === 'web-speech-slow') {
-        utterance.rate = 0.6;    // Much slower for clarity
+        utterance.rate = 0.6;
         utterance.pitch = 1.0;   
         utterance.volume = 0.9;
       } else if (voice.id.includes('enhanced')) {
-        utterance.rate = 0.85;   // Slightly slower for better quality
+        utterance.rate = 0.85;
         utterance.pitch = voice.gender === 'male' ? 0.85 : 0.95;
         utterance.volume = 0.9;
       } else {
@@ -178,61 +142,13 @@ export const useTTS = (): UseTTSReturn => {
         utterance.volume = 0.8;
       }
       
-      utterance.onstart = () => setIsPlaying(true);
-      utterance.onend = () => {
-        setIsPlaying(false);
-        resolve();
-      };
-      utterance.onerror = (event) => {
-        setIsPlaying(false);
-        reject(new Error('Speech synthesis error'));
-      };
+      utterance.onstart = () => {};
+      utterance.onend = () => resolve();
+      utterance.onerror = () => reject(new Error('Speech synthesis error'));
       
       speechSynthesis.speak(utterance);
     });
   }, []);
 
-  // Removed transformers TTS since models don't exist - using enhanced web speech instead
-
-  const stop = useCallback(() => {
-    // Stop web speech
-    if ('speechSynthesis' in window) {
-      speechSynthesis.cancel();
-    }
-    
-    // Stop audio playback
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
-    
-    setIsPlaying(false);
-  }, []);
-
-  const speak = useCallback(async (text: string) => {
-    try {
-      stop();
-      await speakWithWebSpeech(text, selectedVoice);
-    } catch (error) {
-      console.error('TTS Error:', error);
-      toast({
-        title: "TTS Fehler",
-        description: "Fehler bei der Sprachwiedergabe",
-        variant: "destructive"
-      });
-    }
-  }, [selectedVoice, speakWithWebSpeech, stop, toast]);
-
-  // No longer needed - all voices use web speech API
-
-  return {
-    voices: AVAILABLE_VOICES,
-    selectedVoice,
-    setSelectedVoice,
-    isLoading,
-    isPlaying,
-    speak,
-    stop,
-    loadingProgress
-  };
+  return { speakWithVoice };
 };

@@ -47,13 +47,26 @@ const VoiceSelector: React.FC<VoiceSelectorProps> = ({
               {voices.map((voice) => (
                 <SelectItem key={voice.id} value={voice.id}>
                   <div className="flex items-center justify-between w-full">
-                    <span>{voice.name}</span>
-                    <Badge 
-                      variant={voice.id === 'enhanced-web-speech' ? 'default' : 'secondary'}
-                      className="ml-2"
-                    >
-                      {voice.id === 'enhanced-web-speech' ? 'Erweitert' : 'Standard'}
-                    </Badge>
+                    <div className="flex flex-col">
+                      <span>{voice.name}</span>
+                      <span className="text-xs text-muted-foreground">{voice.description}</span>
+                    </div>
+                    <div className="flex gap-1 ml-2">
+                      <Badge 
+                        variant={voice.id.includes('enhanced') ? 'default' : 'secondary'}
+                        className="text-xs"
+                      >
+                        {voice.id.includes('enhanced') ? 'Erweitert' : 'Standard'}
+                      </Badge>
+                      {voice.gender && (
+                        <Badge 
+                          variant="outline"
+                          className="text-xs"
+                        >
+                          {voice.gender === 'male' ? '♂' : voice.gender === 'female' ? '♀' : '⚪'}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </SelectItem>
               ))}
@@ -93,16 +106,30 @@ const VoiceSelector: React.FC<VoiceSelectorProps> = ({
       </p>
 
       {/* Enhanced voice info */}
-      {selectedVoice.id === 'enhanced-web-speech' && (
+      {selectedVoice.id.includes('enhanced') && (
         <div className="p-3 bg-muted rounded-lg">
           <div className="flex items-center gap-2">
             <Badge variant="default">Optimiert</Badge>
             <span className="text-sm text-muted-foreground">
-              Erweiterte Browser-TTS
+              {selectedVoice.name}
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Verbesserte Sprachqualität und -einstellungen
+            {selectedVoice.description}
+          </p>
+        </div>
+      )}
+
+      {selectedVoice.id === 'web-speech-slow' && (
+        <div className="p-3 bg-muted rounded-lg">
+          <div className="flex items-center gap-2">
+            <Badge variant="default">Speziell</Badge>
+            <span className="text-sm text-muted-foreground">
+              Langsame Wiedergabe
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Ideal für wichtige Durchsagen die deutlich verstanden werden müssen
           </p>
         </div>
       )}

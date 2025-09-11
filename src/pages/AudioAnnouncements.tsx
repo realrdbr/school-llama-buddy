@@ -10,6 +10,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Volume2, VolumeX, Mic, Upload, Play, Pause, RotateCcw, ArrowLeft, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import OfflineTTS from '@/components/OfflineTTS';
+import VoiceSelector from '@/components/VoiceSelector';
+import { useTTS } from '@/hooks/useTTS';
+import { useTTSWithVoice } from '@/hooks/useTTSWithVoice';
 
 interface AudioAnnouncement {
   id: string;
@@ -30,13 +33,15 @@ const AudioAnnouncements = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { voices, selectedVoice, setSelectedVoice } = useTTS();
+  const { speakWithVoice } = useTTSWithVoice();
   const [announcements, setAnnouncements] = useState<AudioAnnouncement[]>([]);
   const [loading, setLoading] = useState(false);
   const [ttsForm, setTtsForm] = useState({
     title: '',
     description: '',
     text: '',
-    voice_id: 'Aria',
+    voice_id: 'web-speech-de-female',
     schedule_date: ''
   });
 
@@ -116,7 +121,7 @@ const AudioAnnouncements = () => {
         title: '',
         description: '',
         text: '',
-        voice_id: 'Aria',
+        voice_id: 'web-speech-de-female',
         schedule_date: ''
       });
       
@@ -199,49 +204,17 @@ const AudioAnnouncements = () => {
       let audioUrl = '';
 
       if (announcement.is_tts && announcement.tts_text) {
-        // For TTS, use the Web Speech API directly
-        if ('speechSynthesis' in window) {
-          speechSynthesis.cancel();
-          
-          const utterance = new SpeechSynthesisUtterance(announcement.tts_text);
-          
-          // Try to find a German voice
-          const voices = speechSynthesis.getVoices();
-          const germanVoice = voices.find(voice => 
-            voice.lang.includes('de') || voice.name.includes('German')
-          );
-          
-          if (germanVoice) {
-            utterance.voice = germanVoice;
-          }
-          
-          utterance.lang = 'de-DE';
-          utterance.rate = 0.9;
-          utterance.pitch = 1;
-          utterance.volume = 0.8;
-          
-          utterance.onstart = () => {
-            setPlayingId(announcement.id);
-          };
-          
-          utterance.onend = () => {
-            setPlayingId(null);
-          };
-          
-          utterance.onerror = () => {
-            setPlayingId(null);
-            toast({
-              title: "TTS Fehler",
-              description: "Fehler bei der Sprachwiedergabe",
-              variant: "destructive"
-            });
-          };
-          
-          speechSynthesis.speak(utterance);
-          return;
-        } else {
-          throw new Error('Web Speech API nicht unterstützt');
-        }
+        // For TTS, use the saved voice_id or fallback to default
+        const voiceId = announcement.voice_id || 'web-speech-de-female';
+        await speakWithVoice(announcement.tts_text, voiceId);
+        setPlayingId(announcement.id);
+        
+        // Wait for speech to finish (approximate timing)
+        setTimeout(() => {
+          setPlayingId(null);
+        }, announcement.tts_text.length * 100); // Rough estimate
+        
+        return;
       } else if (announcement.audio_file_path) {
         // For uploaded audio files (use audio-files bucket)
         const { data } = supabase.storage
@@ -393,6 +366,19 @@ const AudioAnnouncements = () => {
             </div>
             
             <div>
+              <label className="block text-sm font-medium mb-1">Stimme</label>
+              <VoiceSelector
+                voices={voices}
+                selectedVoice={voices.find(v => v.id === ttsForm.voice_id) || voices[0]}
+                onVoiceChange={(voice) => setTtsForm({ ...ttsForm, voice_id: voice.id })}
+                isLoading={false}
+                loadingProgress={0}
+                onPreview={() => {}}
+                isPlaying={false}
+              />
+            </div>
+            
+            <div>
               <label className="block text-sm font-medium mb-1">Geplante Zeit</label>
               <Input
                 type="datetime-local"
@@ -488,8 +474,17 @@ const AudioAnnouncements = () => {
                   )}
                   
                   {announcement.is_tts && announcement.tts_text && (
-                    <div className="mb-2">
-                      <OfflineTTS text={announcement.tts_text} voiceId={announcement.voice_id} />
+                    <div className="mb-2 flex items-center gap-2">
+                      <OfflineTTS 
+                        text={announcement.tts_text} 
+                        voiceId={announcement.voice_id}
+                        showVoiceSettings={false}
+                      />
+                      {announcement.voice_id && (
+                        <span className="text-xs text-muted-foreground">
+                          Stimme: {voices.find(v => v.id === announcement.voice_id)?.name || 'Standard'}
+                        </span>
+                      )}
                     </div>
                   )}
                   
