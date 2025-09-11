@@ -12,16 +12,15 @@ async function generateTTSAudio(text: string, voiceId: string = 'alloy', usePipe
   
   if (usePiper) {
     try {
-      // Try PiperTTS first
+      // Try PiperTTS first - correct API format
       console.log('Attempting PiperTTS generation...')
-      const piperResponse = await fetch('https://gymolb.eduard.services/pipertts/synthesize', {
+      const piperResponse = await fetch('https://gymolb.eduard.services/pipertts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          text: text,
-          voice: voiceId || 'thorsten-medium'
+          text: text
         })
       })
       
