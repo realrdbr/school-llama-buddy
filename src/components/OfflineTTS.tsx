@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Volume2, VolumeX, Settings } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { useTTS } from '@/hooks/useTTS';
+import { useTTSWithVoice } from '@/hooks/useTTSWithVoice';
 import VoiceSelector from './VoiceSelector';
 
 interface OfflineTTSProps {

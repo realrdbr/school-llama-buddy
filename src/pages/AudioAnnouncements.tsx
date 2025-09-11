@@ -10,8 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Volume2, VolumeX, Mic, Upload, Play, Pause, RotateCcw, ArrowLeft, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import OfflineTTS from '@/components/OfflineTTS';
-import VoiceSelector from '@/components/VoiceSelector';
-import { useTTS } from '@/hooks/useTTS';
+import BrowserVoicePicker from '@/components/BrowserVoicePicker';
+import { useSpeechVoices } from '@/hooks/useSpeechVoices';
 import { useTTSWithVoice } from '@/hooks/useTTSWithVoice';
 
 interface AudioAnnouncement {
@@ -33,7 +33,7 @@ const AudioAnnouncements = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { voices, selectedVoice, setSelectedVoice } = useTTS();
+  const { voices: browserVoices, ready: voicesReady, defaultVoiceId } = useSpeechVoices('de');
   const { speakWithVoice } = useTTSWithVoice();
   const [announcements, setAnnouncements] = useState<AudioAnnouncement[]>([]);
   const [loading, setLoading] = useState(false);
@@ -41,7 +41,7 @@ const AudioAnnouncements = () => {
     title: '',
     description: '',
     text: '',
-    voice_id: 'web-speech-de-female',
+    voice_id: '',
     schedule_date: ''
   });
 
@@ -58,6 +58,13 @@ const AudioAnnouncements = () => {
   useEffect(() => {
     fetchAnnouncements();
   }, []);
+
+  // Set default browser voice when voices are ready and none selected yet
+  useEffect(() => {
+    if (voicesReady && !ttsForm.voice_id) {
+      setTtsForm((prev) => ({ ...prev, voice_id: defaultVoiceId || prev.voice_id }));
+    }
+  }, [voicesReady, defaultVoiceId]);
 
   const fetchAnnouncements = async () => {
     try {
@@ -95,7 +102,7 @@ const AudioAnnouncements = () => {
       const { data: ttsResult, error: ttsError } = await supabase.functions.invoke('native-tts', {
         body: {
           text: ttsForm.text,
-          voice_id: ttsForm.voice_id,
+          voice_id: ttsForm.voice_id || defaultVoiceId,
           title: ttsForm.title,
           description: ttsForm.description || `TTS-Durchsage erstellt von ${profile?.username}`,
           schedule_date: ttsForm.schedule_date,
@@ -121,7 +128,7 @@ const AudioAnnouncements = () => {
         title: '',
         description: '',
         text: '',
-        voice_id: 'web-speech-de-female',
+        voice_id: defaultVoiceId || '',
         schedule_date: ''
       });
       
@@ -204,16 +211,14 @@ const AudioAnnouncements = () => {
       let audioUrl = '';
 
       if (announcement.is_tts && announcement.tts_text) {
-        // For TTS, use the saved voice_id or fallback to default
-        const voiceId = announcement.voice_id || 'web-speech-de-female';
-        await speakWithVoice(announcement.tts_text, voiceId);
+        // For TTS, use the saved voice_id or fallback to browser default
+        const voiceId = announcement.voice_id || defaultVoiceId || '';
         setPlayingId(announcement.id);
-        
-        // Wait for speech to finish (approximate timing)
-        setTimeout(() => {
+        try {
+          await speakWithVoice(announcement.tts_text, voiceId);
+        } finally {
           setPlayingId(null);
-        }, announcement.tts_text.length * 100); // Rough estimate
-        
+        }
         return;
       } else if (announcement.audio_file_path) {
         // For uploaded audio files (use audio-files bucket)
@@ -367,15 +372,24 @@ const AudioAnnouncements = () => {
             
             <div>
               <label className="block text-sm font-medium mb-1">Stimme</label>
-              <VoiceSelector
-                voices={voices}
-                selectedVoice={voices.find(v => v.id === ttsForm.voice_id) || voices[0]}
-                onVoiceChange={(voice) => setTtsForm({ ...ttsForm, voice_id: voice.id })}
-                isLoading={false}
-                loadingProgress={0}
-                onPreview={() => {}}
-                isPlaying={false}
-              />
+              <div className="flex items-end gap-3">
+                <div className="flex-1">
+                  <BrowserVoicePicker
+                    voices={browserVoices}
+                    selectedId={ttsForm.voice_id || defaultVoiceId}
+                    onChange={(id) => setTtsForm({ ...ttsForm, voice_id: id })}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => speakWithVoice(ttsForm.text || 'Dies ist eine Stimmenvorschau', (ttsForm.voice_id || defaultVoiceId) || '')}
+                  disabled={!voicesReady}
+                >
+                  Testen
+                </Button>
+              </div>
             </div>
             
             <div>
@@ -482,7 +496,7 @@ const AudioAnnouncements = () => {
                       />
                       {announcement.voice_id && (
                         <span className="text-xs text-muted-foreground">
-                          Stimme: {voices.find(v => v.id === announcement.voice_id)?.name || 'Standard'}
+                          Stimme: {browserVoices.find(v => v.voiceURI === announcement.voice_id || v.name === announcement.voice_id)?.name || 'Standard'}
                         </span>
                       )}
                     </div>
