@@ -10,9 +10,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Volume2, VolumeX, Mic, Upload, Play, Pause, RotateCcw, ArrowLeft, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import OfflineTTS from '@/components/OfflineTTS';
-import BrowserVoicePicker from '@/components/BrowserVoicePicker';
-import { useSpeechVoices } from '@/hooks/useSpeechVoices';
-import { useTTSWithVoice } from '@/hooks/useTTSWithVoice';
 
 interface AudioAnnouncement {
   id: string;
@@ -33,15 +30,13 @@ const AudioAnnouncements = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { voices: browserVoices, ready: voicesReady, defaultVoiceId } = useSpeechVoices('de');
-  const { speakWithVoice } = useTTSWithVoice();
   const [announcements, setAnnouncements] = useState<AudioAnnouncement[]>([]);
   const [loading, setLoading] = useState(false);
   const [ttsForm, setTtsForm] = useState({
     title: '',
     description: '',
     text: '',
-    voice_id: '',
+    voice_id: 'Aria',
     schedule_date: ''
   });
 
@@ -58,13 +53,6 @@ const AudioAnnouncements = () => {
   useEffect(() => {
     fetchAnnouncements();
   }, []);
-
-  // Set default browser voice when voices are ready and none selected yet
-  useEffect(() => {
-    if (voicesReady && !ttsForm.voice_id) {
-      setTtsForm((prev) => ({ ...prev, voice_id: defaultVoiceId || prev.voice_id }));
-    }
-  }, [voicesReady, defaultVoiceId]);
 
   const fetchAnnouncements = async () => {
     try {
@@ -102,7 +90,7 @@ const AudioAnnouncements = () => {
       const { data: ttsResult, error: ttsError } = await supabase.functions.invoke('native-tts', {
         body: {
           text: ttsForm.text,
-          voice_id: ttsForm.voice_id || defaultVoiceId,
+          voice_id: ttsForm.voice_id,
           title: ttsForm.title,
           description: ttsForm.description || `TTS-Durchsage erstellt von ${profile?.username}`,
           schedule_date: ttsForm.schedule_date,
@@ -128,7 +116,7 @@ const AudioAnnouncements = () => {
         title: '',
         description: '',
         text: '',
-        voice_id: defaultVoiceId || '',
+        voice_id: 'Aria',
         schedule_date: ''
       });
       
@@ -208,13 +196,63 @@ const AudioAnnouncements = () => {
         currentAudio.currentTime = 0;
       }
 
-      if (announcement.audio_file_path) {
-        // All announcements now have audio files (TTS or uploaded)
+      let audioUrl = '';
+
+      if (announcement.is_tts && announcement.tts_text) {
+        // For TTS, use the Web Speech API directly
+        if ('speechSynthesis' in window) {
+          speechSynthesis.cancel();
+          
+          const utterance = new SpeechSynthesisUtterance(announcement.tts_text);
+          
+          // Try to find a German voice
+          const voices = speechSynthesis.getVoices();
+          const germanVoice = voices.find(voice => 
+            voice.lang.includes('de') || voice.name.includes('German')
+          );
+          
+          if (germanVoice) {
+            utterance.voice = germanVoice;
+          }
+          
+          utterance.lang = 'de-DE';
+          utterance.rate = 0.9;
+          utterance.pitch = 1;
+          utterance.volume = 0.8;
+          
+          utterance.onstart = () => {
+            setPlayingId(announcement.id);
+          };
+          
+          utterance.onend = () => {
+            setPlayingId(null);
+          };
+          
+          utterance.onerror = () => {
+            setPlayingId(null);
+            toast({
+              title: "TTS Fehler",
+              description: "Fehler bei der Sprachwiedergabe",
+              variant: "destructive"
+            });
+          };
+          
+          speechSynthesis.speak(utterance);
+          return;
+        } else {
+          throw new Error('Web Speech API nicht unterstützt');
+        }
+      } else if (announcement.audio_file_path) {
+        // For uploaded audio files (use audio-files bucket)
         const { data } = supabase.storage
           .from('audio-files')
           .getPublicUrl(announcement.audio_file_path);
         
-        const audio = new Audio(data.publicUrl);
+        audioUrl = data.publicUrl;
+      }
+
+      if (audioUrl) {
+        const audio = new Audio(audioUrl);
         audio.onplay = () => setPlayingId(announcement.id);
         audio.onended = () => setPlayingId(null);
         audio.onerror = () => {
@@ -228,19 +266,13 @@ const AudioAnnouncements = () => {
 
         setCurrentAudio(audio);
         await audio.play();
-
-        // Mark as played
-        await supabase
-          .from('audio_announcements')
-          .update({ played_at: new Date().toISOString() })
-          .eq('id', announcement.id);
-      } else {
-        toast({
-          title: "Fehler",
-          description: "Keine Audio-Datei gefunden",
-          variant: "destructive"
-        });
       }
+
+      // Mark as played
+      await supabase
+        .from('audio_announcements')
+        .update({ played_at: new Date().toISOString() })
+        .eq('id', announcement.id);
 
     } catch (error: any) {
       console.error('Playback error:', error);
@@ -361,28 +393,6 @@ const AudioAnnouncements = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-1">Stimme</label>
-              <div className="flex items-end gap-3">
-                <div className="flex-1">
-                  <BrowserVoicePicker
-                    voices={browserVoices}
-                    selectedId={ttsForm.voice_id || defaultVoiceId}
-                    onChange={(id) => setTtsForm({ ...ttsForm, voice_id: id })}
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => speakWithVoice(ttsForm.text || 'Dies ist eine Stimmenvorschau', (ttsForm.voice_id || defaultVoiceId) || '')}
-                  disabled={!voicesReady}
-                >
-                  Testen
-                </Button>
-              </div>
-            </div>
-            
-            <div>
               <label className="block text-sm font-medium mb-1">Geplante Zeit</label>
               <Input
                 type="datetime-local"
@@ -477,32 +487,9 @@ const AudioAnnouncements = () => {
                     <p className="text-sm text-muted-foreground mb-2">{announcement.description}</p>
                   )}
                   
-                   {announcement.is_tts && announcement.tts_text && (
+                  {announcement.is_tts && announcement.tts_text && (
                     <div className="mb-2">
-                      <p className="text-sm bg-muted p-2 rounded">
-                        <strong>TTS-Text:</strong> {announcement.tts_text}
-                      </p>
-                      {announcement.voice_id && (
-                        <span className="text-xs text-muted-foreground mt-1 block">
-                          Stimme: {browserVoices.find(v => v.voiceURI === announcement.voice_id || v.name === announcement.voice_id)?.name || 'Standard'}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  
-                  {announcement.audio_file_path && (
-                    <div className="mb-2">
-                      <audio 
-                        controls 
-                        className="w-full h-8"
-                        preload="metadata"
-                      >
-                        <source 
-                          src={`${supabase.storage.from('audio-files').getPublicUrl(announcement.audio_file_path).data.publicUrl}`} 
-                          type="audio/wav" 
-                        />
-                        Ihr Browser unterstützt das Audio-Element nicht.
-                      </audio>
+                      <OfflineTTS text={announcement.tts_text} voiceId={announcement.voice_id} />
                     </div>
                   )}
                   
