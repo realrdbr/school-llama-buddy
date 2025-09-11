@@ -21,20 +21,12 @@ const AVAILABLE_VOICES: TTSVoice[] = [
     description: 'Standard Browser-Stimme'
   },
   {
-    id: 'speecht5-german',
-    name: 'SpeechT5 Deutsch',
+    id: 'enhanced-web-speech',
+    name: 'Browser Deutsch (Erweitert)',
     language: 'de-DE',
-    modelId: 'microsoft/speecht5_tts',
-    type: 'transformers',
-    description: 'KI-Stimme mit hoher Qualität'
-  },
-  {
-    id: 'mms-tts-german',
-    name: 'MMS TTS Deutsch',
-    language: 'de-DE',
-    modelId: 'facebook/mms-tts-deu',
-    type: 'transformers',
-    description: 'Meta\'s mehrsprachige Stimme'
+    modelId: 'web-speech-enhanced',
+    type: 'web-speech',
+    description: 'Browser-Stimme mit optimierten Einstellungen'
   }
 ];
 
@@ -59,52 +51,12 @@ export const useTTS = (): UseTTSReturn => {
   const ttsRef = useRef<Pipeline | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Removed transformer model loading since the models don't exist
+  // We'll focus on enhancing the web speech API instead
   const loadTransformerModel = useCallback(async (voice: TTSVoice) => {
-    if (voice.type !== 'transformers') return;
-    
-    try {
-      setIsLoading(true);
-      setLoadingProgress(10);
-      
-      toast({
-        title: "Model wird geladen",
-        description: `${voice.name} wird heruntergeladen...`,
-      });
-
-      setLoadingProgress(30);
-      
-      // Load the TTS pipeline
-      const tts = await pipeline('text-to-speech', voice.modelId, {
-        device: 'webgpu',
-        progress_callback: (progress: any) => {
-          if (progress.status === 'downloading') {
-            const percent = Math.round((progress.loaded / progress.total) * 100);
-            setLoadingProgress(30 + (percent * 0.6));
-          }
-        }
-      });
-      
-      ttsRef.current = tts;
-      setLoadingProgress(100);
-      
-      toast({
-        title: "Model geladen",
-        description: `${voice.name} ist bereit zur Verwendung`,
-      });
-    } catch (error) {
-      console.error('Error loading TTS model:', error);
-      toast({
-        title: "Fehler beim Laden",
-        description: "Fallback auf Browser-TTS",
-        variant: "destructive"
-      });
-      // Fallback to web speech
-      setSelectedVoice(AVAILABLE_VOICES[0]);
-    } finally {
-      setIsLoading(false);
-      setLoadingProgress(0);
-    }
-  }, [toast]);
+    // No longer needed - all voices use web speech API
+    return;
+  }, []);
 
   const speakWithWebSpeech = useCallback((text: string, voice: TTSVoice) => {
     return new Promise<void>((resolve, reject) => {
@@ -117,20 +69,38 @@ export const useTTS = (): UseTTSReturn => {
       
       const utterance = new SpeechSynthesisUtterance(text);
       
-      // Try to find a matching voice
+      // Enhanced voice selection
       const voices = speechSynthesis.getVoices();
-      const germanVoice = voices.find(v => 
-        v.lang.includes('de') || v.name.includes('German')
-      );
+      let selectedVoice = null;
       
-      if (germanVoice) {
-        utterance.voice = germanVoice;
+      if (voice.id === 'enhanced-web-speech') {
+        // Try to find the best German voice for enhanced mode
+        selectedVoice = voices.find(v => 
+          v.lang === 'de-DE' && (v.name.includes('Google') || v.name.includes('Microsoft'))
+        ) || voices.find(v => v.lang.includes('de'));
+      } else {
+        // Standard German voice selection
+        selectedVoice = voices.find(v => 
+          v.lang.includes('de') || v.name.includes('German')
+        );
+      }
+      
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
       }
       
       utterance.lang = voice.language;
-      utterance.rate = 0.9;
-      utterance.pitch = 1;
-      utterance.volume = 0.8;
+      
+      // Enhanced settings for better quality
+      if (voice.id === 'enhanced-web-speech') {
+        utterance.rate = 0.85;
+        utterance.pitch = 0.95;
+        utterance.volume = 0.9;
+      } else {
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        utterance.volume = 0.8;
+      }
       
       utterance.onstart = () => setIsPlaying(true);
       utterance.onend = () => {
@@ -146,62 +116,7 @@ export const useTTS = (): UseTTSReturn => {
     });
   }, []);
 
-  const speakWithTransformers = useCallback(async (text: string) => {
-    if (!ttsRef.current) {
-      throw new Error('TTS model not loaded');
-    }
-
-    try {
-      // Generate audio using the transformer model
-      const result = await ttsRef.current(text);
-      
-      // Convert the audio tensor to a playable format
-      // Note: This is a simplified implementation
-      // In practice, you'd need to properly handle the audio tensor
-      const audioData = result.audio;
-      
-      // Create audio context and play
-      const audioContext = new AudioContext();
-      const audioBuffer = await audioContext.decodeAudioData(audioData.buffer);
-      const source = audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContext.destination);
-      
-      setIsPlaying(true);
-      source.start();
-      
-      source.onended = () => {
-        setIsPlaying(false);
-      };
-    } catch (error) {
-      console.error('Error with transformers TTS:', error);
-      // Fallback to web speech
-      await speakWithWebSpeech(text, selectedVoice);
-    }
-  }, [selectedVoice, speakWithWebSpeech]);
-
-  const speak = useCallback(async (text: string) => {
-    try {
-      stop();
-      
-      if (selectedVoice.type === 'web-speech') {
-        await speakWithWebSpeech(text, selectedVoice);
-      } else {
-        // Load model if not already loaded
-        if (!ttsRef.current) {
-          await loadTransformerModel(selectedVoice);
-        }
-        await speakWithTransformers(text);
-      }
-    } catch (error) {
-      console.error('TTS Error:', error);
-      toast({
-        title: "TTS Fehler",
-        description: "Fehler bei der Sprachwiedergabe",
-        variant: "destructive"
-      });
-    }
-  }, [selectedVoice, speakWithWebSpeech, speakWithTransformers, loadTransformerModel, toast]);
+  // Removed transformers TTS since models don't exist - using enhanced web speech instead
 
   const stop = useCallback(() => {
     // Stop web speech
@@ -218,12 +133,21 @@ export const useTTS = (): UseTTSReturn => {
     setIsPlaying(false);
   }, []);
 
-  // Auto-load transformer models when voice is selected
-  useEffect(() => {
-    if (selectedVoice.type === 'transformers' && !ttsRef.current) {
-      loadTransformerModel(selectedVoice);
+  const speak = useCallback(async (text: string) => {
+    try {
+      stop();
+      await speakWithWebSpeech(text, selectedVoice);
+    } catch (error) {
+      console.error('TTS Error:', error);
+      toast({
+        title: "TTS Fehler",
+        description: "Fehler bei der Sprachwiedergabe",
+        variant: "destructive"
+      });
     }
-  }, [selectedVoice, loadTransformerModel]);
+  }, [selectedVoice, speakWithWebSpeech, stop, toast]);
+
+  // No longer needed - all voices use web speech API
 
   return {
     voices: AVAILABLE_VOICES,

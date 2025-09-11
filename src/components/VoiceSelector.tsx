@@ -49,10 +49,10 @@ const VoiceSelector: React.FC<VoiceSelectorProps> = ({
                   <div className="flex items-center justify-between w-full">
                     <span>{voice.name}</span>
                     <Badge 
-                      variant={voice.type === 'transformers' ? 'default' : 'secondary'}
+                      variant={voice.id === 'enhanced-web-speech' ? 'default' : 'secondary'}
                       className="ml-2"
                     >
-                      {voice.type === 'transformers' ? 'KI' : 'Browser'}
+                      {voice.id === 'enhanced-web-speech' ? 'Erweitert' : 'Standard'}
                     </Badge>
                   </div>
                 </SelectItem>
@@ -92,28 +92,17 @@ const VoiceSelector: React.FC<VoiceSelectorProps> = ({
         {selectedVoice.description}
       </p>
 
-      {/* Loading progress for transformer models */}
-      {isLoading && selectedVoice.type === 'transformers' && (
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span>Model wird geladen...</span>
-            <span>{loadingProgress}%</span>
-          </div>
-          <Progress value={loadingProgress} className="w-full" />
-        </div>
-      )}
-
-      {/* Model info for transformer voices */}
-      {selectedVoice.type === 'transformers' && !isLoading && (
+      {/* Enhanced voice info */}
+      {selectedVoice.id === 'enhanced-web-speech' && (
         <div className="p-3 bg-muted rounded-lg">
           <div className="flex items-center gap-2">
-            <Badge variant="default">KI-Model</Badge>
+            <Badge variant="default">Optimiert</Badge>
             <span className="text-sm text-muted-foreground">
-              {selectedVoice.modelId}
+              Erweiterte Browser-TTS
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Läuft komplett lokal im Browser
+            Verbesserte Sprachqualität und -einstellungen
           </p>
         </div>
       )}

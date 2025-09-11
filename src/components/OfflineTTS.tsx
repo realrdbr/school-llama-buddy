@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Volume2, VolumeX, Settings } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { useTTS } from '@/hooks/useTTS';
 import VoiceSelector from './VoiceSelector';
 
@@ -83,6 +83,9 @@ const OfflineTTS: React.FC<OfflineTTSProps> = ({
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>TTS Einstellungen</DialogTitle>
+              <DialogDescription>
+                Wählen Sie eine Stimme für die Sprachwiedergabe aus
+              </DialogDescription>
             </DialogHeader>
             <VoiceSelector
               voices={voices}
