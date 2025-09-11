@@ -36,7 +36,8 @@ const AudioAnnouncements = () => {
     title: '',
     description: '',
     text: '',
-    voice_id: 'Aria',
+    voice_id: 'thorsten-medium',
+    tts_type: 'piper', // 'piper' or 'browser'
     schedule_date: ''
   });
 
@@ -86,37 +87,61 @@ const AudioAnnouncements = () => {
     
     setLoading(true);
     try {
-      // Use Native TTS for server-side processing
-      const { data: ttsResult, error: ttsError } = await supabase.functions.invoke('native-tts', {
-        body: {
-          text: ttsForm.text,
-          voice_id: ttsForm.voice_id,
-          title: ttsForm.title,
-          description: ttsForm.description || `TTS-Durchsage erstellt von ${profile?.username}`,
-          schedule_date: ttsForm.schedule_date,
-          user_id: profile?.username || profile?.name
+      if (ttsForm.tts_type === 'browser') {
+        // Use Browser TTS - create announcement record directly
+        const { error: insertError } = await supabase
+          .from('audio_announcements')
+          .insert({
+            title: ttsForm.title,
+            description: ttsForm.description || `Browser TTS-Durchsage erstellt von ${profile?.username}`,
+            is_tts: true,
+            tts_text: ttsForm.text,
+            voice_id: ttsForm.voice_id,
+            schedule_date: ttsForm.schedule_date || null,
+            is_active: true
+          });
+
+        if (insertError) throw insertError;
+
+        toast({
+          title: "Erfolg",
+          description: "Browser TTS-Durchsage wurde erstellt"
+        });
+      } else {
+        // Use PiperTTS via server
+        const { data: ttsResult, error: ttsError } = await supabase.functions.invoke('native-tts', {
+          body: {
+            text: ttsForm.text,
+            voice_id: ttsForm.voice_id,
+            title: ttsForm.title,
+            description: ttsForm.description || `PiperTTS-Durchsage erstellt von ${profile?.username}`,
+            schedule_date: ttsForm.schedule_date,
+            user_id: profile?.username || profile?.name,
+            use_piper: true
+          }
+        });
+
+        if (ttsError) {
+          throw new Error(`TTS-Fehler: ${ttsError.message}`);
         }
-      });
 
-      if (ttsError) {
-        throw new Error(`TTS-Fehler: ${ttsError.message}`);
+        if (!ttsResult?.success) {
+          throw new Error(ttsResult?.error || 'TTS-Generierung fehlgeschlagen');
+        }
+        
+        toast({
+          title: "Erfolg",
+          description: ttsResult.message || "TTS-Durchsage wurde erfolgreich erstellt"
+        });
       }
-
-      if (!ttsResult?.success) {
-        throw new Error(ttsResult?.error || 'TTS-Generierung fehlgeschlagen');
-      }
-      
-      toast({
-        title: "Erfolg",
-        description: "TTS-Durchsage wurde erfolgreich mit Native TTS erstellt"
-      });
       
       // Reset form
       setTtsForm({
         title: '',
         description: '',
         text: '',
-        voice_id: 'Aria',
+        voice_id: 'thorsten-medium',
+        tts_type: 'piper',
         schedule_date: ''
       });
       
@@ -391,6 +416,33 @@ const AudioAnnouncements = () => {
                 required
               />
             </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-1">TTS-Typ</label>
+              <select 
+                className="w-full p-2 border rounded-md"
+                value={ttsForm.tts_type}
+                onChange={(e) => setTtsForm({ ...ttsForm, tts_type: e.target.value as 'piper' | 'browser' })}
+              >
+                <option value="piper">PiperTTS (Server)</option>
+                <option value="browser">Browser TTS</option>
+              </select>
+            </div>
+
+            {ttsForm.tts_type === 'piper' && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Stimme</label>
+                <select 
+                  className="w-full p-2 border rounded-md"
+                  value={ttsForm.voice_id}
+                  onChange={(e) => setTtsForm({ ...ttsForm, voice_id: e.target.value })}
+                >
+                  <option value="thorsten-medium">Thorsten (Deutsch)</option>
+                  <option value="eva_k-medium">Eva K (Deutsch)</option>
+                  <option value="karlsson-medium">Karlsson (Deutsch)</option>
+                </select>
+              </div>
+            )}
             
             <div>
               <label className="block text-sm font-medium mb-1">Geplante Zeit</label>

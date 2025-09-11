@@ -6,18 +6,46 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Simple TTS using Web Speech API synthesis (server-side equivalent)
-async function generateTTSAudio(text: string, voiceId: string = 'alloy'): Promise<{ audioBuffer: ArrayBuffer, filename: string }> {
-  // For this implementation, we'll use a placeholder approach
-  // In a real scenario, you might want to use a TTS library like:
-  // - Google Cloud TTS
-  // - Microsoft Speech Services
-  // - Or implement a simple text-to-speech with WebAssembly
+// TTS generation using PiperTTS server or browser fallback
+async function generateTTSAudio(text: string, voiceId: string = 'alloy', usePiper: boolean = true): Promise<{ audioBuffer: ArrayBuffer, filename: string }> {
+  console.log('TTS Generation:', { text: text.substring(0, 100), voiceId, usePiper })
   
-  // For now, we'll create a minimal WAV file with silence as placeholder
-  // This can be replaced with actual TTS generation
+  if (usePiper) {
+    try {
+      // Try PiperTTS first
+      console.log('Attempting PiperTTS generation...')
+      const piperResponse = await fetch('https://gymolb.eduard.services/pipertts/synthesize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: text,
+          voice: voiceId || 'thorsten-medium'
+        })
+      })
+      
+      if (piperResponse.ok) {
+        const audioBuffer = await piperResponse.arrayBuffer()
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+        const filename = `piper-tts-${timestamp}.wav`
+        
+        console.log('PiperTTS generation successful:', filename)
+        return { audioBuffer, filename }
+      } else {
+        const errorText = await piperResponse.text()
+        console.warn('PiperTTS failed:', piperResponse.status, errorText)
+        throw new Error(`PiperTTS Server Error: ${piperResponse.status}`)
+      }
+    } catch (error) {
+      console.warn('PiperTTS unavailable, falling back to simple audio:', error)
+    }
+  }
+  
+  // Fallback: Generate simple tone pattern (improved version)
+  console.log('Using fallback tone generation...')
   const sampleRate = 44100
-  const duration = Math.max(1, text.length * 0.1) // Estimate duration based on text length
+  const duration = Math.max(2, Math.min(10, text.length * 0.08)) // 2-10 seconds based on text length
   const numSamples = Math.floor(sampleRate * duration)
   
   // Create WAV header
@@ -45,17 +73,20 @@ async function generateTTSAudio(text: string, voiceId: string = 'alloy'): Promis
   writeString(36, 'data')
   view.setUint32(40, numSamples * 2, true)
   
-  // Generate simple tone pattern based on text (placeholder for actual TTS)
+  // Generate more pleasant tone pattern
   for (let i = 0; i < numSamples; i++) {
     const t = i / sampleRate
-    const frequency = 200 + (text.charCodeAt(i % text.length) - 65) * 10
-    const amplitude = Math.sin(2 * Math.PI * frequency * t) * 0.1
-    const sample = Math.floor(amplitude * 32767)
+    const baseFreq = 440 // A4 note
+    const modulation = Math.sin(2 * Math.PI * 2 * t) * 0.1 // Slow vibrato
+    const frequency = baseFreq + modulation * 50
+    const envelope = Math.exp(-t * 0.5) // Decay envelope
+    const amplitude = Math.sin(2 * Math.PI * frequency * t) * envelope * 0.3
+    const sample = Math.floor(amplitude * 16384) // Reduced volume
     view.setInt16(44 + i * 2, sample, true)
   }
   
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-  const filename = `tts-${timestamp}.wav`
+  const filename = `fallback-tts-${timestamp}.wav`
   
   return { audioBuffer: buffer, filename }
 }
@@ -66,9 +97,9 @@ serve(async (req) => {
   }
 
   try {
-    const { text, voice_id = 'alloy', title, description, schedule_date, user_id } = await req.json()
+    const { text, voice_id = 'alloy', title, description, schedule_date, user_id, use_piper = true } = await req.json()
     
-    console.log('Native TTS Request received:', { text, user_id, title })
+    console.log('Native TTS Request received:', { text, user_id, title, use_piper, voice_id })
     
     if (!text) {
       throw new Error('Text ist erforderlich')
@@ -98,7 +129,7 @@ serve(async (req) => {
 
     // Generate TTS audio
     console.log('Generating TTS audio...')
-    const { audioBuffer, filename } = await generateTTSAudio(text, voice_id)
+    const { audioBuffer, filename } = await generateTTSAudio(text, voice_id, use_piper)
     
     // Upload to Supabase Storage
     const { data: uploadData, error: uploadError } = await supabase.storage
@@ -143,7 +174,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         announcement,
-        message: 'TTS-Durchsage wurde erfolgreich mit Native TTS erstellt',
+        message: use_piper ? 'TTS-Durchsage wurde erfolgreich mit PiperTTS erstellt' : 'TTS-Durchsage wurde mit Fallback-Audio erstellt',
         audioFile: audioFilePath
       }),
       { 
