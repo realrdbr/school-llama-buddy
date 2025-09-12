@@ -444,25 +444,10 @@ const AudioAnnouncements = () => {
                 value={ttsForm.tts_type}
                 onChange={(e) => setTtsForm({ ...ttsForm, tts_type: e.target.value as 'piper' | 'browser' })}
               >
-                <option value="piper">PiperTTS (Server)</option>
+                <option value="piper">PiperTTS</option>
                 <option value="browser">Browser TTS</option>
               </select>
             </div>
-
-            {ttsForm.tts_type === 'piper' && (
-              <div>
-                <label className="block text-sm font-medium mb-1">Stimme</label>
-                <select 
-                  className="w-full p-2 border rounded-md"
-                  value={ttsForm.voice_id}
-                  onChange={(e) => setTtsForm({ ...ttsForm, voice_id: e.target.value })}
-                >
-                  <option value="thorsten-medium">Thorsten (Deutsch)</option>
-                  <option value="eva_k-medium">Eva K (Deutsch)</option>
-                  <option value="karlsson-medium">Karlsson (Deutsch)</option>
-                </select>
-              </div>
-            )}
             
             <div>
               <label className="block text-sm font-medium mb-1">Geplante Zeit</label>
