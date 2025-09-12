@@ -225,8 +225,9 @@ const AudioAnnouncements = () => {
 
       // Prefer stored audio file if available (server-generated PiperTTS or uploaded files)
       if (announcement.audio_file_path) {
+        const bucket = announcement.is_tts ? 'audio-announcements' : 'audio-files'
         const { data } = supabase.storage
-          .from('audio-files')
+          .from(bucket)
           .getPublicUrl(announcement.audio_file_path);
         audioUrl = data.publicUrl;
       } else if (announcement.is_tts && announcement.tts_text) {
@@ -353,7 +354,8 @@ const AudioAnnouncements = () => {
 
       // Try to delete audio file from storage (if present)
       if (announcement.audio_file_path) {
-        await supabase.storage.from('audio-files').remove([announcement.audio_file_path]);
+        const bucket = announcement.is_tts ? 'audio-announcements' : 'audio-files'
+        await supabase.storage.from(bucket).remove([announcement.audio_file_path]);
       }
 
       toast({ title: 'Gelöscht', description: 'Durchsage wurde gelöscht' });

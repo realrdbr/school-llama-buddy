@@ -142,7 +142,7 @@ serve(async (req) => {
     
     // Upload to Supabase Storage
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('audio-files')
+      .from('audio-announcements')
       .upload(`tts/${filename}`, audioBuffer, {
         contentType: 'audio/wav',
         cacheControl: '3600'
