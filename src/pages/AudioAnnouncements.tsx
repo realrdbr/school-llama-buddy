@@ -128,6 +128,11 @@ const AudioAnnouncements = () => {
         if (!ttsResult?.success) {
           throw new Error(ttsResult?.error || 'TTS-Generierung fehlgeschlagen');
         }
+
+        // Immediately add the new announcement to state if returned
+        if (ttsResult?.announcement) {
+          setAnnouncements(prev => [ttsResult.announcement, ...prev]);
+        }
         
         toast({
           title: "Erfolg",
@@ -225,13 +230,23 @@ const AudioAnnouncements = () => {
 
       // Prefer stored audio file if available (server-generated PiperTTS or uploaded files)
       if (announcement.audio_file_path) {
-        const bucket = announcement.is_tts ? 'audio-announcements' : 'audio-files'
+        const bucket = announcement.is_tts ? 'audio-announcements' : 'audio-files';
+        
+        // Normalize path - remove bucket prefix if accidentally included
+        const normalizedPath = announcement.audio_file_path.replace(/^audio-announcements\//, '');
+        
+        console.log(`🎵 Play from file: ${bucket}/${normalizedPath}`, announcement);
+        
         const { data } = supabase.storage
           .from(bucket)
-          .getPublicUrl(announcement.audio_file_path);
+          .getPublicUrl(normalizedPath);
         audioUrl = data.publicUrl;
+        
+        console.log(`🎵 Audio URL: ${audioUrl}`);
       } else if (announcement.is_tts && announcement.tts_text && !announcement.audio_file_path) {
         // Fallback: Use the Web Speech API for TTS when no audio file exists
+        console.log(`🗣️ Fallback to Browser TTS for: ${announcement.title}`, announcement);
+        
         if ('speechSynthesis' in window) {
           speechSynthesis.cancel();
           
@@ -274,6 +289,9 @@ const AudioAnnouncements = () => {
         } else {
           throw new Error('Web Speech API nicht unterstützt');
         }
+      } else {
+        console.log(`❌ No playback method available for: ${announcement.title}`, announcement);
+        throw new Error('Keine Audioquelle verfügbar');
       }
 
       if (audioUrl) {
@@ -282,6 +300,7 @@ const AudioAnnouncements = () => {
         audio.onended = () => setPlayingId(null);
         audio.onerror = () => {
           setPlayingId(null);
+          console.error(`❌ Audio playback failed for: ${audioUrl}`);
           toast({
             title: "Wiedergabe-Fehler",
             description: "Audio konnte nicht abgespielt werden",
@@ -526,7 +545,7 @@ const AudioAnnouncements = () => {
             {announcements.map((announcement) => (
               <div key={announcement.id} className="flex items-center justify-between p-4 border rounded-lg">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
+                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-medium">{announcement.title}</h3>
                     <Badge variant={announcement.is_active ? "default" : "secondary"}>
                       {announcement.is_active ? 'Aktiv' : 'Inaktiv'}
@@ -534,13 +553,18 @@ const AudioAnnouncements = () => {
                     <Badge variant="outline">
                       {announcement.is_tts ? 'TTS' : 'Audio'}
                     </Badge>
+                    {announcement.is_tts && (
+                      <Badge variant="secondary">
+                        {announcement.audio_file_path ? '📁 Datei (Piper)' : '🗣️ Browser TTS'}
+                      </Badge>
+                    )}
                   </div>
                   
                   {announcement.description && (
                     <p className="text-sm text-muted-foreground mb-2">{announcement.description}</p>
                   )}
                   
-                  {announcement.is_tts && announcement.tts_text && (
+                  {announcement.is_tts && announcement.tts_text && !announcement.audio_file_path && (
                     <div className="mb-2">
                       <OfflineTTS text={announcement.tts_text} voiceId={announcement.voice_id} />
                     </div>
