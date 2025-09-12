@@ -368,6 +368,24 @@ const AudioAnnouncements = () => {
 
     setLoading(true);
     try {
+      // First collect and delete all audio files from storage
+      const audioFiles = announcements.filter(a => a.audio_file_path);
+      
+      for (const announcement of audioFiles) {
+        const bucket = announcement.is_tts ? 'audio-announcements' : 'audio-files';
+        const normalizedPath = announcement.audio_file_path!.replace(/^audio-announcements\//, '');
+        
+        console.log(`🗑️ Deleting file from bucket "${bucket}": ${normalizedPath}`);
+        
+        const { error: storageError } = await supabase.storage
+          .from(bucket)
+          .remove([normalizedPath]);
+          
+        if (storageError) {
+          console.warn(`Storage deletion failed for ${normalizedPath}:`, storageError);
+        }
+      }
+
       // Delete all announcements from database
       const { error: dbError } = await supabase
         .from('audio_announcements')
@@ -376,28 +394,9 @@ const AudioAnnouncements = () => {
 
       if (dbError) throw dbError;
 
-      // Delete all audio files from both storage buckets
-      const audioFiles = announcements
-        .filter(a => a.audio_file_path)
-        .map(a => ({
-          bucket: a.is_tts ? 'audio-announcements' : 'audio-files',
-          path: a.audio_file_path!
-        }));
-
-      // Group by bucket and delete
-      const audioBucket = audioFiles.filter(f => f.bucket === 'audio-announcements').map(f => f.path);
-      const filesBucket = audioFiles.filter(f => f.bucket === 'audio-files').map(f => f.path);
-
-      if (audioBucket.length > 0) {
-        await supabase.storage.from('audio-announcements').remove(audioBucket);
-      }
-      if (filesBucket.length > 0) {
-        await supabase.storage.from('audio-files').remove(filesBucket);
-      }
-
       toast({
         title: "Alle gelöscht",
-        description: `${announcements.length} Durchsagen wurden gelöscht`
+        description: `${announcements.length} Durchsagen wurden aus Datenbank und Storage gelöscht`
       });
 
       setAnnouncements([]);
@@ -419,24 +418,44 @@ const AudioAnnouncements = () => {
     if (!confirmed) return;
     
     try {
-      // Delete database record first
-      const { error } = await supabase
+      // First try to delete audio file from storage (if present)
+      if (announcement.audio_file_path) {
+        const bucket = announcement.is_tts ? 'audio-announcements' : 'audio-files';
+        
+        // Normalize path - remove bucket prefix if accidentally included
+        const normalizedPath = announcement.audio_file_path.replace(/^audio-announcements\//, '');
+        
+        console.log(`🗑️ Deleting file from bucket "${bucket}": ${normalizedPath}`);
+        
+        const { error: storageError } = await supabase.storage
+          .from(bucket)
+          .remove([normalizedPath]);
+          
+        if (storageError) {
+          console.warn('Storage deletion error (continuing with DB deletion):', storageError);
+        } else {
+          console.log(`✅ Successfully deleted file from storage: ${normalizedPath}`);
+        }
+      }
+
+      // Delete database record
+      const { error: dbError } = await supabase
         .from('audio_announcements')
         .delete()
         .eq('id', announcement.id);
-      if (error) throw error;
-
-      // Try to delete audio file from storage (if present)
-      if (announcement.audio_file_path) {
-        const bucket = announcement.is_tts ? 'audio-announcements' : 'audio-files';
-        console.log(`🗑️ Deleting file from ${bucket}: ${announcement.audio_file_path}`);
-        await supabase.storage.from(bucket).remove([announcement.audio_file_path]);
-      }
+        
+      if (dbError) throw dbError;
 
       toast({ 
         title: 'Gelöscht', 
         description: 'Durchsage wurde aus Datenbank und Storage gelöscht' 
       });
+      
+      // Stop audio if this announcement is playing
+      if (playingId === announcement.id) {
+        stopAnnouncement();
+      }
+      
       fetchAnnouncements();
     } catch (e: any) {
       console.error('Delete error:', e);
