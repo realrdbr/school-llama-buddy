@@ -368,14 +368,45 @@ const AudioAnnouncements = () => {
 
     setLoading(true);
     try {
-      // First collect and delete all audio files from storage
+      // Use Edge Function for reliable deletion
+      const { data, error } = await supabase.functions.invoke('delete-announcements', {
+        body: { 
+          all: true, 
+          user_id: profile?.username || profile?.name 
+        }
+      });
+
+      if (error) {
+        console.error('Edge function error, trying fallback:', error);
+        // Fallback: manual deletion
+        await deleteFallbackAll();
+      } else {
+        console.log('✅ All announcements deleted via Edge Function:', data);
+        toast({
+          title: "Alle gelöscht",
+          description: `${announcements.length} Durchsagen wurden aus Datenbank und Storage gelöscht`
+        });
+        setAnnouncements([]);
+        stopAnnouncement();
+      }
+    } catch (error: any) {
+      console.error('Error deleting all announcements:', error);
+      // Try fallback
+      await deleteFallbackAll();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteFallbackAll = async () => {
+    try {
+      console.log('🔄 Using fallback deletion method');
+      // Delete files from storage first
       const audioFiles = announcements.filter(a => a.audio_file_path);
       
       for (const announcement of audioFiles) {
         const bucket = announcement.is_tts ? 'audio-announcements' : 'audio-files';
         const normalizedPath = announcement.audio_file_path!.replace(/^audio-announcements\//, '');
-        
-        console.log(`🗑️ Deleting file from bucket "${bucket}": ${normalizedPath}`);
         
         const { error: storageError } = await supabase.storage
           .from(bucket)
@@ -386,30 +417,28 @@ const AudioAnnouncements = () => {
         }
       }
 
-      // Delete all announcements from database
+      // Delete all from database
       const { error: dbError } = await supabase
         .from('audio_announcements')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
+        .neq('id', '00000000-0000-0000-0000-000000000000');
 
       if (dbError) throw dbError;
 
       toast({
         title: "Alle gelöscht",
-        description: `${announcements.length} Durchsagen wurden aus Datenbank und Storage gelöscht`
+        description: `${announcements.length} Durchsagen wurden gelöscht (Fallback-Methode)`
       });
 
       setAnnouncements([]);
-      stopAnnouncement(); // Stop any playing audio
-    } catch (error: any) {
-      console.error('Delete all error:', error);
+      stopAnnouncement();
+    } catch (fallbackError: any) {
+      console.error('Fallback deletion also failed:', fallbackError);
       toast({
+        variant: "destructive",
         title: "Fehler",
-        description: error.message || "Löschen fehlgeschlagen",
-        variant: "destructive"
+        description: "Fehler beim Löschen der Durchsagen"
       });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -418,14 +447,46 @@ const AudioAnnouncements = () => {
     if (!confirmed) return;
     
     try {
-      // First try to delete audio file from storage (if present)
+      // Use Edge Function for reliable deletion
+      const { data, error } = await supabase.functions.invoke('delete-announcements', {
+        body: { 
+          id: announcement.id, 
+          user_id: profile?.username || profile?.name 
+        }
+      });
+
+      if (error) {
+        console.error('Edge function error, trying fallback:', error);
+        // Fallback: manual deletion
+        await deleteFallbackSingle(announcement);
+      } else {
+        console.log('✅ Announcement deleted via Edge Function:', data);
+        toast({ 
+          title: 'Gelöscht', 
+          description: 'Durchsage wurde aus Datenbank und Storage gelöscht' 
+        });
+        
+        // Stop audio if this announcement is playing
+        if (playingId === announcement.id) {
+          stopAnnouncement();
+        }
+        
+        fetchAnnouncements();
+      }
+    } catch (e: any) {
+      console.error('Delete error:', e);
+      // Try fallback
+      await deleteFallbackSingle(announcement);
+    }
+  };
+
+  const deleteFallbackSingle = async (announcement: AudioAnnouncement) => {
+    try {
+      console.log('🔄 Using fallback deletion method for single announcement');
+      // Delete audio file from storage (if present)
       if (announcement.audio_file_path) {
         const bucket = announcement.is_tts ? 'audio-announcements' : 'audio-files';
-        
-        // Normalize path - remove bucket prefix if accidentally included
         const normalizedPath = announcement.audio_file_path.replace(/^audio-announcements\//, '');
-        
-        console.log(`🗑️ Deleting file from bucket "${bucket}": ${normalizedPath}`);
         
         const { error: storageError } = await supabase.storage
           .from(bucket)
@@ -433,8 +494,6 @@ const AudioAnnouncements = () => {
           
         if (storageError) {
           console.warn('Storage deletion error (continuing with DB deletion):', storageError);
-        } else {
-          console.log(`✅ Successfully deleted file from storage: ${normalizedPath}`);
         }
       }
 
@@ -448,7 +507,7 @@ const AudioAnnouncements = () => {
 
       toast({ 
         title: 'Gelöscht', 
-        description: 'Durchsage wurde aus Datenbank und Storage gelöscht' 
+        description: 'Durchsage wurde gelöscht (Fallback-Methode)' 
       });
       
       // Stop audio if this announcement is playing
@@ -457,12 +516,12 @@ const AudioAnnouncements = () => {
       }
       
       fetchAnnouncements();
-    } catch (e: any) {
-      console.error('Delete error:', e);
-      toast({ 
-        title: 'Fehler', 
-        description: e.message || 'Löschen fehlgeschlagen', 
-        variant: 'destructive' 
+    } catch (fallbackError: any) {
+      console.error('Fallback deletion also failed:', fallbackError);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Fehler beim Löschen der Durchsage"
       });
     }
   };
