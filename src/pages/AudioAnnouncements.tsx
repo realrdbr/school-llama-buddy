@@ -230,7 +230,7 @@ const AudioAnnouncements = () => {
           .from(bucket)
           .getPublicUrl(announcement.audio_file_path);
         audioUrl = data.publicUrl;
-      } else if (announcement.is_tts && announcement.tts_text) {
+      } else if (announcement.is_tts && announcement.tts_text && !announcement.audio_file_path) {
         // Fallback: Use the Web Speech API for TTS when no audio file exists
         if ('speechSynthesis' in window) {
           speechSynthesis.cancel();
