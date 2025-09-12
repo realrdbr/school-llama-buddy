@@ -13,26 +13,41 @@ async function generateTTSAudio(text: string, voiceId: string = 'alloy', usePipe
   if (usePiper) {
     const endpoints = [
       'https://gymolb.eduard.services/pipertts',
-      'http://gymolb.eduard.services/pipertts'
+      'https://gymolb.eduard.services/pipertts/',
+      'http://gymolb.eduard.services/pipertts',
+      'http://gymolb.eduard.services/pipertts/',
     ]
 
     for (const url of endpoints) {
       try {
         console.log('Attempting PiperTTS generation via', url)
-        const piperResponse = await fetch(url, {
+        const reqInit: RequestInit = {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Accept': 'audio/wav',
+            'Accept': 'audio/wav, application/octet-stream',
           },
-          body: JSON.stringify({ text })
-        })
-        
+          body: JSON.stringify({ text }),
+          redirect: 'manual',
+        }
+
+        let piperResponse = await fetch(url, reqInit)
+
+        // Handle redirects explicitly to preserve POST
+        if ([301, 302, 303, 307, 308].includes(piperResponse.status)) {
+          const location = piperResponse.headers.get('location')
+          if (location) {
+            const redirectedUrl = new URL(location, url).toString()
+            console.log('Redirect from PiperTTS:', { from: url, to: redirectedUrl, status: piperResponse.status })
+            piperResponse = await fetch(redirectedUrl, reqInit)
+          }
+        }
+
         if (piperResponse.ok) {
           const audioBuffer = await piperResponse.arrayBuffer()
           const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
           const filename = `piper-tts-${timestamp}.wav`
-          console.log('PiperTTS generation successful at', url)
+          console.log('PiperTTS generation successful at', url, 'status:', piperResponse.status)
           return { audioBuffer, filename, usedPiper: true }
         } else {
           const errorText = await piperResponse.text().catch(() => '')
