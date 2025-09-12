@@ -59,53 +59,45 @@ async function generateTTSAudio(text: string, voiceId: string = 'alloy', usePipe
     }
   }
   
-  // Fallback: Generate simple tone pattern (improved version)
-  console.log('Using fallback tone generation...')
-  const sampleRate = 44100
-  const duration = Math.max(2, Math.min(10, text.length * 0.08)) // 2-10 seconds based on text length
-  const numSamples = Math.floor(sampleRate * duration)
-  
-  // Create WAV header
-  const buffer = new ArrayBuffer(44 + numSamples * 2)
-  const view = new DataView(buffer)
-  
-  // WAV header
-  const writeString = (offset: number, string: string) => {
-    for (let i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i))
-    }
-  }
-  
-  writeString(0, 'RIFF')
-  view.setUint32(4, 36 + numSamples * 2, true)
-  writeString(8, 'WAVE')
-  writeString(12, 'fmt ')
-  view.setUint32(16, 16, true)
-  view.setUint16(20, 1, true)
-  view.setUint16(22, 1, true)
-  view.setUint32(24, sampleRate, true)
-  view.setUint32(28, sampleRate * 2, true)
-  view.setUint16(32, 2, true)
-  view.setUint16(34, 16, true)
-  writeString(36, 'data')
-  view.setUint32(40, numSamples * 2, true)
-  
-  // Generate more pleasant tone pattern
-  for (let i = 0; i < numSamples; i++) {
-    const t = i / sampleRate
-    const baseFreq = 440 // A4 note
-    const modulation = Math.sin(2 * Math.PI * 2 * t) * 0.1 // Slow vibrato
-    const frequency = baseFreq + modulation * 50
-    const envelope = Math.exp(-t * 0.5) // Decay envelope
-    const amplitude = Math.sin(2 * Math.PI * frequency * t) * envelope * 0.3
-    const sample = Math.floor(amplitude * 16384) // Reduced volume
-    view.setInt16(44 + i * 2, sample, true)
-  }
-  
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-  const filename = `fallback-tts-${timestamp}.wav`
-  
-  return { audioBuffer: buffer, filename, usedPiper: false }
+  // Fallback: Generate simple tone pattern (disabled)
+  // console.log('Using fallback tone generation...')
+  // const sampleRate = 44100
+  // const duration = Math.max(2, Math.min(10, text.length * 0.08))
+  // const numSamples = Math.floor(sampleRate * duration)
+  // const buffer = new ArrayBuffer(44 + numSamples * 2)
+  // const view = new DataView(buffer)
+  // const writeString = (offset: number, string: string) => {
+  //   for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i))
+  // }
+  // writeString(0, 'RIFF')
+  // view.setUint32(4, 36 + numSamples * 2, true)
+  // writeString(8, 'WAVE')
+  // writeString(12, 'fmt ')
+  // view.setUint32(16, 16, true)
+  // view.setUint16(20, 1, true)
+  // view.setUint16(22, 1, true)
+  // view.setUint32(24, sampleRate, true)
+  // view.setUint32(28, sampleRate * 2, true)
+  // view.setUint16(32, 2, true)
+  // view.setUint16(34, 16, true)
+  // writeString(36, 'data')
+  // view.setUint32(40, numSamples * 2, true)
+  // for (let i = 0; i < numSamples; i++) {
+  //   const t = i / sampleRate
+  //   const baseFreq = 440
+  //   const modulation = Math.sin(2 * Math.PI * 2 * t) * 0.1
+  //   const frequency = baseFreq + modulation * 50
+  //   const envelope = Math.exp(-t * 0.5)
+  //   const amplitude = Math.sin(2 * Math.PI * frequency * t) * envelope * 0.3
+  //   const sample = Math.floor(amplitude * 16384)
+  //   view.setInt16(44 + i * 2, sample, true)
+  // }
+  // const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+  // const filename = `fallback-tts-${timestamp}.wav`
+  // return { audioBuffer: buffer, filename, usedPiper: false }
+
+  // Only PiperTTS allowed now
+  throw new Error('PiperTTS unavailable or failed; fallback disabled')
 }
 
 serve(async (req) => {
