@@ -202,6 +202,18 @@ export type Database = {
         }
         Relationships: []
       }
+      Klassen: {
+        Row: {
+          name: string
+        }
+        Insert: {
+          name: string
+        }
+        Update: {
+          name?: string
+        }
+        Relationships: []
+      }
       level_permissions: {
         Row: {
           allowed: boolean
