@@ -360,9 +360,64 @@ const AudioAnnouncements = () => {
     }
   };
 
+  const handleDeleteAll = async () => {
+    const confirmed = window.confirm(
+      `Wirklich ALLE ${announcements.length} Durchsagen unwiderruflich löschen?`
+    );
+    if (!confirmed) return;
+
+    setLoading(true);
+    try {
+      // Delete all announcements from database
+      const { error: dbError } = await supabase
+        .from('audio_announcements')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
+
+      if (dbError) throw dbError;
+
+      // Delete all audio files from both storage buckets
+      const audioFiles = announcements
+        .filter(a => a.audio_file_path)
+        .map(a => ({
+          bucket: a.is_tts ? 'audio-announcements' : 'audio-files',
+          path: a.audio_file_path!
+        }));
+
+      // Group by bucket and delete
+      const audioBucket = audioFiles.filter(f => f.bucket === 'audio-announcements').map(f => f.path);
+      const filesBucket = audioFiles.filter(f => f.bucket === 'audio-files').map(f => f.path);
+
+      if (audioBucket.length > 0) {
+        await supabase.storage.from('audio-announcements').remove(audioBucket);
+      }
+      if (filesBucket.length > 0) {
+        await supabase.storage.from('audio-files').remove(filesBucket);
+      }
+
+      toast({
+        title: "Alle gelöscht",
+        description: `${announcements.length} Durchsagen wurden gelöscht`
+      });
+
+      setAnnouncements([]);
+      stopAnnouncement(); // Stop any playing audio
+    } catch (error: any) {
+      console.error('Delete all error:', error);
+      toast({
+        title: "Fehler",
+        description: error.message || "Löschen fehlgeschlagen",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeleteAnnouncement = async (announcement: AudioAnnouncement) => {
     const confirmed = window.confirm('Durchsage wirklich löschen?');
     if (!confirmed) return;
+    
     try {
       // Delete database record first
       const { error } = await supabase
@@ -373,14 +428,23 @@ const AudioAnnouncements = () => {
 
       // Try to delete audio file from storage (if present)
       if (announcement.audio_file_path) {
-        const bucket = announcement.is_tts ? 'audio-announcements' : 'audio-files'
+        const bucket = announcement.is_tts ? 'audio-announcements' : 'audio-files';
+        console.log(`🗑️ Deleting file from ${bucket}: ${announcement.audio_file_path}`);
         await supabase.storage.from(bucket).remove([announcement.audio_file_path]);
       }
 
-      toast({ title: 'Gelöscht', description: 'Durchsage wurde gelöscht' });
+      toast({ 
+        title: 'Gelöscht', 
+        description: 'Durchsage wurde aus Datenbank und Storage gelöscht' 
+      });
       fetchAnnouncements();
     } catch (e: any) {
-      toast({ title: 'Fehler', description: e.message || 'Löschen fehlgeschlagen', variant: 'destructive' });
+      console.error('Delete error:', e);
+      toast({ 
+        title: 'Fehler', 
+        description: e.message || 'Löschen fehlgeschlagen', 
+        variant: 'destructive' 
+      });
     }
   };
 
@@ -523,7 +587,20 @@ const AudioAnnouncements = () => {
       {/* Announcements List */}
       <Card>
         <CardHeader>
-          <CardTitle>Durchsagen-Übersicht</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Durchsagen-Übersicht</CardTitle>
+            {announcements.length > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDeleteAll}
+                disabled={loading}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Alle löschen ({announcements.length})
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
