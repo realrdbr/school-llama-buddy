@@ -223,8 +223,14 @@ const AudioAnnouncements = () => {
 
       let audioUrl = '';
 
-      if (announcement.is_tts && announcement.tts_text) {
-        // For TTS, use the Web Speech API directly
+      // Prefer stored audio file if available (server-generated PiperTTS or uploaded files)
+      if (announcement.audio_file_path) {
+        const { data } = supabase.storage
+          .from('audio-files')
+          .getPublicUrl(announcement.audio_file_path);
+        audioUrl = data.publicUrl;
+      } else if (announcement.is_tts && announcement.tts_text) {
+        // Fallback: Use the Web Speech API for TTS when no audio file exists
         if ('speechSynthesis' in window) {
           speechSynthesis.cancel();
           
@@ -267,13 +273,6 @@ const AudioAnnouncements = () => {
         } else {
           throw new Error('Web Speech API nicht unterstützt');
         }
-      } else if (announcement.audio_file_path) {
-        // For uploaded audio files (use audio-files bucket)
-        const { data } = supabase.storage
-          .from('audio-files')
-          .getPublicUrl(announcement.audio_file_path);
-        
-        audioUrl = data.publicUrl;
       }
 
       if (audioUrl) {
