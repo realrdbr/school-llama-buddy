@@ -582,7 +582,6 @@ const AudioAnnouncements = () => {
             <div>
               <label className="block text-sm font-medium mb-1">TTS-Typ</label>
               <select 
-                style={{ borderColor: 'var(--secondary)' }} // Hier wird die sekundäre Farbe verwendet
                 className="w-full p-2 border rounded-md"
                 value={ttsForm.tts_type}
                 onChange={(e) => setTtsForm({ ...ttsForm, tts_type: e.target.value as 'piper' | 'browser' })}
