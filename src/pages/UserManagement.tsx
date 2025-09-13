@@ -58,22 +58,28 @@ const [deleting, setDeleting] = useState(false);
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('permissions')
-        .select('id, username, name, permission_lvl, created_at, user_class')
-        .order('created_at', { ascending: false });
+      const sessionId = localStorage.getItem('school_session_id');
+      if (!profile || !sessionId) throw new Error('Keine gültige Admin-Sitzung');
 
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Fehler",
-          description: "Benutzer konnten nicht geladen werden."
-        });
-      } else {
-        setUsers(data || []);
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: {
+          action: 'list_users',
+          actorUserId: profile.id,
+          sessionId,
+        },
+      });
+
+      if (error || !data?.success) {
+        throw new Error(data?.error || error?.message);
       }
+      setUsers(data.users || []);
     } catch (error) {
       console.error('Error fetching users:', error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Benutzer konnten nicht geladen werden."
+      });
     } finally {
       setLoading(false);
     }

@@ -105,19 +105,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       localStorage.removeItem('eduard_last_route');
       document.cookie = 'eduard_last_route=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
       
-      // Clear from database
-      if (profileData.id) {
-        await supabase
-          .from('user_sessions')
-          .delete()
-          .eq('user_id', profileData.id);
-      }
-      
-      setLoading(false);
-      return { 
-        error: null, 
-        mustChangePassword: userData.must_change_password || false 
-      };
+       // Create session for privileged operations via Edge Functions
+       if (profileData.id) {
+         const { data: sess, error: sessErr } = await supabase
+           .from('user_sessions')
+           .insert({ user_id: profileData.id, last_route: '/' })
+           .select('id')
+           .single();
+         if (!sessErr && sess?.id) {
+           localStorage.setItem('school_session_id', sess.id);
+         }
+       }
+       
+       setLoading(false);
+       return { 
+         error: null, 
+         mustChangePassword: userData.must_change_password || false 
+       };
     } catch (error) {
       setLoading(false);
       return { error };

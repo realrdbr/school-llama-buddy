@@ -48,14 +48,19 @@ const PermissionManager = () => {
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('permissions')
-        .select('id, username, name, permission_lvl, user_class')
-        .order('permission_lvl', { ascending: false })
-        .order('name', { ascending: true });
+      const sessionId = localStorage.getItem('school_session_id');
+      if (!profile || !sessionId) throw new Error('Keine gültige Admin-Sitzung');
 
-      if (error) throw error;
-      setUsers(data || []);
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: {
+          action: 'list_users',
+          actorUserId: profile.id,
+          sessionId,
+        },
+      });
+
+      if (error || !data?.success) throw new Error(data?.error || error?.message);
+      setUsers(data.users || []);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
