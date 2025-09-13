@@ -581,11 +581,19 @@ export type Database = {
         }
         Returns: Json
       }
+      get_current_user_id: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       get_current_user_permission_level: {
         Args: Record<PropertyKey, never>
         Returns: number
       }
       is_current_user_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_current_user_admin_safe: {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
