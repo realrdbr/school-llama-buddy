@@ -81,13 +81,23 @@ const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
 
     setLoading(true);
     try {
-      if (!profile) throw new Error('Kein Profil gefunden');
+      // Build actor info from context or localStorage fallback
+      const storedProfile = typeof window !== 'undefined' ? localStorage.getItem('school_profile') : null;
+      let actorUserId = profile?.id as number | undefined;
+      let actorUsername = (profile as any)?.username as string | undefined;
+      if ((!actorUserId || !actorUsername) && storedProfile) {
+        try {
+          const parsed = JSON.parse(storedProfile);
+          actorUserId = actorUserId ?? parsed?.id;
+          actorUsername = actorUsername ?? parsed?.username;
+        } catch {}
+      }
 
       const { data, error } = await supabase.functions.invoke('admin-users', {
         body: {
           action: 'update_user',
-          actorUserId: profile.id,
-          actorUsername: profile.username,
+          actorUserId,
+          actorUsername,
           targetUserId: user.id,
           targetUsername: user.username,
           updates: {
