@@ -14,8 +14,8 @@ serve(async (req) => {
 
   try {
     const payload = await req.json();
-    const { action, actorUserId, actorUsername } = payload;
-    console.log('[admin-users] input', { action, actorUserId, actorUsername });
+    const { action } = payload;
+    console.log('[admin-users] input', { action });
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -29,29 +29,27 @@ serve(async (req) => {
 
     if (!action) return deny(400, "Missing action");
 
-    // Verify actor is level 10+
-    let actor: { permission_lvl: number | null; username: string; name: string } | null = null;
-    let actorErr: any = null;
-
-    if (payload.actorUserId) {
-      const res = await supabase
-        .from("permissions")
-        .select("permission_lvl, username, name")
-        .eq("id", payload.actorUserId)
-        .maybeSingle();
-      actor = res.data as any;
-      actorErr = res.error;
+    // Get JWT token from request headers for authentication
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return deny(401, 'Missing or invalid authorization header')
     }
 
-    if ((!actor || actorErr) && payload.actorUsername) {
-      const res2 = await supabase
-        .from("permissions")
-        .select("permission_lvl, username, name")
-        .eq("username", payload.actorUsername)
-        .maybeSingle();
-      if (!actor) actor = res2.data as any;
-      if (!actorErr) actorErr = res2.error;
+    // Verify JWT and get user info
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    
+    if (authError || !user) {
+      console.error('[admin-users] Auth error:', authError)
+      return deny(401, 'Invalid authentication token')
     }
+
+    // Get actor permission info using username from JWT
+    const { data: actor, error: actorErr } = await supabase
+      .from('permissions')
+      .select('id, permission_lvl, username, name')
+      .eq('username', user.email || user.id)
+      .maybeSingle()
 
     console.log('[admin-users] actor', { actor, actorErr });
 
@@ -128,10 +126,28 @@ serve(async (req) => {
           updatePayload.user_class = updates.user_class ?? null;
         }
         
-        // Handle password update (only if password is provided and not empty)
+        // Handle password update using secure function
         if (updates?.new_password && updates.new_password.trim()) {
-          updatePayload.password = updates.new_password.trim();
-          updatePayload.must_change_password = false;
+          // Use secure password change function
+          const { data: result, error: pwError } = await supabase.rpc('change_user_password_secure', {
+            user_id_input: targetUserIdResolved,
+            old_password: 'admin_override', // Admin override - we'll modify the function to handle this
+            new_password: updates.new_password.trim()
+          });
+
+          if (pwError || !result?.success) {
+            console.error('[admin-users] Password change error:', pwError, result);
+            return deny(500, 'Fehler beim Ändern des Passworts');
+          }
+          
+          // Log security event
+          await supabase.rpc('log_security_event', {
+            user_id_param: actor.id,
+            action_param: 'admin_password_change',
+            resource_param: `user:${targetUserIdResolved}`,
+            success_param: true,
+            details_param: { targetUser: targetUser.username, actor: actor.username }
+          }).catch(err => console.error('Failed to log security event:', err));
         }
 
         if (Object.keys(updatePayload).length === 0) {

@@ -605,6 +605,16 @@ export type Database = {
         }
         Returns: Json
       }
+      create_school_user_secure: {
+        Args: {
+          creator_user_id: number
+          full_name_input: string
+          password_input: string
+          permission_level_input: number
+          username_input: string
+        }
+        Returns: Json
+      }
       get_current_user_id: {
         Args: Record<PropertyKey, never>
         Returns: number
