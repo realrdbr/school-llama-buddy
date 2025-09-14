@@ -153,7 +153,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     try {
-      const { data, error } = await supabase.rpc('create_school_user', {
+      const { data, error } = await supabase.rpc('create_school_user_secure', {
         username_input: username,
         password_input: password,
         full_name_input: fullName,

@@ -177,10 +177,10 @@ const handleCreateAnnouncement = async () => {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'urgent': return 'border-red-500 bg-red-50';
-      case 'high': return 'border-orange-500 bg-orange-50';
-      case 'low': return 'border-gray-500 bg-gray-50';
-      default: return 'border-blue-500 bg-blue-50';
+      case 'urgent': return 'border-red-500 bg-red-50 dark:bg-red-950/20 dark:border-red-400';
+      case 'high': return 'border-orange-500 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-400';
+      case 'low': return 'border-gray-500 bg-gray-50 dark:bg-gray-950/20 dark:border-gray-400';
+      default: return 'border-blue-500 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-400';
     }
   };
 
