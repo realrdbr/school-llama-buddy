@@ -35,12 +35,8 @@ serve(async (req) => {
       .eq("id", sessionId)
       .eq("user_id", actorUserId)
       .maybeSingle();
+    
     console.log('[admin-users] sessionRow', { sessionRow, sessionErr });
-      .from("user_sessions")
-      .select("id, user_id, created_at")
-      .eq("id", sessionId)
-      .eq("user_id", actorUserId)
-      .maybeSingle();
 
     if (sessionErr) {
       console.error("admin-users session lookup error:", sessionErr);
@@ -62,11 +58,8 @@ serve(async (req) => {
       .select("permission_lvl, username, name")
       .eq("id", actorUserId)
       .maybeSingle();
+    
     console.log('[admin-users] actor', { actor, actorErr });
-      .from("permissions")
-      .select("permission_lvl")
-      .eq("id", actorUserId)
-      .maybeSingle();
 
     if (actorErr) {
       console.error("admin-users actor lookup error:", actorErr);
@@ -84,11 +77,9 @@ serve(async (req) => {
           .select("id, username, name, permission_lvl, created_at, user_class")
           .order("permission_lvl", { ascending: false })
           .order("name", { ascending: true });
+        
         console.log('[admin-users] list_users result', { count: data?.length, error });
-          .from("permissions")
-          .select("id, username, name, permission_lvl, created_at, user_class")
-          .order("permission_lvl", { ascending: false })
-          .order("name", { ascending: true });
+        
         if (error) throw error;
         return new Response(
           JSON.stringify({ success: true, users: data || [] }),
