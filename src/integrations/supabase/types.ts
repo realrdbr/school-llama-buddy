@@ -609,6 +609,10 @@ export type Database = {
         Args: { target_user_id: number }
         Returns: boolean
       }
+      hash_password: {
+        Args: { password_input: string }
+        Returns: string
+      }
       invalidate_user_sessions: {
         Args: { keep_session_id?: string; target_user_id: number }
         Returns: undefined
@@ -636,6 +640,10 @@ export type Database = {
       set_primary_session: {
         Args: { session_id_param: string; target_user_id: number }
         Returns: undefined
+      }
+      verify_password: {
+        Args: { password_hash: string; password_input: string }
+        Returns: boolean
       }
       verify_user_login: {
         Args: { password_input: string; username_input: string }
