@@ -29,27 +29,34 @@ serve(async (req) => {
 
     if (!action) return deny(400, "Missing action");
 
-    // Get JWT token from request headers for authentication
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return deny(401, 'Missing or invalid authorization header')
-    }
-
-    // Verify JWT and get user info
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    // Get actor info from request payload (internal auth system)
+    const { actorUserId, actorUsername } = payload;
     
-    if (authError || !user) {
-      console.error('[admin-users] Auth error:', authError)
-      return deny(401, 'Invalid authentication token')
+    if (!actorUserId && !actorUsername) {
+      return deny(400, "Missing actor information");
     }
 
-    // Get actor permission info using username from JWT
-    const { data: actor, error: actorErr } = await supabase
-      .from('permissions')
-      .select('id, permission_lvl, username, name')
-      .eq('username', user.email || user.id)
-      .maybeSingle()
+    // Get actor permission info using internal user ID or username
+    let actor;
+    let actorErr;
+    
+    if (actorUserId) {
+      const result = await supabase
+        .from('permissions')
+        .select('id, permission_lvl, username, name')
+        .eq('id', actorUserId)
+        .maybeSingle();
+      actor = result.data;
+      actorErr = result.error;
+    } else if (actorUsername) {
+      const result = await supabase
+        .from('permissions')
+        .select('id, permission_lvl, username, name')
+        .eq('username', actorUsername)
+        .maybeSingle();
+      actor = result.data;
+      actorErr = result.error;
+    }
 
     console.log('[admin-users] actor', { actor, actorErr });
 
