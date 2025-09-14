@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { TimeoutProvider } from "@/hooks/useTimeout";
 import { useSessionStorage } from "@/hooks/useSessionStorage";
+import { usePermissionSync } from "@/hooks/usePermissionSync";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -29,6 +30,7 @@ const queryClient = new QueryClient();
 // Session-aware wrapper component
 const SessionAwareApp = () => {
   useSessionStorage(); // Initialize session management
+  usePermissionSync(); // Listen to permission changes in realtime
 
   return (
     <Routes>

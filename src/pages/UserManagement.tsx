@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useEnhancedPermissions } from '@/hooks/useEnhancedPermissions';
+import { useUserDataSync } from '@/hooks/usePermissionSync';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,12 +31,19 @@ const UserManagement = () => {
   
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-const [showCreateModal, setShowCreateModal] = useState(false);
-const [showEditModal, setShowEditModal] = useState(false);
-const [selectedUser, setSelectedUser] = useState<User | null>(null);
-const [confirmDeleteOpen1, setConfirmDeleteOpen1] = useState(false);
-const [confirmDeleteOpen2, setConfirmDeleteOpen2] = useState(false);
-const [deleting, setDeleting] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [confirmDeleteOpen1, setConfirmDeleteOpen1] = useState(false);
+  const [confirmDeleteOpen2, setConfirmDeleteOpen2] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Listen to user data changes and refresh the list
+  useUserDataSync(() => {
+    if (profile) {
+      fetchUsers();
+    }
+  });
   useEffect(() => {
     if (!user) {
       navigate('/auth');
