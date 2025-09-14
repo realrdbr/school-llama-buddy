@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -25,6 +25,13 @@ const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { profile } = useAuth();
+
+  // Reset form when user changes
+  useEffect(() => {
+    setSelectedClass(user.user_class || 'none');
+    setNewPassword('');
+    setConfirmPassword('');
+  }, [user]);
 
   const handleSave = async () => {
     if (newPassword && newPassword.length < 6) {
@@ -60,7 +67,10 @@ const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
         }
       });
 
-      if (error || !data?.success) throw new Error(data?.error || error?.message);
+      if (error || !data?.success) {
+        const errorMessage = data?.error || error?.message || 'Unbekannter Fehler';
+        throw new Error(errorMessage);
+      }
 
       toast({
         title: 'Erfolg',
@@ -69,7 +79,12 @@ const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
       onClose();
     } catch (error) {
       console.error('Error updating user:', error);
-      toast({ title: 'Fehler', description: 'Benutzer konnte nicht aktualisiert werden.', variant: 'destructive' });
+      const errorMessage = error instanceof Error ? error.message : 'Benutzer konnte nicht aktualisiert werden.';
+      toast({ 
+        title: 'Fehler', 
+        description: errorMessage, 
+        variant: 'destructive' 
+      });
     } finally {
       setLoading(false);
     }

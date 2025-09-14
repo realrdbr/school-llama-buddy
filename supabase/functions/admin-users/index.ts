@@ -70,26 +70,59 @@ serve(async (req) => {
 
         if (!targetUserId) return deny(400, "Missing targetUserId");
 
+        // Check if target user exists
+        const { data: targetUser, error: targetError } = await supabase
+          .from("permissions")
+          .select("id, username, name")
+          .eq("id", targetUserId)
+          .maybeSingle();
+
+        console.log('[admin-users] target user check', { targetUser, targetError });
+
+        if (targetError) {
+          console.error("Target user lookup error:", targetError);
+          return deny(500, `Fehler beim Suchen des Benutzers: ${targetError.message}`);
+        }
+
+        if (!targetUser) {
+          return deny(404, "Benutzer nicht gefunden");
+        }
+
         const updatePayload: Record<string, unknown> = {};
-        if ("user_class" in updates) updatePayload.user_class = updates.user_class ?? null;
-        if (updates?.new_password) {
-          updatePayload.password = updates.new_password;
+        
+        // Handle class update
+        if ("user_class" in updates) {
+          updatePayload.user_class = updates.user_class ?? null;
+        }
+        
+        // Handle password update (only if password is provided and not empty)
+        if (updates?.new_password && updates.new_password.trim()) {
+          updatePayload.password = updates.new_password.trim();
           updatePayload.must_change_password = false;
         }
 
         if (Object.keys(updatePayload).length === 0) {
-          return deny(400, "No updates provided");
+          return deny(400, "Keine Änderungen angegeben");
         }
 
-        const { error } = await supabase
+        console.log('[admin-users] updating with payload', updatePayload);
+
+        const { data: updatedUser, error } = await supabase
           .from("permissions")
           .update(updatePayload)
-          .eq("id", targetUserId);
+          .eq("id", targetUserId)
+          .select("id, username, name, user_class")
+          .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error("Update error:", error);
+          return deny(500, `Fehler beim Aktualisieren: ${error.message}`);
+        }
+
+        console.log('[admin-users] update successful', { updatedUser });
 
         return new Response(
-          JSON.stringify({ success: true }),
+          JSON.stringify({ success: true, user: updatedUser }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
