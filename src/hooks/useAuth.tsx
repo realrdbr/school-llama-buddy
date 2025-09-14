@@ -104,58 +104,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Clear any stored last route from all sources to ensure fresh start
       localStorage.removeItem('eduard_last_route');
       document.cookie = 'eduard_last_route=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      
-       // Check if there's already a primary session for this user
-       if (profileData.id) {
-         try {
-           // Check for existing primary session
-           const { data: existingPrimary } = await supabase
-             .from('user_sessions')
-             .select('id')
-             .eq('user_id', profileData.id)
-             .eq('is_active', true)
-             .eq('is_primary', true)
-             .maybeSingle();
-           
-           const deviceInfo = `${navigator.userAgent} - ${new Date().toISOString()}`;
-           const isPrimary = !existingPrimary; // First active session becomes primary
-           
-           // Create new session
-           const { data: sess, error: sessErr } = await supabase
-             .from('user_sessions')
-             .insert({ 
-               user_id: profileData.id, 
-               last_route: '/',
-               device_info: deviceInfo,
-               is_active: true,
-               is_primary: isPrimary
-             })
-             .select('id, session_token, is_primary, created_at')
-             .single();
-             
-           let sessionRecord = sess;
-           if (sessErr || !sess?.id) {
-             // Fallback: fetch most recent session for this user
-             const { data: latest, error: latestErr } = await supabase
-               .from('user_sessions')
-               .select('id, session_token, is_primary, created_at')
-               .eq('user_id', profileData.id)
-               .order('created_at', { ascending: false })
-               .maybeSingle();
-             if (!latestErr) sessionRecord = latest as any;
-           }
-
-           if (sessionRecord?.id) {
-             localStorage.setItem('school_session_id', sessionRecord.id as string);
-             // @ts-ignore
-             localStorage.setItem('school_session_token', sessionRecord.session_token as string);
-             // @ts-ignore
-             localStorage.setItem('school_session_primary', String(sessionRecord.is_primary));
-           }
-         } catch (error) {
-           console.error('Session creation error:', error);
-         }
-       }
        
        setLoading(false);
        return { 
@@ -230,31 +178,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    // Invalidate session in database and release admin rights
-    const sessionId = localStorage.getItem('school_session_id');
-    if (sessionId && profile) {
-      try {
-        await supabase.rpc('release_primary_session', {
-          target_user_id: profile.id
-        });
-        
-        await supabase
-          .from('user_sessions')
-          .update({ is_active: false })
-          .eq('id', sessionId);
-      } catch (error) {
-        console.error('Error invalidating session:', error);
-      }
-    }
-    
     setUser(null);
     setSession(null);
     setProfile(null);
     // Clear stored login data
     localStorage.removeItem('school_profile');
-    localStorage.removeItem('school_session_id');
-    localStorage.removeItem('school_session_token');
-    localStorage.removeItem('school_session_primary');
   };
 
   return (

@@ -7,8 +7,6 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { TimeoutProvider } from "@/hooks/useTimeout";
 import { useSessionStorage } from "@/hooks/useSessionStorage";
-import { useSessionValidator } from "@/hooks/useSessionValidator";
-import { useSessionCleanup } from "@/hooks/useSessionCleanup";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -31,8 +29,6 @@ const queryClient = new QueryClient();
 // Session-aware wrapper component
 const SessionAwareApp = () => {
   useSessionStorage(); // Initialize session management
-  useSessionValidator(); // Validate session in background
-  useSessionCleanup(); // Handle session cleanup
 
   return (
     <Routes>
