@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useEnhancedPermissions } from '@/hooks/useEnhancedPermissions';
-import { useAdminRights } from '@/hooks/useAdminRights';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Users, Shield, Save, RefreshCw, Settings, User, Search, CheckSquare, Square, Eye, EyeOff } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import AdminRightsIndicator from '@/components/AdminRightsIndicator';
+
 
 interface User {
   id: number;
@@ -35,7 +34,7 @@ const PermissionManager = () => {
     isLoaded,
     hasPermission
   } = useEnhancedPermissions();
-  const { hasAdminRights } = useAdminRights();
+  
   
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,19 +50,15 @@ const PermissionManager = () => {
 
   const fetchUsers = async () => {
     try {
-      const sessionId = localStorage.getItem('school_session_id');
-      if (!profile || !sessionId) throw new Error('Keine gültige Admin-Sitzung');
+      if (!profile) throw new Error('Kein Profil gefunden');
 
       const { data, error } = await supabase.functions.invoke('admin-users', {
         body: {
           action: 'list_users',
           actorUserId: profile.id,
-          sessionId,
         },
       });
-      console.log('[PermissionManager] fetchUsers', { sessionId, actorUserId: profile.id, data, error });
-      // end invoke
-
+      
       if (error || !data?.success) throw new Error(data?.error || error?.message);
       setUsers(data.users || []);
     } catch (error) {
@@ -248,9 +243,8 @@ const PermissionManager = () => {
           <RefreshCw className="h-4 w-4" />
         </Button>
       </div>
-      <AdminRightsIndicator />
 
-      <Tabs defaultValue="individual" className="w-full mt-6">
+      <Tabs defaultValue="individual" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="individual" className="flex items-center gap-2">
             <User className="h-4 w-4" />
@@ -297,7 +291,7 @@ const PermissionManager = () => {
                         size="sm"
                         onClick={() => handleBulkPermissionChange(permission.id, true)}
                         className="text-xs"
-                        disabled={!hasAdminRights}
+                        disabled={!profile || profile.permission_lvl < 10}
                       >
                         ✓ {permission.name}
                       </Button>
@@ -306,7 +300,7 @@ const PermissionManager = () => {
                         size="sm"
                         onClick={() => handleBulkPermissionChange(permission.id, false)}
                         className="text-xs"
-                        disabled={!hasAdminRights}
+                        disabled={!profile || profile.permission_lvl < 10}
                       >
                         ✗ {permission.name}
                       </Button>
@@ -389,7 +383,7 @@ const PermissionManager = () => {
                               <Switch
                                 checked={currentValue}
                                 onCheckedChange={() => handleUserPermissionToggle(user.id, permission.id, currentValue)}
-                                disabled={!hasAdminRights}
+                                disabled={!profile || profile.permission_lvl < 10}
                               />
                            </div>
                          )})}
@@ -433,7 +427,7 @@ const PermissionManager = () => {
                              <Switch
                                checked={currentValue}
                                onCheckedChange={() => handleLevelPermissionToggle(level, permission.id, currentValue)}
-                               disabled={!hasAdminRights || level < permission.requiresLevel}
+                               disabled={!profile || profile.permission_lvl < 10 || level < permission.requiresLevel}
                              />
                           </div>
                         )})}

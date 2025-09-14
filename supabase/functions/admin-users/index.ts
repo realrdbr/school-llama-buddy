@@ -12,8 +12,8 @@ serve(async (req) => {
   }
 
   try {
-    const { action, actorUserId, sessionId } = await req.json();
-    console.log('[admin-users] input', { action, actorUserId, sessionId });
+    const { action, actorUserId } = await req.json();
+    console.log('[admin-users] input', { action, actorUserId });
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -26,31 +26,7 @@ serve(async (req) => {
       });
 
     if (!action) return deny(400, "Missing action");
-    if (!actorUserId || !sessionId) return deny(400, "Missing actorUserId or sessionId");
-
-    // Verify session (must belong to actorUserId and be recent)
-    const { data: sessionRow, error: sessionErr } = await supabase
-      .from("user_sessions")
-      .select("id, user_id, created_at, is_active, is_primary")
-      .eq("id", sessionId)
-      .eq("user_id", actorUserId)
-      .maybeSingle();
-    
-    console.log('[admin-users] sessionRow', { sessionRow, sessionErr });
-
-    if (sessionErr) {
-      console.error("admin-users session lookup error:", sessionErr);
-      return deny(500, "Session check failed");
-    }
-
-    if (!sessionRow) return deny(401, "Invalid session");
-
-    // Optional freshness check: 48h
-    const createdAt = new Date(sessionRow.created_at || Date.now());
-    const maxAgeMs = 1000 * 60 * 60 * 48; // 48 hours
-    if (Date.now() - createdAt.getTime() > maxAgeMs) {
-      return deny(401, "Session expired");
-    }
+    if (!actorUserId) return deny(400, "Missing actorUserId");
 
     // Verify actor is level 10+
     const { data: actor, error: actorErr } = await supabase

@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useEnhancedPermissions } from '@/hooks/useEnhancedPermissions';
-import { useAdminRights } from '@/hooks/useAdminRights';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +12,7 @@ import { toast } from '@/hooks/use-toast';
 import CreateUserModal from '@/components/CreateUserModal';
 import EditUserModal from '@/components/EditUserModal';
 import PermissionManager from '@/components/PermissionManager';
-import AdminRightsIndicator from '@/components/AdminRightsIndicator';
+
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 interface User {
   id: number;
@@ -28,7 +27,7 @@ const UserManagement = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const { hasPermission, isLoaded } = useEnhancedPermissions();
-  const { hasAdminRights, isCheckingRights } = useAdminRights();
+  
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 const [showCreateModal, setShowCreateModal] = useState(false);
@@ -61,19 +60,15 @@ const [deleting, setDeleting] = useState(false);
 
   const fetchUsers = async () => {
     try {
-      const sessionId = localStorage.getItem('school_session_id');
-      if (!profile || !sessionId) throw new Error('Keine gültige Admin-Sitzung');
+      if (!profile) throw new Error('Kein Profil gefunden');
 
-       const { data, error } = await supabase.functions.invoke('admin-users', {
-         body: {
-           action: 'list_users',
-           actorUserId: profile.id,
-           sessionId,
-         },
-       });
-       console.log('[UserManagement] fetchUsers', { sessionId, actorUserId: profile.id, data, error });
-      // end invoke
-
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: {
+          action: 'list_users',
+          actorUserId: profile.id,
+        },
+      });
+      
       if (error || !data?.success) {
         throw new Error(data?.error || error?.message);
       }
@@ -185,7 +180,7 @@ const handleDeleteUser = async () => {
               onClick={() => setShowCreateModal(true)} 
               size="sm" 
               className="w-full sm:w-auto"
-              disabled={!hasAdminRights}
+              disabled={!profile || profile.permission_lvl < 10}
             >
               <UserPlus className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Neuer Benutzer</span>
@@ -197,9 +192,7 @@ const handleDeleteUser = async () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
-        <AdminRightsIndicator />
-        
-        <Tabs defaultValue="users" className="w-full mt-6">
+        <Tabs defaultValue="users" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
@@ -320,7 +313,7 @@ const handleDeleteUser = async () => {
     onClick={() => handleEditUser(userItem)}
     title="Benutzer bearbeiten"
     className="h-8 w-8 p-0"
-    disabled={!hasAdminRights}
+                    disabled={!profile || profile.permission_lvl < 10}
   >
     <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
   </Button>
@@ -330,7 +323,7 @@ const handleDeleteUser = async () => {
     className="text-destructive h-8 w-8 p-0" 
     title="Benutzer löschen" 
     onClick={() => requestDeleteUser(userItem)}
-    disabled={!hasAdminRights}
+    disabled={!profile || profile.permission_lvl < 10}
   >
     <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
   </Button>
