@@ -94,6 +94,24 @@ serve(async (req) => {
         );
       }
 
+      case "delete_user": {
+        const { targetUserId } = payload;
+        console.log('[admin-users] delete_user input', { targetUserId });
+        if (!targetUserId) return deny(400, "Missing targetUserId");
+
+        const { error } = await supabase
+          .from("permissions")
+          .delete()
+          .eq("id", targetUserId);
+
+        if (error) throw error;
+
+        return new Response(
+          JSON.stringify({ success: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       default:
         return deny(400, "Unknown action");
     }

@@ -114,23 +114,28 @@ const handleConfirmStep1 = () => {
 const handleDeleteUser = async () => {
   if (!selectedUser) return;
   setDeleting(true);
-  try {
-    const { error } = await supabase
-      .from('permissions')
-      .delete()
-      .eq('id', selectedUser.id);
-    if (error) throw error;
+    try {
+      if (!profile) throw new Error('Kein Profil gefunden');
 
-    toast({ title: 'Benutzer gelöscht', description: `${selectedUser.name} wurde entfernt.` });
-    setUsers((prev) => prev.filter((u) => u.id !== selectedUser.id));
-  } catch (err) {
-    console.error('Error deleting user:', err);
-    toast({ title: 'Fehler', description: 'Benutzer konnte nicht gelöscht werden.', variant: 'destructive' });
-  } finally {
-    setDeleting(false);
-    setConfirmDeleteOpen2(false);
-    setSelectedUser(null);
-  }
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: {
+          action: 'delete_user',
+          actorUserId: profile.id,
+          targetUserId: selectedUser.id
+        }
+      });
+      if (error || !data?.success) throw new Error(data?.error || error?.message);
+
+      toast({ title: 'Benutzer gelöscht', description: `${selectedUser.name} wurde entfernt.` });
+      setUsers((prev) => prev.filter((u) => u.id !== selectedUser.id));
+    } catch (err) {
+      console.error('Error deleting user:', err);
+      toast({ title: 'Fehler', description: 'Benutzer konnte nicht gelöscht werden.', variant: 'destructive' });
+    } finally {
+      setDeleting(false);
+      setConfirmDeleteOpen2(false);
+      setSelectedUser(null);
+    }
 };
   const getPermissionBadge = (level: number) => {
     if (level >= 10) return { text: "Schulleitung", variant: "default" as const };
