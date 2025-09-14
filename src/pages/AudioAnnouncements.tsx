@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Volume2, VolumeX, Mic, Upload, Play, Pause, RotateCcw, ArrowLeft, Trash2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
 import OfflineTTS from '@/components/OfflineTTS';
 
@@ -581,14 +582,18 @@ const AudioAnnouncements = () => {
             
             <div>
               <label className="block text-sm font-medium mb-1">TTS-Typ</label>
-              <select 
-                className="w-full p-2 border rounded-md"
+              <Select 
                 value={ttsForm.tts_type}
-                onChange={(e) => setTtsForm({ ...ttsForm, tts_type: e.target.value as 'piper' | 'browser' })}
+                onValueChange={(value) => setTtsForm({ ...ttsForm, tts_type: value as 'piper' | 'browser' })}
               >
-                <option value="piper">PiperTTS</option>
-                <option value="browser">Browser TTS</option>
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="TTS-Typ auswählen" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="piper">PiperTTS</SelectItem>
+                  <SelectItem value="browser">Browser TTS</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             
             <div>
