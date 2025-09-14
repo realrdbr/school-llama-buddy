@@ -128,16 +128,16 @@ serve(async (req) => {
         
         // Handle password update using secure function
         if (updates?.new_password && updates.new_password.trim()) {
-          // Use secure password change function
-          const { data: result, error: pwError } = await supabase.rpc('change_user_password_secure', {
-            user_id_input: targetUserIdResolved,
-            old_password: 'admin_override', // Admin override - we'll modify the function to handle this
+          // Use admin password override function
+          const { data: result, error: pwError } = await supabase.rpc('admin_change_user_password', {
+            admin_user_id: actor.id,
+            target_user_id: targetUserIdResolved,
             new_password: updates.new_password.trim()
           });
 
           if (pwError || !result?.success) {
             console.error('[admin-users] Password change error:', pwError, result);
-            return deny(500, 'Fehler beim Ändern des Passworts');
+            return deny(500, result?.error || 'Fehler beim Ändern des Passworts');
           }
           
           // Log security event

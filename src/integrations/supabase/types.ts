@@ -567,6 +567,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_change_user_password: {
+        Args: {
+          admin_user_id: number
+          new_password: string
+          target_user_id: number
+        }
+        Returns: Json
+      }
       auto_assign_primary_session: {
         Args: { target_user_id: number }
         Returns: string
