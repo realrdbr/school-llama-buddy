@@ -37,21 +37,40 @@ export const usePermissionSync = () => {
     const currentRoute = location.pathname;
     const requiredPermission = routePermissions[currentRoute];
     
-    if (requiredPermission) {
+    if (requiredPermission && profile) {
       // Reload permissions to get latest data
       await reloadPermissions();
-      
-      // Check if user still has access
-      if (!hasPermission(requiredPermission)) {
-        toast({
-          title: "Zugriff verweigert",
-          description: "Ihre Berechtigung für diese Seite wurde entfernt.",
-          variant: "destructive"
+
+      // Server-side permission check to avoid stale client state
+      try {
+        const { data, error } = await supabase.rpc('check_user_permission', {
+          user_id_param: profile.id as any,
+          permission_id_param: requiredPermission
         });
-        
-        setTimeout(() => {
-          navigate('/');
-        }, 1500);
+
+        if (error) {
+          console.warn('RPC check_user_permission error:', error);
+        }
+
+        const allowed = data === true;
+        if (!allowed) {
+          toast({
+            title: "Zugriff verweigert",
+            description: "Ihre Berechtigung für diese Seite wurde entfernt.",
+            variant: "destructive"
+          });
+          setTimeout(() => navigate('/', { replace: true }), 300);
+        }
+      } catch (e) {
+        console.warn('RPC check failed, falling back to client state:', e);
+        if (!hasPermission(requiredPermission)) {
+          toast({
+            title: "Zugriff verweigert",
+            description: "Ihre Berechtigung für diese Seite wurde entfernt.",
+            variant: "destructive"
+          });
+          setTimeout(() => navigate('/', { replace: true }), 300);
+        }
       }
     }
   };

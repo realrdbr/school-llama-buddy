@@ -5,23 +5,28 @@ import PermissionManager from '@/components/PermissionManager';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
+import { useEnhancedPermissions } from '@/hooks/useEnhancedPermissions';
 
 const Permissions = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
-
-  useEffect(() => {
-    if (profile && profile.permission_lvl < 10) {
+  const { hasPermission, isLoaded } = useEnhancedPermissions();
+useEffect(() => {
+    if (!isLoaded) return;
+    if (!hasPermission('permission_management')) {
       toast({
         variant: "destructive",
         title: "Zugriff verweigert",
         description: "Sie haben keine Berechtigung für diese Seite."
       });
-      navigate('/');
+      navigate('/', { replace: true });
     }
-  }, [profile, navigate]);
+  }, [isLoaded, hasPermission, navigate]);
 
-  if (!profile || profile.permission_lvl < 10) {
+  if (!isLoaded) {
+    return null;
+  }
+  if (!hasPermission('permission_management')) {
     return null;
   }
 
