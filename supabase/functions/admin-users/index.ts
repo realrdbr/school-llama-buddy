@@ -149,11 +149,14 @@ serve(async (req) => {
           .update(updatePayload)
           .eq("id", targetUserIdResolved)
           .select("id, username, name, user_class")
-          .single();
+          .maybeSingle();
 
         if (error) {
           console.error("Update error:", error);
           return deny(500, `Fehler beim Aktualisieren: ${error.message}`);
+        }
+        if (!updatedUser) {
+          return deny(404, "Benutzer nicht gefunden");
         }
 
         console.log('[admin-users] update successful', { updatedUser });
