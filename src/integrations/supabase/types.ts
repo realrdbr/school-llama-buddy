@@ -579,6 +579,14 @@ export type Database = {
         }
         Returns: Json
       }
+      change_user_password_secure: {
+        Args: {
+          new_password: string
+          old_password: string
+          user_id_input: number
+        }
+        Returns: Json
+      }
       check_user_permission: {
         Args: { permission_id_param: string; user_id_param: number }
         Returns: boolean
@@ -646,6 +654,16 @@ export type Database = {
         Returns: boolean
       }
       verify_user_login: {
+        Args: { password_input: string; username_input: string }
+        Returns: {
+          full_name: string
+          must_change_password: boolean
+          permission_level: number
+          profile_id: number
+          user_id: number
+        }[]
+      }
+      verify_user_login_secure: {
         Args: { password_input: string; username_input: string }
         Returns: {
           full_name: string

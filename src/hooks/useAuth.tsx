@@ -59,8 +59,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setLoading(true);
       
-      // Use the verify_user_login function instead of direct password check
-      const { data, error } = await supabase.rpc('verify_user_login', {
+      // Use the secure password verification function
+      const { data, error } = await supabase.rpc('verify_user_login_secure', {
         username_input: username,
         password_input: password
       });
@@ -120,7 +120,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (!user || !profile) return { error: { message: 'Nicht angemeldet' } };
 
     try {
-      const { data, error } = await supabase.rpc('change_user_password', {
+      const { data, error } = await supabase.rpc('change_user_password_secure', {
         user_id_input: profile.id,
         old_password: oldPassword,
         new_password: newPassword
