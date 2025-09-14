@@ -12,7 +12,8 @@ serve(async (req) => {
   }
 
   try {
-    const { action, actorUserId } = await req.json();
+    const payload = await req.json();
+    const { action, actorUserId } = payload;
     console.log('[admin-users] input', { action, actorUserId });
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -62,6 +63,37 @@ serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+      case "update_user": {
+        const { targetUserId, updates } = payload;
+        console.log('[admin-users] update_user input', { targetUserId, updates });
+
+        if (!targetUserId) return deny(400, "Missing targetUserId");
+
+        const updatePayload: Record<string, unknown> = {};
+        if ("user_class" in updates) updatePayload.user_class = updates.user_class ?? null;
+        if (updates?.new_password) {
+          updatePayload.password = updates.new_password;
+          updatePayload.must_change_password = false;
+        }
+
+        if (Object.keys(updatePayload).length === 0) {
+          return deny(400, "No updates provided");
+        }
+
+        const { error } = await supabase
+          .from("permissions")
+          .update(updatePayload)
+          .eq("id", targetUserId);
+
+        if (error) throw error;
+
+        return new Response(
+          JSON.stringify({ success: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       default:
         return deny(400, "Unknown action");
     }

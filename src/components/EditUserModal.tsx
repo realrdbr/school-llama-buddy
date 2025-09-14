@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 interface EditUserModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const { profile } = useAuth();
 
   const handleSave = async () => {
     if (newPassword && newPassword.length < 6) {
@@ -44,22 +46,21 @@ const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
 
     setLoading(true);
     try {
-      // Update class
-      const { error: classErr } = await supabase
-        .from('permissions')
-        .update({ user_class: selectedClass === 'none' ? null : selectedClass })
-        .eq('id', user.id);
-      if (classErr) throw classErr;
+      if (!profile) throw new Error('Kein Profil gefunden');
 
-      // Update password if provided
-      if (newPassword) {
-        const { error: pwErr } = await supabase.rpc('change_user_password', {
-          user_id_input: user.id,
-          old_password: '',
-          new_password: newPassword,
-        });
-        if (pwErr) throw pwErr;
-      }
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: {
+          action: 'update_user',
+          actorUserId: profile.id,
+          targetUserId: user.id,
+          updates: {
+            user_class: selectedClass === 'none' ? null : selectedClass,
+            new_password: newPassword || null
+          }
+        }
+      });
+
+      if (error || !data?.success) throw new Error(data?.error || error?.message);
 
       toast({
         title: 'Erfolg',
