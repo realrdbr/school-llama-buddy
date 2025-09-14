@@ -432,6 +432,7 @@ export type Database = {
           device_info: string | null
           id: string
           is_active: boolean | null
+          is_primary: boolean | null
           last_route: string | null
           session_token: string | null
           updated_at: string | null
@@ -442,6 +443,7 @@ export type Database = {
           device_info?: string | null
           id?: string
           is_active?: boolean | null
+          is_primary?: boolean | null
           last_route?: string | null
           session_token?: string | null
           updated_at?: string | null
@@ -452,6 +454,7 @@ export type Database = {
           device_info?: string | null
           id?: string
           is_active?: boolean | null
+          is_primary?: boolean | null
           last_route?: string | null
           session_token?: string | null
           updated_at?: string | null
@@ -613,6 +616,14 @@ export type Database = {
       is_session_valid: {
         Args: { session_id_param: string }
         Returns: boolean
+      }
+      session_has_admin_rights: {
+        Args: { session_id_param: string }
+        Returns: boolean
+      }
+      set_primary_session: {
+        Args: { session_id_param: string; target_user_id: number }
+        Returns: undefined
       }
       verify_user_login: {
         Args: { password_input: string; username_input: string }

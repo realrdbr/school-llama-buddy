@@ -24,9 +24,23 @@ export const useSessionValidator = () => {
           toast({
             variant: "destructive",
             title: "Sitzung abgelaufen",
-            description: "Sie wurden auf einem anderen Gerät angemeldet. Bitte melden Sie sich erneut an."
+            description: "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an."
           });
           await signOut();
+        } else {
+          // Also check if primary status changed
+          const { data: hasAdminRights } = await supabase.rpc('session_has_admin_rights', {
+            session_id_param: sessionId
+          });
+          
+          const currentPrimary = localStorage.getItem('school_session_primary') === 'true';
+          if (currentPrimary && !hasAdminRights) {
+            localStorage.setItem('school_session_primary', 'false');
+            toast({
+              title: "Admin-Rechte entzogen",
+              description: "Ein anderes Gerät hat jetzt die Admin-Rechte übernommen."
+            });
+          }
         }
       } catch (error) {
         console.error('Session validation error:', error);

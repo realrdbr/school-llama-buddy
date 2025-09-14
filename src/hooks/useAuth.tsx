@@ -105,30 +105,38 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       localStorage.removeItem('eduard_last_route');
       document.cookie = 'eduard_last_route=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
       
-       // Invalidate existing sessions and create new one for single-device login
+       // Check if there's already a primary session for this user
        if (profileData.id) {
          try {
-           // First invalidate all existing sessions for this user
-           await supabase.rpc('invalidate_user_sessions', {
-             target_user_id: profileData.id
-           });
+           // Check for existing primary session
+           const { data: existingPrimary } = await supabase
+             .from('user_sessions')
+             .select('id')
+             .eq('user_id', profileData.id)
+             .eq('is_active', true)
+             .eq('is_primary', true)
+             .maybeSingle();
            
-           // Create new session with device info
            const deviceInfo = `${navigator.userAgent} - ${new Date().toISOString()}`;
+           const isPrimary = !existingPrimary; // First active session becomes primary
+           
+           // Create new session
            const { data: sess, error: sessErr } = await supabase
              .from('user_sessions')
              .insert({ 
                user_id: profileData.id, 
                last_route: '/',
                device_info: deviceInfo,
-               is_active: true
+               is_active: true,
+               is_primary: isPrimary
              })
-             .select('id, session_token')
+             .select('id, session_token, is_primary')
              .single();
              
            if (!sessErr && sess?.id) {
              localStorage.setItem('school_session_id', sess.id);
              localStorage.setItem('school_session_token', sess.session_token);
+             localStorage.setItem('school_session_primary', sess.is_primary.toString());
            }
          } catch (error) {
            console.error('Session creation error:', error);
@@ -228,6 +236,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.removeItem('school_profile');
     localStorage.removeItem('school_session_id');
     localStorage.removeItem('school_session_token');
+    localStorage.removeItem('school_session_primary');
   };
 
   return (
