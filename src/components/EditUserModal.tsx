@@ -59,7 +59,9 @@ const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
         body: {
           action: 'update_user',
           actorUserId: profile.id,
+          actorUsername: profile.username,
           targetUserId: user.id,
+          targetUsername: user.username,
           updates: {
             user_class: selectedClass === 'none' ? null : selectedClass,
             new_password: newPassword || null

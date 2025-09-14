@@ -66,6 +66,7 @@ const [deleting, setDeleting] = useState(false);
         body: {
           action: 'list_users',
           actorUserId: profile.id,
+          actorUsername: profile.username,
         },
       });
       
@@ -121,7 +122,9 @@ const handleDeleteUser = async () => {
         body: {
           action: 'delete_user',
           actorUserId: profile.id,
-          targetUserId: selectedUser.id
+          actorUsername: profile.username,
+          targetUserId: selectedUser.id,
+          targetUsername: selectedUser.username
         }
       });
       if (error || !data?.success) throw new Error(data?.error || error?.message);
