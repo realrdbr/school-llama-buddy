@@ -107,9 +107,11 @@ const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
         }
       });
 
-      if (error || !data?.success) {
-        const errorMessage = data?.error || error?.message || 'Unbekannter Fehler';
-        throw new Error(errorMessage);
+      if (error) {
+        throw new Error(error.message);
+      }
+      if (data && data.success === false) {
+        throw new Error(data.error || 'Unbekannter Fehler');
       }
 
       toast({
