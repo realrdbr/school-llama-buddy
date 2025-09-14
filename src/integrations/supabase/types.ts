@@ -246,6 +246,33 @@ export type Database = {
           },
         ]
       }
+      login_attempts: {
+        Row: {
+          attempted_at: string | null
+          id: string
+          ip_address: unknown | null
+          success: boolean | null
+          user_agent: string | null
+          username: string
+        }
+        Insert: {
+          attempted_at?: string | null
+          id?: string
+          ip_address?: unknown | null
+          success?: boolean | null
+          user_agent?: string | null
+          username: string
+        }
+        Update: {
+          attempted_at?: string | null
+          id?: string
+          ip_address?: unknown | null
+          success?: boolean | null
+          user_agent?: string | null
+          username?: string
+        }
+        Relationships: []
+      }
       permission_definitions: {
         Row: {
           created_at: string
@@ -594,6 +621,10 @@ export type Database = {
           user_id_input: number
         }
         Returns: Json
+      }
+      check_brute_force_protection: {
+        Args: { ip_address_input?: unknown; username_input: string }
+        Returns: boolean
       }
       check_user_permission: {
         Args: { permission_id_param: string; user_id_param: number }
