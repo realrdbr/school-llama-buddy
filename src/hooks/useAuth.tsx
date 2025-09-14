@@ -230,10 +230,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    // Invalidate session in database
+    // Invalidate session in database and release admin rights
     const sessionId = localStorage.getItem('school_session_id');
-    if (sessionId) {
+    if (sessionId && profile) {
       try {
+        await supabase.rpc('release_primary_session', {
+          target_user_id: profile.id
+        });
+        
         await supabase
           .from('user_sessions')
           .update({ is_active: false })

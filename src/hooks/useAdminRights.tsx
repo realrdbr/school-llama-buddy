@@ -34,7 +34,17 @@ export const useAdminRights = () => {
           
           setHasAdminRights(!!hasRights);
         } else {
-          setHasAdminRights(false);
+          // Check if we can auto-assign admin rights
+          const { data: newPrimaryId } = await supabase.rpc('auto_assign_primary_session', {
+            target_user_id: profile.id
+          });
+          
+          if (newPrimaryId === sessionId) {
+            localStorage.setItem('school_session_primary', 'true');
+            setHasAdminRights(true);
+          } else {
+            setHasAdminRights(false);
+          }
         }
       } catch (error) {
         console.error('Error checking admin rights:', error);
@@ -46,6 +56,49 @@ export const useAdminRights = () => {
 
     checkAdminRights();
   }, [profile]);
+
+  // Handle page leave/unload - release admin rights
+  useEffect(() => {
+    if (!profile || !hasAdminRights) return;
+
+    const releaseAdminRights = async () => {
+      try {
+        await supabase.rpc('release_primary_session', {
+          target_user_id: profile.id
+        });
+        localStorage.setItem('school_session_primary', 'false');
+      } catch (error) {
+        console.error('Error releasing admin rights:', error);
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      // Use sendBeacon for reliable cleanup on page unload
+      if (navigator.sendBeacon) {
+        const data = new FormData();
+        data.append('action', 'release_rights');
+        data.append('user_id', profile.id.toString());
+        navigator.sendBeacon('/api/cleanup-session', data);
+      } else {
+        releaseAdminRights();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        releaseAdminRights();
+      }
+    };
+
+    // Listen for page unload and visibility changes
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [profile, hasAdminRights]);
 
   const requestAdminRights = async (): Promise<boolean> => {
     if (!profile) return false;
@@ -68,9 +121,27 @@ export const useAdminRights = () => {
     }
   };
 
+  const releaseAdminRights = async (): Promise<boolean> => {
+    if (!profile) return false;
+
+    try {
+      await supabase.rpc('release_primary_session', {
+        target_user_id: profile.id
+      });
+
+      localStorage.setItem('school_session_primary', 'false');
+      setHasAdminRights(false);
+      return true;
+    } catch (error) {
+      console.error('Error releasing admin rights:', error);
+      return false;
+    }
+  };
+
   return {
     hasAdminRights,
     isCheckingRights,
-    requestAdminRights
+    requestAdminRights,
+    releaseAdminRights
   };
 };

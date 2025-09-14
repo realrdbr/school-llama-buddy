@@ -567,6 +567,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      auto_assign_primary_session: {
+        Args: { target_user_id: number }
+        Returns: string
+      }
       change_user_password: {
         Args: {
           new_password: string
@@ -601,6 +605,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      has_active_sessions: {
+        Args: { target_user_id: number }
+        Returns: boolean
+      }
       invalidate_user_sessions: {
         Args: { keep_session_id?: string; target_user_id: number }
         Returns: undefined
@@ -616,6 +624,10 @@ export type Database = {
       is_session_valid: {
         Args: { session_id_param: string }
         Returns: boolean
+      }
+      release_primary_session: {
+        Args: { target_user_id: number }
+        Returns: undefined
       }
       session_has_admin_rights: {
         Args: { session_id_param: string }
