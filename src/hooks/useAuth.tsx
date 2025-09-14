@@ -59,18 +59,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setLoading(true);
       
-      // Use the secure password verification function
+      // Get user's user agent for security logging
+      const userAgent = navigator.userAgent;
+      
+      // Use the secure password verification function with brute force protection
       const { data, error } = await supabase.rpc('verify_user_login_secure', {
         username_input: username,
-        password_input: password
+        password_input: password,
+        ip_address_input: null, // Frontend can't get real IP
+        user_agent_input: userAgent
       });
 
-      if (error || !data || data.length === 0) {
+      if (error) {
+        setLoading(false);
+        return { error: { message: error.message || 'Anmeldung fehlgeschlagen' } };
+      }
+
+      if (!data || data.length === 0) {
         setLoading(false);
         return { error: { message: 'Ungültiger Benutzername oder Passwort' } };
       }
 
       const userData = data[0];
+
+      // Check for error message from brute force protection
+      if ((userData as any).error_message) {
+        setLoading(false);
+        return { error: { message: (userData as any).error_message } };
+      }
+
+      if (!userData.user_id) {
+        setLoading(false);
+        return { error: { message: 'Ungültige Anmeldedaten' } };
+      }
 
       // Create a dummy user for internal auth
       const dummyUser: User = {

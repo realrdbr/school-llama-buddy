@@ -686,9 +686,22 @@ export type Database = {
         Args: { session_id_param: string }
         Returns: boolean
       }
+      log_login_attempt: {
+        Args: {
+          ip_address_input?: unknown
+          success_input: boolean
+          user_agent_input?: string
+          username_input: string
+        }
+        Returns: undefined
+      }
       release_primary_session: {
         Args: { target_user_id: number }
         Returns: undefined
+      }
+      rotate_session_token: {
+        Args: { old_session_token: string }
+        Returns: string
       }
       session_has_admin_rights: {
         Args: { session_id_param: string }
@@ -713,7 +726,14 @@ export type Database = {
         }[]
       }
       verify_user_login_secure: {
-        Args: { password_input: string; username_input: string }
+        Args:
+          | {
+              ip_address_input?: unknown
+              password_input: string
+              user_agent_input?: string
+              username_input: string
+            }
+          | { password_input: string; username_input: string }
         Returns: {
           full_name: string
           must_change_password: boolean

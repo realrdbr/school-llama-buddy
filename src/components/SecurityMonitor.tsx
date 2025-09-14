@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Shield, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { de } from 'date-fns/locale';
 
 const SecurityMonitor: React.FC = () => {
   const { hasAdminRights } = useAdminRights();
@@ -85,8 +84,7 @@ const SecurityMonitor: React.FC = () => {
                       </Badge>
                       <span className="text-sm text-muted-foreground">
                         {formatDistanceToNow(event.timestamp, { 
-                          addSuffix: true, 
-                          locale: de 
+                          addSuffix: true
                         })}
                       </span>
                     </div>
