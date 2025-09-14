@@ -429,22 +429,31 @@ export type Database = {
       user_sessions: {
         Row: {
           created_at: string | null
+          device_info: string | null
           id: string
+          is_active: boolean | null
           last_route: string | null
+          session_token: string | null
           updated_at: string | null
           user_id: number | null
         }
         Insert: {
           created_at?: string | null
+          device_info?: string | null
           id?: string
+          is_active?: boolean | null
           last_route?: string | null
+          session_token?: string | null
           updated_at?: string | null
           user_id?: number | null
         }
         Update: {
           created_at?: string | null
+          device_info?: string | null
           id?: string
+          is_active?: boolean | null
           last_route?: string | null
+          session_token?: string | null
           updated_at?: string | null
           user_id?: number | null
         }
@@ -589,12 +598,20 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      invalidate_user_sessions: {
+        Args: { keep_session_id?: string; target_user_id: number }
+        Returns: undefined
+      }
       is_current_user_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
       is_current_user_admin_safe: {
         Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_session_valid: {
+        Args: { session_id_param: string }
         Returns: boolean
       }
       verify_user_login: {

@@ -105,15 +105,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       localStorage.removeItem('eduard_last_route');
       document.cookie = 'eduard_last_route=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
       
-       // Create session for privileged operations via Edge Functions
+       // Invalidate existing sessions and create new one for single-device login
        if (profileData.id) {
-         const { data: sess, error: sessErr } = await supabase
-           .from('user_sessions')
-           .insert({ user_id: profileData.id, last_route: '/' })
-           .select('id')
-           .single();
-         if (!sessErr && sess?.id) {
-           localStorage.setItem('school_session_id', sess.id);
+         try {
+           // First invalidate all existing sessions for this user
+           await supabase.rpc('invalidate_user_sessions', {
+             target_user_id: profileData.id
+           });
+           
+           // Create new session with device info
+           const deviceInfo = `${navigator.userAgent} - ${new Date().toISOString()}`;
+           const { data: sess, error: sessErr } = await supabase
+             .from('user_sessions')
+             .insert({ 
+               user_id: profileData.id, 
+               last_route: '/',
+               device_info: deviceInfo,
+               is_active: true
+             })
+             .select('id, session_token')
+             .single();
+             
+           if (!sessErr && sess?.id) {
+             localStorage.setItem('school_session_id', sess.id);
+             localStorage.setItem('school_session_token', sess.session_token);
+           }
+         } catch (error) {
+           console.error('Session creation error:', error);
          }
        }
        
@@ -190,11 +208,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
+    // Invalidate session in database
+    const sessionId = localStorage.getItem('school_session_id');
+    if (sessionId) {
+      try {
+        await supabase
+          .from('user_sessions')
+          .update({ is_active: false })
+          .eq('id', sessionId);
+      } catch (error) {
+        console.error('Error invalidating session:', error);
+      }
+    }
+    
     setUser(null);
     setSession(null);
     setProfile(null);
     // Clear stored login data
     localStorage.removeItem('school_profile');
+    localStorage.removeItem('school_session_id');
+    localStorage.removeItem('school_session_token');
   };
 
   return (
