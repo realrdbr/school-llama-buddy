@@ -135,7 +135,11 @@ serve(async (req) => {
         }
 
         if (Object.keys(updatePayload).length === 0) {
-          return deny(400, "Keine Änderungen angegeben");
+          // No-op update: nothing to change, but consider it a success for idempotency
+          return new Response(
+            JSON.stringify({ success: true, user: targetUser }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
 
         console.log('[admin-users] updating with payload', updatePayload);
