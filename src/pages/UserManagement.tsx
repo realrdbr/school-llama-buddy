@@ -64,13 +64,15 @@ const [deleting, setDeleting] = useState(false);
       const sessionId = localStorage.getItem('school_session_id');
       if (!profile || !sessionId) throw new Error('Keine gültige Admin-Sitzung');
 
-      const { data, error } = await supabase.functions.invoke('admin-users', {
-        body: {
-          action: 'list_users',
-          actorUserId: profile.id,
-          sessionId,
-        },
-      });
+       const { data, error } = await supabase.functions.invoke('admin-users', {
+         body: {
+           action: 'list_users',
+           actorUserId: profile.id,
+           sessionId,
+         },
+       });
+       console.log('[UserManagement] fetchUsers', { sessionId, actorUserId: profile.id, data, error });
+      // end invoke
 
       if (error || !data?.success) {
         throw new Error(data?.error || error?.message);

@@ -13,6 +13,7 @@ serve(async (req) => {
 
   try {
     const { action, actorUserId, sessionId } = await req.json();
+    console.log('[admin-users] input', { action, actorUserId, sessionId });
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -29,6 +30,12 @@ serve(async (req) => {
 
     // Verify session (must belong to actorUserId and be recent)
     const { data: sessionRow, error: sessionErr } = await supabase
+      .from("user_sessions")
+      .select("id, user_id, created_at, is_active, is_primary")
+      .eq("id", sessionId)
+      .eq("user_id", actorUserId)
+      .maybeSingle();
+    console.log('[admin-users] sessionRow', { sessionRow, sessionErr });
       .from("user_sessions")
       .select("id, user_id, created_at")
       .eq("id", sessionId)
@@ -52,6 +59,11 @@ serve(async (req) => {
     // Verify actor is level 10+
     const { data: actor, error: actorErr } = await supabase
       .from("permissions")
+      .select("permission_lvl, username, name")
+      .eq("id", actorUserId)
+      .maybeSingle();
+    console.log('[admin-users] actor', { actor, actorErr });
+      .from("permissions")
       .select("permission_lvl")
       .eq("id", actorUserId)
       .maybeSingle();
@@ -68,6 +80,11 @@ serve(async (req) => {
     switch (action) {
       case "list_users": {
         const { data, error } = await supabase
+          .from("permissions")
+          .select("id, username, name, permission_lvl, created_at, user_class")
+          .order("permission_lvl", { ascending: false })
+          .order("name", { ascending: true });
+        console.log('[admin-users] list_users result', { count: data?.length, error });
           .from("permissions")
           .select("id, username, name, permission_lvl, created_at, user_class")
           .order("permission_lvl", { ascending: false })

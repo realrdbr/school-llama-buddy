@@ -130,13 +130,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                is_active: true,
                is_primary: isPrimary
              })
-             .select('id, session_token, is_primary')
+             .select('id, session_token, is_primary, created_at')
              .single();
              
-           if (!sessErr && sess?.id) {
-             localStorage.setItem('school_session_id', sess.id);
-             localStorage.setItem('school_session_token', sess.session_token);
-             localStorage.setItem('school_session_primary', sess.is_primary.toString());
+           let sessionRecord = sess;
+           if (sessErr || !sess?.id) {
+             // Fallback: fetch most recent session for this user
+             const { data: latest, error: latestErr } = await supabase
+               .from('user_sessions')
+               .select('id, session_token, is_primary, created_at')
+               .eq('user_id', profileData.id)
+               .order('created_at', { ascending: false })
+               .maybeSingle();
+             if (!latestErr) sessionRecord = latest as any;
+           }
+
+           if (sessionRecord?.id) {
+             localStorage.setItem('school_session_id', sessionRecord.id as string);
+             // @ts-ignore
+             localStorage.setItem('school_session_token', sessionRecord.session_token as string);
+             // @ts-ignore
+             localStorage.setItem('school_session_primary', String(sessionRecord.is_primary));
            }
          } catch (error) {
            console.error('Session creation error:', error);
