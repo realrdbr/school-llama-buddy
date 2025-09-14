@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ArrowLeft, BookOpen, Users, Calendar, Settings, Plus, Edit } from 'lucide-react';
+import { ArrowLeft, BookOpen, Users, Calendar, Settings, Plus, Edit, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface ClassInfo {
@@ -32,7 +32,7 @@ const Klassenverwaltung = () => {
       navigate('/auth');
       return;
     }
-    if (profile && profile.permission_lvl < 5) {
+    if (profile && profile.permission_lvl < 10) {
       toast({
         variant: "destructive",
         title: "Zugriff verweigert",
@@ -79,7 +79,7 @@ const Klassenverwaltung = () => {
     }
   };
 
-  const canEditClasses = profile?.permission_lvl && profile.permission_lvl >= 8;
+  const canEditClasses = profile?.permission_lvl && profile.permission_lvl >= 10;
 
   const handleCreateClass = () => {
     if (!newClass.name || !newClass.classTeacher) {
@@ -129,6 +129,16 @@ const Klassenverwaltung = () => {
       title: "Klasse bearbeitet",
       description: `Die Klasse ${selectedClass.name} wurde erfolgreich aktualisiert.`
     });
+  };
+
+  const handleDeleteClass = (className: string) => {
+    if (window.confirm(`Möchten Sie die Klasse "${className}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`)) {
+      setClasses(classes.filter(cls => cls.name !== className));
+      toast({
+        title: "Klasse gelöscht",
+        description: `Die Klasse ${className} wurde erfolgreich gelöscht.`
+      });
+    }
   };
 
   return (
@@ -307,16 +317,26 @@ const Klassenverwaltung = () => {
                         Stundenplan
                       </Button>
                       {canEditClasses && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            setSelectedClass(classInfo);
-                            setShowEditClass(true);
-                          }}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              setSelectedClass(classInfo);
+                              setShowEditClass(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteClass(classInfo.name)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </CardContent>

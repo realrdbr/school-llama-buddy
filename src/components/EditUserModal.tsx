@@ -24,7 +24,35 @@ const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [availableClasses, setAvailableClasses] = useState<string[]>([]);
   const { profile } = useAuth();
+
+  // Load available classes from database
+  useEffect(() => {
+    const loadClasses = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('Klassen')
+          .select('name')
+          .order('name');
+        
+        if (error) {
+          console.error('Error loading classes:', error);
+          // Fallback to hardcoded classes
+          setAvailableClasses(['10b', '10c']);
+        } else {
+          setAvailableClasses(data.map(cls => cls.name));
+        }
+      } catch (error) {
+        console.error('Error loading classes:', error);
+        setAvailableClasses(['10b', '10c']);
+      }
+    };
+    
+    if (isOpen) {
+      loadClasses();
+    }
+  }, [isOpen]);
 
   // Reset form when user changes
   useEffect(() => {
@@ -108,8 +136,9 @@ const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Keine Klasse</SelectItem>
-                <SelectItem value="10b">10b</SelectItem>
-                <SelectItem value="10c">10c</SelectItem>
+                {availableClasses.map(className => (
+                  <SelectItem key={className} value={className}>{className}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
