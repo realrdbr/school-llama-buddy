@@ -112,7 +112,7 @@ const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
       const errorMessage = error instanceof Error ? error.message : 'Benutzer konnte nicht aktualisiert werden.';
       toast({ 
         title: 'Fehler', 
-        description: errorMessage, 
+        description: 'Benutzer konnte nicht bearbeitet werden.', 
         variant: 'destructive' 
       });
     } finally {
