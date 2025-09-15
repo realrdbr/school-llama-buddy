@@ -129,7 +129,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [currentTheme, setCurrentTheme] = useState<Theme | null>(null);
   const [userThemes, setUserThemes] = useState<Theme[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user, profile } = useAuth();
+  const { user, profile, sessionId } = useAuth();
 
   // Local storage key for theme persistence
   const THEME_STORAGE_KEY = 'app_active_theme';
@@ -293,15 +293,17 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Apply immediately for visual feedback
     applyTheme(newTheme);
 
-    if (!profile) return;
+    if (!profile || !sessionId) return;
 
     try {
-      const password = window.prompt('Bitte bestätigen Sie Ihr Passwort, um das Theme zu erstellen:');
-      if (!password) return;
+      // Set session context for RLS
+      await supabase.rpc('set_config', {
+        setting_name: 'app.current_session_id',
+        setting_value: sessionId,
+        is_local: false
+      });
 
-      const { data, error } = await supabase.rpc('create_user_theme_secure', {
-        username_input: profile.username,
-        password_input: password,
+      const { data, error } = await supabase.rpc('create_user_theme_session', {
         theme_name: name,
         theme_colors: colors as any
       });
@@ -325,19 +327,28 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       await loadUserThemes();
     } catch (error) {
       console.error('Error creating theme:', error);
+    } finally {
+      // Clean up session context
+      await supabase.rpc('set_config', {
+        setting_name: 'app.current_session_id',
+        setting_value: '',
+        is_local: false
+      });
     }
   };
 
   const updateTheme = async (themeId: string, colors: ThemeColors) => {
-    if (!profile) return;
+    if (!profile || !sessionId) return;
 
     try {
-      const password = window.prompt('Bitte bestätigen Sie Ihr Passwort, um das Theme zu aktualisieren:');
-      if (!password) return;
+      // Set session context for RLS
+      await supabase.rpc('set_config', {
+        setting_name: 'app.current_session_id',
+        setting_value: sessionId,
+        is_local: false
+      });
 
-      const { data, error } = await supabase.rpc('update_user_theme_secure', {
-        username_input: profile.username,
-        password_input: password,
+      const { data, error } = await supabase.rpc('update_user_theme_session', {
         theme_id: themeId as any,
         theme_colors: colors as any
       });
@@ -350,19 +361,28 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       await loadUserThemes();
     } catch (error) {
       console.error('Error updating theme:', error);
+    } finally {
+      // Clean up session context
+      await supabase.rpc('set_config', {
+        setting_name: 'app.current_session_id',
+        setting_value: '',
+        is_local: false
+      });
     }
   };
 
   const deleteTheme = async (themeId: string) => {
-    if (!profile) return;
+    if (!profile || !sessionId) return;
 
     try {
-      const password = window.prompt('Bitte bestätigen Sie Ihr Passwort, um das Theme zu löschen:');
-      if (!password) return;
+      // Set session context for RLS
+      await supabase.rpc('set_config', {
+        setting_name: 'app.current_session_id',
+        setting_value: sessionId,
+        is_local: false
+      });
 
-      const { data, error } = await supabase.rpc('delete_user_theme_secure', {
-        username_input: profile.username,
-        password_input: password,
+      const { data, error } = await supabase.rpc('delete_user_theme_session', {
         theme_id: themeId as any
       });
 
@@ -374,6 +394,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       await loadUserThemes();
     } catch (error) {
       console.error('Error deleting theme:', error);
+    } finally {
+      // Clean up session context
+      await supabase.rpc('set_config', {
+        setting_name: 'app.current_session_id',
+        setting_value: '',
+        is_local: false
+      });
     }
   };
 

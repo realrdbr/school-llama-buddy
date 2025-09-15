@@ -22,6 +22,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   changePassword: (oldPassword: string, newPassword: string) => Promise<{ error: any }>;
   createUser: (username: string, password: string, fullName: string, permissionLevel: number) => Promise<{ error: any }>;
+  sessionId: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,14 +32,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     // Check for stored login data in cookies
     const storedProfile = localStorage.getItem('school_profile');
-    if (storedProfile) {
+    const storedSessionId = localStorage.getItem('school_session_id');
+    if (storedProfile && storedSessionId) {
       try {
         const profile = JSON.parse(storedProfile);
         setProfile(profile);
+        setSessionId(storedSessionId);
         setUser({
           id: profile.username,
           app_metadata: {},
@@ -50,6 +54,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } catch (error) {
         console.error('Error loading stored profile:', error);
         localStorage.removeItem('school_profile');
+        localStorage.removeItem('school_session_id');
       }
     }
     setLoading(false);
@@ -114,12 +119,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         must_change_password: userData.must_change_password || false
       };
 
+      // Create session for user
+      const { data: sessionData, error: sessionError } = await supabase.rpc('create_user_session', {
+        user_id_param: userData.user_id
+      });
+
+      if (sessionError) {
+        console.error('Session creation error:', sessionError);
+        setLoading(false);
+        return { error: { message: 'Sitzung konnte nicht erstellt werden' } };
+      }
+
       // Set user and profile state
       setUser(dummyUser);
       setProfile(profileData);
+      setSessionId(sessionData);
       
-      // Store login data in localStorage for persistence
+      // Store login data and session in localStorage for persistence
       localStorage.setItem('school_profile', JSON.stringify(profileData));
+      localStorage.setItem('school_session_id', sessionData);
       localStorage.setItem('fresh_login', 'true');
       
       // Clear any stored last route from all sources to ensure fresh start
@@ -202,8 +220,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(null);
     setSession(null);
     setProfile(null);
+    setSessionId(null);
     // Clear stored login data
     localStorage.removeItem('school_profile');
+    localStorage.removeItem('school_session_id');
   };
 
   return (
@@ -215,7 +235,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       signInWithUsername,
       signOut,
       changePassword,
-      createUser
+      createUser,
+      sessionId
     }}>
       {children}
     </AuthContext.Provider>
