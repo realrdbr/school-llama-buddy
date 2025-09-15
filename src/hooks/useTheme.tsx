@@ -244,6 +244,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     try {
+      // Ensure session context for RLS
+      if (sessionId) {
+        await supabase.rpc('set_session_context', { session_id_param: sessionId });
+      }
+
       if (theme.id) {
         // Existing user theme - activate it
         await supabase
@@ -284,6 +289,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       await loadUserThemes();
     } catch (error) {
       console.error('Error setting theme:', error);
+    } finally {
+      if (sessionId) {
+        await supabase.rpc('set_session_context', { session_id_param: '' });
+      }
     }
   };
 

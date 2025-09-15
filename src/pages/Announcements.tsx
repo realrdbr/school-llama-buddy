@@ -22,7 +22,7 @@ interface Announcement {
 
 const Announcements = () => {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user, profile, sessionId } = useAuth();
   const { canAccess, isLoaded } = usePermissions();
 const [announcements, setAnnouncements] = useState<Announcement[]>([]);
 const [showCreateForm, setShowCreateForm] = useState(false);
@@ -152,7 +152,14 @@ const handleCreateAnnouncement = async () => {
 };
 
   const handleDeleteAnnouncement = async (id: string) => {
+    if (!sessionId) {
+      toast({ variant: 'destructive', title: 'Fehler', description: 'Keine aktive Sitzung' });
+      return;
+    }
     try {
+      // Set session context for RLS
+      await supabase.rpc('set_session_context', { session_id_param: sessionId });
+
       const { error } = await supabase
         .from('announcements')
         .delete()
@@ -162,20 +169,16 @@ const handleCreateAnnouncement = async () => {
 
       await fetchAnnouncements();
       toast({
-        title: "Ankündigung gelöscht",
-        description: "Die Ankündigung wurde entfernt."
+        title: 'Ankündigung gelöscht',
+        description: 'Die Ankündigung wurde entfernt.'
       });
     } catch (error) {
       console.error('Error deleting announcement:', error);
-      toast({
-        variant: "destructive",
-        title: "Fehler",
-        description: "Ankündigung konnte nicht gelöscht werden."
-      });
+      toast({ variant: 'destructive', title: 'Fehler', description: 'Ankündigung konnte nicht gelöscht werden.' });
+    } finally {
+      await supabase.rpc('set_session_context', { session_id_param: '' });
     }
   };
-
-  const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'urgent': return 'border-red-500 bg-red-50 dark:bg-red-950/20 dark:border-red-400';
       case 'high': return 'border-orange-500 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-400';
