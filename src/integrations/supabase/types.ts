@@ -372,6 +372,36 @@ export type Database = {
         }
         Relationships: []
       }
+      security_audit_log: {
+        Row: {
+          created_at: string | null
+          event_details: Json | null
+          event_type: string
+          id: string
+          ip_address: unknown | null
+          user_agent: string | null
+          user_id: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_details?: Json | null
+          event_type: string
+          id?: string
+          ip_address?: unknown | null
+          user_agent?: string | null
+          user_id?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          event_details?: Json | null
+          event_type?: string
+          id?: string
+          ip_address?: unknown | null
+          user_agent?: string | null
+          user_id?: number | null
+        }
+        Relationships: []
+      }
       Stundenplan_10b_A: {
         Row: {
           friday: string | null
@@ -718,6 +748,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      is_current_user_admin_secure: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       is_custom_user_authenticated: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -750,6 +784,10 @@ export type Database = {
       set_primary_session: {
         Args: { session_id_param: string; target_user_id: number }
         Returns: undefined
+      }
+      validate_session_security: {
+        Args: { session_id_param: string }
+        Returns: boolean
       }
       verify_password: {
         Args: { password_hash: string; password_input: string }
