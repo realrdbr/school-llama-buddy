@@ -739,7 +739,6 @@ export type Database = {
             }
           | { password_input: string; username_input: string }
         Returns: {
-          error_message: string
           full_name: string
           must_change_password: boolean
           permission_level: number
