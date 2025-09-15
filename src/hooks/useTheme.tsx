@@ -296,23 +296,23 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!profile) return;
 
     try {
-      const { data, error } = await supabase
-        .from('user_themes')
-        .insert({
-          user_id: profile.id,
-          name,
-          colors: colors as any,
-          is_preset: false,
-          is_active: true
-        })
-        .select()
-        .single();
+      const password = window.prompt('Bitte bestätigen Sie Ihr Passwort, um das Theme zu erstellen:');
+      if (!password) return;
 
-      if (error) throw error;
+      const { data, error } = await supabase.rpc('create_user_theme_secure', {
+        username_input: profile.username,
+        password_input: password,
+        theme_name: name,
+        theme_colors: colors as any
+      });
+
+      if (error || !(data as any)?.success) throw new Error((data as any)?.error || (error as any)?.message || 'Erstellen fehlgeschlagen');
+
+      const createdId = (data as any)?.id as string | undefined;
 
       // Optimistically update themes list
       const createdTheme: Theme = { 
-        id: data.id, 
+        id: createdId, 
         name, 
         colors, 
         is_preset: false 
@@ -332,13 +332,17 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!profile) return;
 
     try {
-      const { error } = await supabase
-        .from('user_themes')
-        .update({ colors: colors as any })
-        .eq('id', themeId)
-        .eq('user_id', profile.id);
+      const password = window.prompt('Bitte bestätigen Sie Ihr Passwort, um das Theme zu aktualisieren:');
+      if (!password) return;
 
-      if (error) throw error;
+      const { data, error } = await supabase.rpc('update_user_theme_secure', {
+        username_input: profile.username,
+        password_input: password,
+        theme_id: themeId as any,
+        theme_colors: colors as any
+      });
+
+      if (error || !(data as any)?.success) throw new Error((data as any)?.error || (error as any)?.message || 'Aktualisierung fehlgeschlagen');
 
       if (currentTheme?.id === themeId) {
         applyTheme({ ...currentTheme, colors });
@@ -353,13 +357,16 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!profile) return;
 
     try {
-      const { error } = await supabase
-        .from('user_themes')
-        .delete()
-        .eq('id', themeId)
-        .eq('user_id', profile.id);
+      const password = window.prompt('Bitte bestätigen Sie Ihr Passwort, um das Theme zu löschen:');
+      if (!password) return;
 
-      if (error) throw error;
+      const { data, error } = await supabase.rpc('delete_user_theme_secure', {
+        username_input: profile.username,
+        password_input: password,
+        theme_id: themeId as any
+      });
+
+      if (error || !(data as any)?.success) throw new Error((data as any)?.error || (error as any)?.message || 'Löschen fehlgeschlagen');
 
       if (currentTheme?.id === themeId) {
         await setTheme(presetThemes[0]);

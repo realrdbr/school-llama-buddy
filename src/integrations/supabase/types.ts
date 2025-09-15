@@ -724,6 +724,44 @@ export type Database = {
         }
         Returns: Json
       }
+      create_user_theme_secure: {
+        Args: {
+          password_input: string
+          theme_colors: Json
+          theme_name: string
+          username_input: string
+        }
+        Returns: Json
+      }
+      create_vertretung_secure: {
+        Args: {
+          password_input: string
+          username_input: string
+          v_class_name: string
+          v_date: string
+          v_note: string
+          v_original_room: string
+          v_original_subject: string
+          v_original_teacher: string
+          v_period: number
+          v_substitute_room: string
+          v_substitute_subject: string
+          v_substitute_teacher: string
+        }
+        Returns: Json
+      }
+      delete_user_theme_secure: {
+        Args: {
+          password_input: string
+          theme_id: string
+          username_input: string
+        }
+        Returns: Json
+      }
+      delete_vertretung_secure: {
+        Args: { password_input: string; username_input: string; v_id: string }
+        Returns: Json
+      }
       get_current_user_id: {
         Args: Record<PropertyKey, never>
         Returns: number
@@ -788,6 +826,27 @@ export type Database = {
       set_primary_session: {
         Args: { session_id_param: string; target_user_id: number }
         Returns: undefined
+      }
+      update_user_theme_secure: {
+        Args: {
+          password_input: string
+          theme_colors: Json
+          theme_id: string
+          username_input: string
+        }
+        Returns: Json
+      }
+      update_vertretung_secure: {
+        Args: {
+          password_input: string
+          username_input: string
+          v_id: string
+          v_note: string
+          v_substitute_room: string
+          v_substitute_subject: string
+          v_substitute_teacher: string
+        }
+        Returns: Json
       }
       validate_session_security: {
         Args: { session_id_param: string }

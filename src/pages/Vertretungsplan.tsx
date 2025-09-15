@@ -347,39 +347,47 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
     
     try {
       if (selectedScheduleEntry.isEdit && selectedScheduleEntry.substitutionId) {
-        // Update existing substitution
-        const { error } = await supabase
-          .from('vertretungsplan')
-          .update({
-            substitute_teacher: substitutionData.substituteTeacher,
-            substitute_subject: substitutionData.substituteSubject,
-            substitute_room: substitutionData.substituteRoom,
-            note: substitutionData.note
-          })
-          .eq('id', selectedScheduleEntry.substitutionId);
+        // Update existing substitution via secure RPC
+        const password = window.prompt('Bitte bestätigen Sie Ihr Passwort, um die Vertretung zu aktualisieren:');
+        if (!password || !profile?.username) return;
 
-        if (error) throw error;
+        const { data, error } = await supabase.rpc('update_vertretung_secure', {
+          username_input: profile.username,
+          password_input: password,
+          v_id: selectedScheduleEntry.substitutionId,
+          v_substitute_teacher: substitutionData.substituteTeacher || null,
+          v_substitute_subject: substitutionData.substituteSubject || null,
+          v_substitute_room: substitutionData.substituteRoom || null,
+          v_note: substitutionData.note || null
+        });
+
+        if (error || !(data as any)?.success) throw new Error((data as any)?.error || (error as any)?.message || 'Aktualisierung fehlgeschlagen');
         
         toast({
           title: "Vertretung aktualisiert",
           description: "Die Vertretung wurde erfolgreich aktualisiert."
         });
       } else {
-        // Create new substitution
-        const { error } = await supabase.from('vertretungsplan').insert({
-          date: targetDate,
-          class_name: selectedScheduleEntry.class,
-          period: selectedScheduleEntry.period,
-          original_subject: selectedScheduleEntry.entry.subject,
-          original_teacher: selectedScheduleEntry.entry.teacher,
-          original_room: selectedScheduleEntry.entry.room,
-          substitute_teacher: substitutionData.substituteTeacher,
-          substitute_subject: substitutionData.substituteSubject,
-          substitute_room: substitutionData.substituteRoom,
-          note: substitutionData.note
+        // Create new substitution via secure RPC
+        const password = window.prompt('Bitte bestätigen Sie Ihr Passwort, um die Vertretung zu erstellen:');
+        if (!password || !profile?.username) return;
+
+        const { data, error } = await supabase.rpc('create_vertretung_secure', {
+          username_input: profile.username,
+          password_input: password,
+          v_date: targetDate,
+          v_class_name: selectedScheduleEntry.class,
+          v_period: selectedScheduleEntry.period,
+          v_original_subject: selectedScheduleEntry.entry.subject,
+          v_original_teacher: selectedScheduleEntry.entry.teacher,
+          v_original_room: selectedScheduleEntry.entry.room,
+          v_substitute_teacher: substitutionData.substituteTeacher || null,
+          v_substitute_subject: substitutionData.substituteSubject || selectedScheduleEntry.entry.subject,
+          v_substitute_room: substitutionData.substituteRoom || selectedScheduleEntry.entry.room,
+          v_note: substitutionData.note || null
         });
 
-        if (error) throw error;
+        if (error || !(data as any)?.success) throw new Error((data as any)?.error || (error as any)?.message || 'Erstellung fehlgeschlagen');
         
         toast({
           title: "Vertretung erstellt",
@@ -406,12 +414,16 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
     if (!selectedScheduleEntry?.substitutionId) return;
 
     try {
-      const { error } = await supabase
-        .from('vertretungsplan')
-        .delete()
-        .eq('id', selectedScheduleEntry.substitutionId);
+      const password = window.prompt('Bitte bestätigen Sie Ihr Passwort, um die Vertretung zu löschen:');
+      if (!password || !profile?.username) return;
 
-      if (error) throw error;
+      const { data, error } = await supabase.rpc('delete_vertretung_secure', {
+        username_input: profile.username,
+        password_input: password,
+        v_id: selectedScheduleEntry.substitutionId
+      });
+
+      if (error || !(data as any)?.success) throw new Error((data as any)?.error || (error as any)?.message || 'Löschen fehlgeschlagen');
 
       toast({
         title: "Vertretung gelöscht",
@@ -435,12 +447,16 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
 
   const handleDeleteSubstitutionById = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('vertretungsplan')
-        .delete()
-        .eq('id', id);
+      const password = window.prompt('Bitte bestätigen Sie Ihr Passwort, um die Vertretung zu löschen:');
+      if (!password || !profile?.username) return;
 
-      if (error) throw error;
+      const { data, error } = await supabase.rpc('delete_vertretung_secure', {
+        username_input: profile.username,
+        password_input: password,
+        v_id: id
+      });
+
+      if (error || !(data as any)?.success) throw new Error((data as any)?.error || (error as any)?.message || 'Löschen fehlgeschlagen');
 
       toast({
         title: "Vertretung gelöscht",

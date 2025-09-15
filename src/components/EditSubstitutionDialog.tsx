@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 interface EditSubstitutionDialogProps {
   isOpen: boolean;
@@ -37,21 +38,26 @@ export const EditSubstitutionDialog = ({
     }
   }, [substitution]);
 
+  const { profile } = useAuth();
+
   const handleUpdate = async () => {
-    if (!substitution?.id) return;
+    if (!substitution?.id || !profile?.username) return;
 
     try {
-      const { error } = await supabase
-        .from('vertretungsplan')
-        .update({
-          substitute_teacher: formData.substituteTeacher,
-          substitute_subject: formData.substituteSubject,
-          substitute_room: formData.substituteRoom,
-          note: formData.note
-        })
-        .eq('id', substitution.id);
+      const password = window.prompt('Bitte bestätigen Sie Ihr Passwort, um die Vertretung zu aktualisieren:');
+      if (!password) return;
 
-      if (error) throw error;
+      const { data, error } = await supabase.rpc('update_vertretung_secure', {
+        username_input: profile.username,
+        password_input: password,
+        v_id: substitution.id,
+        v_substitute_teacher: formData.substituteTeacher || null,
+        v_substitute_subject: formData.substituteSubject || null,
+        v_substitute_room: formData.substituteRoom || null,
+        v_note: formData.note || null
+      });
+
+      if (error || !(data as any)?.success) throw new Error((data as any)?.error || (error as any)?.message || 'Aktualisierung fehlgeschlagen');
 
       toast({
         title: "Vertretung aktualisiert",
@@ -71,19 +77,23 @@ export const EditSubstitutionDialog = ({
   };
 
   const handleDelete = async () => {
-    if (!substitution?.id) return;
+    if (!substitution?.id || !profile?.username) return;
 
     try {
-      const { error } = await supabase
-        .from('vertretungsplan')
-        .delete()
-        .eq('id', substitution.id);
+      const password = window.prompt('Bitte bestätigen Sie Ihr Passwort, um die Vertretung zu löschen:');
+      if (!password) return;
 
-      if (error) throw error;
+      const { data, error } = await supabase.rpc('delete_vertretung_secure', {
+        username_input: profile.username,
+        password_input: password,
+        v_id: substitution.id
+      });
+
+      if (error || !(data as any)?.success) throw new Error((data as any)?.error || (error as any)?.message || 'Löschen fehlgeschlagen');
 
       toast({
-        title: "Vertretung gelöscht",
-        description: "Die Vertretung wurde erfolgreich gelöscht."
+          title: "Vertretung gelöscht",
+          description: "Die Vertretung wurde erfolgreich gelöscht."
       });
 
       onUpdate();
