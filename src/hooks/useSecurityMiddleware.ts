@@ -135,7 +135,7 @@ export const useSecurityMiddleware = () => {
     }
   };
 
-  const logSecurityEvent = (type: SecurityEvent['type'], details: string) => {
+  const logSecurityEvent = async (type: SecurityEvent['type'], details: string) => {
     const event: SecurityEvent = {
       type,
       timestamp: new Date(),
@@ -147,8 +147,20 @@ export const useSecurityMiddleware = () => {
     // Log to console for debugging (remove in production)
     console.warn('Security Event:', event);
     
-    // Could also send to audit log via Edge Function
-    // supabase.functions.invoke('audit-log', { body: event });
+    // Log to secure audit trail in database
+    if (profile?.id) {
+      try {
+        await supabase.from('security_audit_log').insert({
+          user_id: profile.id,
+          event_type: type,
+          event_details: { details, timestamp: event.timestamp.toISOString() },
+          ip_address: null, // Could be enhanced with IP detection
+          user_agent: navigator.userAgent
+        });
+      } catch (error) {
+        console.error('Failed to log security event:', error);
+      }
+    }
   };
 
   const clearSecurityEvents = () => {
