@@ -39,7 +39,7 @@ export const EditSubstitutionDialog = ({
     }
   }, [substitution]);
 
-  const { profile } = useAuth();
+  const { profile, sessionId } = useAuth();
   const { withSession } = useSessionRequest();
 
   // Only show delete button to level 10+ users
@@ -55,7 +55,8 @@ export const EditSubstitutionDialog = ({
           v_substitute_teacher: formData.substituteTeacher || null,
           v_substitute_subject: formData.substituteSubject || null,
           v_substitute_room: formData.substituteRoom || null,
-          v_note: formData.note || null
+          v_note: formData.note || null,
+          v_session_id: sessionId || null
         });
 
         if (error || !(data as any)?.success) {
@@ -86,7 +87,8 @@ export const EditSubstitutionDialog = ({
     try {
       await withSession(async () => {
         const { data, error } = await supabase.rpc('delete_vertretung_session', {
-          v_id: substitution.id
+          v_id: substitution.id,
+          v_session_id: sessionId || null
         });
 
         if (error || !(data as any)?.success) {

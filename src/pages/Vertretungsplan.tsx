@@ -75,7 +75,7 @@ const formatWeekRange = (start: Date) => {
 
 const Vertretungsplan = () => {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user, profile, sessionId } = useAuth();
   const { withSession } = useSessionRequest();
   const isMobile = useIsMobile();
   const [substitutions, setSubstitutions] = useState<SubstitutionEntry[]>([]);
@@ -356,7 +356,8 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
             v_substitute_teacher: substitutionData.substituteTeacher || null,
             v_substitute_subject: substitutionData.substituteSubject || null,
             v_substitute_room: substitutionData.substituteRoom || null,
-            v_note: substitutionData.note || null
+            v_note: substitutionData.note || null,
+            v_session_id: sessionId || null
           });
 
           if (error || !(data as any)?.success) {
@@ -379,7 +380,8 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
             v_substitute_teacher: substitutionData.substituteTeacher || null,
             v_substitute_subject: substitutionData.substituteSubject || selectedScheduleEntry.entry.subject,
             v_substitute_room: substitutionData.substituteRoom || selectedScheduleEntry.entry.room,
-            v_note: substitutionData.note || null
+            v_note: substitutionData.note || null,
+            v_session_id: sessionId || null
           });
 
           if (error || !(data as any)?.success) {
@@ -413,7 +415,8 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
     try {
       await withSession(async () => {
         const { data, error } = await supabase.rpc('delete_vertretung_session', {
-          v_id: selectedScheduleEntry.substitutionId
+          v_id: selectedScheduleEntry.substitutionId,
+          v_session_id: sessionId || null
         });
 
         if (error || !(data as any)?.success) {
@@ -444,7 +447,8 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
     try {
       await withSession(async () => {
         const { data, error } = await supabase.rpc('delete_vertretung_session', {
-          v_id: id
+          v_id: id,
+          v_session_id: sessionId || null
         });
 
         if (error || !(data as any)?.success) {

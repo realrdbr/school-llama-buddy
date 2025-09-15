@@ -767,6 +767,7 @@ export type Database = {
           v_original_subject: string
           v_original_teacher: string
           v_period: number
+          v_session_id?: string
           v_substitute_room: string
           v_substitute_subject: string
           v_substitute_teacher: string
@@ -798,7 +799,7 @@ export type Database = {
         Returns: Json
       }
       delete_vertretung_session: {
-        Args: { v_id: string }
+        Args: { v_id: string; v_session_id?: string }
         Returns: Json
       }
       get_current_user_from_session: {
@@ -903,6 +904,7 @@ export type Database = {
         Args: {
           v_id: string
           v_note: string
+          v_session_id?: string
           v_substitute_room: string
           v_substitute_subject: string
           v_substitute_teacher: string
