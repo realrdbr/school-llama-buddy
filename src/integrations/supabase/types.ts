@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.4"
+    PostgrestVersion: "13.0.5"
   }
   public: {
     Tables: {
@@ -682,6 +682,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      is_custom_user_authenticated: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       is_session_valid: {
         Args: { session_id_param: string }
         Returns: boolean
@@ -735,6 +739,7 @@ export type Database = {
             }
           | { password_input: string; username_input: string }
         Returns: {
+          error_message: string
           full_name: string
           must_change_password: boolean
           permission_level: number
