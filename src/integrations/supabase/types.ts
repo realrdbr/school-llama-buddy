@@ -724,6 +724,10 @@ export type Database = {
         }
         Returns: Json
       }
+      create_user_session: {
+        Args: { user_id_param: number }
+        Returns: string
+      }
       create_user_theme_secure: {
         Args: {
           password_input: string
@@ -750,6 +754,14 @@ export type Database = {
         }
         Returns: Json
       }
+      current_user_has_permission_level: {
+        Args: { required_level: number }
+        Returns: boolean
+      }
+      current_user_owns_resource: {
+        Args: { resource_user_id: number }
+        Returns: boolean
+      }
       delete_user_theme_secure: {
         Args: {
           password_input: string
@@ -761,6 +773,10 @@ export type Database = {
       delete_vertretung_secure: {
         Args: { password_input: string; username_input: string; v_id: string }
         Returns: Json
+      }
+      get_current_user_from_session: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       get_current_user_id: {
         Args: Record<PropertyKey, never>
