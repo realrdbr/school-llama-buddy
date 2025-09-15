@@ -179,6 +179,8 @@ const handleCreateAnnouncement = async () => {
       await supabase.rpc('set_session_context', { session_id_param: '' });
     }
   };
+
+  const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'urgent': return 'border-red-500 bg-red-50 dark:bg-red-950/20 dark:border-red-400';
       case 'high': return 'border-orange-500 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-400';
