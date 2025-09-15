@@ -696,6 +696,10 @@ export type Database = {
         Args: { permission_id_param: string; user_id_param: number }
         Returns: boolean
       }
+      cleanup_expired_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       cleanup_old_conversations: {
         Args: Record<PropertyKey, never>
         Returns: undefined
