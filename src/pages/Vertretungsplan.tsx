@@ -255,7 +255,7 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
     }));
   };
 
-  const hasSubstitution = (classname: string, day: string, period: number) => {
+  const hasSubstitution = (classname: string, day: string, period: number, originalTeacher?: string, originalSubject?: string) => {
     // Get the actual date for this weekday in the selected week
     const selectedDateObj = new Date(selectedDate + 'T00:00:00');
     const dayOfWeek = selectedDateObj.getDay();
@@ -268,14 +268,24 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
     targetDay.setDate(targetDay.getDate() + dayMapping[day as keyof typeof dayMapping]);
     const targetDateString = toISODateLocal(targetDay);
     
-    return substitutions.some(sub => 
-      (sub.class || '').toLowerCase() === (classname || '').toLowerCase() && 
-      sub.date === targetDateString && 
-      sub.period === period
-    );
+    return substitutions.some(sub => {
+      const classMatch = (sub.class || '').toLowerCase() === (classname || '').toLowerCase();
+      const dateMatch = sub.date === targetDateString;
+      const periodMatch = sub.period === period;
+      
+      // If we have teacher/subject info, match more specifically
+      if (originalTeacher && originalSubject) {
+        const teacherMatch = (sub.teacher || '').toLowerCase().includes((originalTeacher || '').toLowerCase());
+        const subjectMatch = (sub.subject || '').toLowerCase() === (originalSubject || '').toLowerCase();
+        return classMatch && dateMatch && periodMatch && teacherMatch && subjectMatch;
+      }
+      
+      // Fallback to basic matching
+      return classMatch && dateMatch && periodMatch;
+    });
   };
 
-  const getSubstitution = (classname: string, day: string, period: number) => {
+  const getSubstitution = (classname: string, day: string, period: number, originalTeacher?: string, originalSubject?: string) => {
     // Get the actual date for this weekday in the selected week
     const selectedDateObj = new Date(selectedDate + 'T00:00:00');
     const dayOfWeek = selectedDateObj.getDay();
@@ -288,11 +298,21 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
     targetDay.setDate(targetDay.getDate() + dayMapping[day as keyof typeof dayMapping]);
     const targetDateString = toISODateLocal(targetDay);
     
-    return substitutions.find(sub => 
-      (sub.class || '').toLowerCase() === (classname || '').toLowerCase() && 
-      sub.date === targetDateString && 
-      sub.period === period
-    );
+    return substitutions.find(sub => {
+      const classMatch = (sub.class || '').toLowerCase() === (classname || '').toLowerCase();
+      const dateMatch = sub.date === targetDateString;
+      const periodMatch = sub.period === period;
+      
+      // If we have teacher/subject info, match more specifically
+      if (originalTeacher && originalSubject) {
+        const teacherMatch = (sub.teacher || '').toLowerCase().includes((originalTeacher || '').toLowerCase());
+        const subjectMatch = (sub.subject || '').toLowerCase() === (originalSubject || '').toLowerCase();
+        return classMatch && dateMatch && periodMatch && teacherMatch && subjectMatch;
+      }
+      
+      // Fallback to basic matching
+      return classMatch && dateMatch && periodMatch;
+    });
   };
 
   const handleCellClick = (classname: string, day: string, period: number, entry: ParsedScheduleEntry) => {
@@ -308,8 +328,8 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
     targetDay.setDate(targetDay.getDate() + dayMapping[day as keyof typeof dayMapping]);
     const targetDateString = toISODateLocal(targetDay);
     
-    // Check if there's an existing substitution
-    const existingSubstitution = getSubstitution(classname, day, period);
+    // Check if there's an existing substitution for this specific lesson
+    const existingSubstitution = getSubstitution(classname, day, period, entry.teacher, entry.subject);
     
     if (existingSubstitution) {
       // Edit existing substitution
@@ -648,67 +668,50 @@ Stundenplan {selectedClass} - Woche {formatWeekRange(__weekStart)}
                     {(schedules[selectedClass] || []).sort((a, b) => a.period - b.period).map((entry) => (
                       <tr key={entry.period}>
                         <td className="border border-border p-2 font-medium bg-muted">{entry.period}</td>
-                        {['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].map((day) => {
-                          const dayEntry = entry[day as keyof ScheduleEntry] as string;
-                          const parsedEntries = parseScheduleEntry(dayEntry);
-                          const isSubstituted = hasSubstitution(selectedClass, day, entry.period);
-                          const substitution = getSubstitution(selectedClass, day, entry.period);
+                         {['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].map((day) => {
+                           const dayEntry = entry[day as keyof ScheduleEntry] as string;
+                           const parsedEntries = parseScheduleEntry(dayEntry);
 
-                          return (
-                            <td key={day} className="border border-border p-1">
-                              <div className="space-y-1">
-                                {parsedEntries.map((parsed, idx) => {
-                                  // Get the actual date for this weekday in the selected week
-                                  const selectedDateObj = new Date(selectedDate + 'T00:00:00');
-                                  const dayOfWeek = selectedDateObj.getDay();
-                                  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-                                  const startOfWeek = new Date(selectedDateObj);
-                                  startOfWeek.setDate(startOfWeek.getDate() - daysToMonday);
-                                  
-                                  const dayMapping = { 'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 'friday': 4 };
-                                  const targetDay = new Date(startOfWeek);
-                                  targetDay.setDate(targetDay.getDate() + dayMapping[day as keyof typeof dayMapping]);
-                                  
-                                  // Check if there's a substitution for this specific date/class/period
-                                  const specificSubstitution = substitutions.find(sub => 
-                                    (sub.class || '').toLowerCase() === (selectedClass || '').toLowerCase() && 
-                                    sub.date === toISODateLocal(targetDay) && 
-                                    sub.period === entry.period
-                                  );
-                                  
-                                  return (
-                                    <div
-                                      key={idx}
-                                      className={`p-2 rounded cursor-pointer transition-colors min-h-[60px] flex flex-col justify-center ${
-                                        specificSubstitution
-                                          ? 'bg-destructive/20 text-destructive border border-destructive/50' 
-                                          : canEditSubstitutions
-                                          ? 'hover:bg-muted/50'
-                                          : 'hover:bg-muted/30'
-                                      }`}
-                                      onClick={() => canEditSubstitutions && handleCellClick(selectedClass, day, entry.period, parsed)}
-                                    >
-                                      <div className="text-sm font-medium">
-                                        {specificSubstitution ? (specificSubstitution.subject || parsed.subject) : parsed.subject}
-                                      </div>
-                                      <div className="text-xs text-muted-foreground">
-                                        {specificSubstitution ? (specificSubstitution.substituteTeacher || 'ENTFALL') : parsed.teacher}
-                                      </div>
-                                      <div className="text-xs text-muted-foreground">
-                                        {specificSubstitution ? (specificSubstitution.room || parsed.room) : parsed.room}
-                                      </div>
-                                      {specificSubstitution?.note && (
-                                        <div className="text-xs text-destructive mt-1">
-                                          {specificSubstitution.note}
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </td>
-                          );
-                        })}
+                           return (
+                             <td key={day} className="border border-border p-1">
+                               <div className="space-y-1">
+                                 {parsedEntries.map((parsed, idx) => {
+                                   // Check if there's a substitution for this specific lesson
+                                   const specificSubstitution = getSubstitution(selectedClass, day, entry.period, parsed.teacher, parsed.subject);
+                                   
+                                   return (
+                                     <div
+                                       key={idx}
+                                       className={`p-2 rounded cursor-pointer transition-colors min-h-[60px] flex flex-col justify-center ${
+                                         specificSubstitution
+                                           ? 'bg-destructive/20 text-destructive border border-destructive/50' 
+                                           : canEditSubstitutions
+                                           ? 'hover:bg-muted/50'
+                                           : 'hover:bg-muted/30'
+                                       }`}
+                                       onClick={() => canEditSubstitutions && handleCellClick(selectedClass, day, entry.period, parsed)}
+                                     >
+                                       <div className="text-sm font-medium">
+                                         {specificSubstitution ? (specificSubstitution.subject || parsed.subject) : parsed.subject}
+                                       </div>
+                                       <div className="text-xs text-muted-foreground">
+                                         {specificSubstitution ? (specificSubstitution.substituteTeacher || 'ENTFALL') : parsed.teacher}
+                                       </div>
+                                       <div className="text-xs text-muted-foreground">
+                                         {specificSubstitution ? (specificSubstitution.room || parsed.room) : parsed.room}
+                                       </div>
+                                       {specificSubstitution?.note && (
+                                         <div className="text-xs text-destructive mt-1">
+                                           {specificSubstitution.note}
+                                         </div>
+                                       )}
+                                     </div>
+                                   );
+                                 })}
+                               </div>
+                             </td>
+                           );
+                         })}
                       </tr>
                     ))}
                   </tbody>
