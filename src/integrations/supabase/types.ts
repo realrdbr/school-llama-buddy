@@ -870,6 +870,10 @@ export type Database = {
         Args: { session_id_param: string; target_user_id: number }
         Returns: undefined
       }
+      set_session_context: {
+        Args: { session_id_param: string }
+        Returns: undefined
+      }
       update_user_theme_secure: {
         Args: {
           password_input: string

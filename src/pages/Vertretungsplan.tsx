@@ -74,7 +74,7 @@ const formatWeekRange = (start: Date) => {
 
 const Vertretungsplan = () => {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user, profile, sessionId } = useAuth();
   const isMobile = useIsMobile();
   const [substitutions, setSubstitutions] = useState<SubstitutionEntry[]>([]);
   const [schedules, setSchedules] = useState<{ [key: string]: ScheduleEntry[] }>({});
@@ -341,19 +341,19 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
   };
 
   const handleCreateSubstitution = async () => {
-    if (!selectedScheduleEntry) return;
+    if (!selectedScheduleEntry || !sessionId) return;
 
     const targetDate = selectedScheduleEntry.targetDate || selectedDate;
     
     try {
-      if (selectedScheduleEntry.isEdit && selectedScheduleEntry.substitutionId) {
-        // Update existing substitution via secure RPC
-        const password = window.prompt('Bitte bestätigen Sie Ihr Passwort, um die Vertretung zu aktualisieren:');
-        if (!password || !profile?.username) return;
+      // Set session context for RLS
+      await supabase.rpc('set_session_context', {
+        session_id_param: sessionId
+      });
 
-        const { data, error } = await supabase.rpc('update_vertretung_secure', {
-          username_input: profile.username,
-          password_input: password,
+      if (selectedScheduleEntry.isEdit && selectedScheduleEntry.substitutionId) {
+        // Update existing substitution via session RPC
+        const { data, error } = await supabase.rpc('update_vertretung_session', {
           v_id: selectedScheduleEntry.substitutionId,
           v_substitute_teacher: substitutionData.substituteTeacher || null,
           v_substitute_subject: substitutionData.substituteSubject || null,
@@ -368,13 +368,8 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
           description: "Die Vertretung wurde erfolgreich aktualisiert."
         });
       } else {
-        // Create new substitution via secure RPC
-        const password = window.prompt('Bitte bestätigen Sie Ihr Passwort, um die Vertretung zu erstellen:');
-        if (!password || !profile?.username) return;
-
-        const { data, error } = await supabase.rpc('create_vertretung_secure', {
-          username_input: profile.username,
-          password_input: password,
+        // Create new substitution via session RPC
+        const { data, error } = await supabase.rpc('create_vertretung_session', {
           v_date: targetDate,
           v_class_name: selectedScheduleEntry.class,
           v_period: selectedScheduleEntry.period,
@@ -405,21 +400,26 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Die Vertretung konnte nicht gespeichert werden."
+        description: "Die Vertretung konnte nicht verarbeitet werden."
+      });
+    } finally {
+      // Clean up session context
+      await supabase.rpc('set_session_context', {
+        session_id_param: ''
       });
     }
   };
 
   const handleDeleteSubstitution = async () => {
-    if (!selectedScheduleEntry?.substitutionId) return;
+    if (!selectedScheduleEntry?.substitutionId || !sessionId) return;
 
     try {
-      const password = window.prompt('Bitte bestätigen Sie Ihr Passwort, um die Vertretung zu löschen:');
-      if (!password || !profile?.username) return;
+      // Set session context for RLS
+      await supabase.rpc('set_session_context', {
+        session_id_param: sessionId
+      });
 
-      const { data, error } = await supabase.rpc('delete_vertretung_secure', {
-        username_input: profile.username,
-        password_input: password,
+      const { data, error } = await supabase.rpc('delete_vertretung_session', {
         v_id: selectedScheduleEntry.substitutionId
       });
 
@@ -442,17 +442,24 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
         title: "Fehler",
         description: "Die Vertretung konnte nicht gelöscht werden."
       });
+    } finally {
+      // Clean up session context
+      await supabase.rpc('set_session_context', {
+        session_id_param: ''
+      });
     }
   };
 
   const handleDeleteSubstitutionById = async (id: string) => {
-    try {
-      const password = window.prompt('Bitte bestätigen Sie Ihr Passwort, um die Vertretung zu löschen:');
-      if (!password || !profile?.username) return;
+    if (!sessionId) return;
 
-      const { data, error } = await supabase.rpc('delete_vertretung_secure', {
-        username_input: profile.username,
-        password_input: password,
+    try {
+      // Set session context for RLS
+      await supabase.rpc('set_session_context', {
+        session_id_param: sessionId
+      });
+
+      const { data, error } = await supabase.rpc('delete_vertretung_session', {
         v_id: id
       });
 
@@ -470,6 +477,11 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
         variant: "destructive",
         title: "Fehler",
         description: "Die Vertretung konnte nicht gelöscht werden."
+      });
+    } finally {
+      // Clean up session context
+      await supabase.rpc('set_session_context', {
+        session_id_param: ''
       });
     }
   };

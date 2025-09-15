@@ -13,20 +13,16 @@ export const useSessionRequest = () => {
     }
 
     // Set session context for the database to use in RLS policies
-    await supabase.rpc('set_config', {
-      setting_name: 'app.current_session_id',
-      setting_value: sessionId,
-      is_local: false
+    await supabase.rpc('set_session_context', {
+      session_id_param: sessionId
     });
 
     try {
       return await operation();
     } finally {
       // Clean up session context
-      await supabase.rpc('set_config', {
-        setting_name: 'app.current_session_id',
-        setting_value: '',
-        is_local: false
+      await supabase.rpc('set_session_context', {
+        session_id_param: ''
       });
     }
   };

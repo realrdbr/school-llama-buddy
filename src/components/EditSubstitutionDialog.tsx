@@ -38,18 +38,18 @@ export const EditSubstitutionDialog = ({
     }
   }, [substitution]);
 
-  const { profile } = useAuth();
+  const { profile, sessionId } = useAuth();
 
   const handleUpdate = async () => {
-    if (!substitution?.id || !profile?.username) return;
+    if (!substitution?.id || !sessionId) return;
 
     try {
-      const password = window.prompt('Bitte bestätigen Sie Ihr Passwort, um die Vertretung zu aktualisieren:');
-      if (!password) return;
+      // Set session context for RLS
+      await supabase.rpc('set_session_context', {
+        session_id_param: sessionId
+      });
 
-      const { data, error } = await supabase.rpc('update_vertretung_secure', {
-        username_input: profile.username,
-        password_input: password,
+      const { data, error } = await supabase.rpc('update_vertretung_session', {
         v_id: substitution.id,
         v_substitute_teacher: formData.substituteTeacher || null,
         v_substitute_subject: formData.substituteSubject || null,
@@ -73,19 +73,24 @@ export const EditSubstitutionDialog = ({
         title: "Fehler",
         description: "Die Vertretung konnte nicht aktualisiert werden."
       });
+    } finally {
+      // Clean up session context
+      await supabase.rpc('set_session_context', {
+        session_id_param: ''
+      });
     }
   };
 
   const handleDelete = async () => {
-    if (!substitution?.id || !profile?.username) return;
+    if (!substitution?.id || !sessionId) return;
 
     try {
-      const password = window.prompt('Bitte bestätigen Sie Ihr Passwort, um die Vertretung zu löschen:');
-      if (!password) return;
+      // Set session context for RLS
+      await supabase.rpc('set_session_context', {
+        session_id_param: sessionId
+      });
 
-      const { data, error } = await supabase.rpc('delete_vertretung_secure', {
-        username_input: profile.username,
-        password_input: password,
+      const { data, error } = await supabase.rpc('delete_vertretung_session', {
         v_id: substitution.id
       });
 
@@ -104,6 +109,11 @@ export const EditSubstitutionDialog = ({
         variant: "destructive",
         title: "Fehler",
         description: "Die Vertretung konnte nicht gelöscht werden."
+      });
+    } finally {
+      // Clean up session context
+      await supabase.rpc('set_session_context', {
+        session_id_param: ''
       });
     }
   };

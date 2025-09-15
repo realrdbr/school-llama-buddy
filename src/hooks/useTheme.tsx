@@ -297,10 +297,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     try {
       // Set session context for RLS
-      await supabase.rpc('set_config', {
-        setting_name: 'app.current_session_id',
-        setting_value: sessionId,
-        is_local: false
+      await supabase.rpc('set_session_context', {
+        session_id_param: sessionId
       });
 
       const { data, error } = await supabase.rpc('create_user_theme_session', {
@@ -329,10 +327,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.error('Error creating theme:', error);
     } finally {
       // Clean up session context
-      await supabase.rpc('set_config', {
-        setting_name: 'app.current_session_id',
-        setting_value: '',
-        is_local: false
+      await supabase.rpc('set_session_context', {
+        session_id_param: ''
       });
     }
   };
@@ -342,10 +338,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     try {
       // Set session context for RLS
-      await supabase.rpc('set_config', {
-        setting_name: 'app.current_session_id',
-        setting_value: sessionId,
-        is_local: false
+      await supabase.rpc('set_session_context', {
+        session_id_param: sessionId
       });
 
       const { data, error } = await supabase.rpc('update_user_theme_session', {
@@ -363,10 +357,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.error('Error updating theme:', error);
     } finally {
       // Clean up session context
-      await supabase.rpc('set_config', {
-        setting_name: 'app.current_session_id',
-        setting_value: '',
-        is_local: false
+      await supabase.rpc('set_session_context', {
+        session_id_param: ''
       });
     }
   };
@@ -376,10 +368,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     try {
       // Set session context for RLS
-      await supabase.rpc('set_config', {
-        setting_name: 'app.current_session_id',
-        setting_value: sessionId,
-        is_local: false
+      await supabase.rpc('set_session_context', {
+        session_id_param: sessionId
       });
 
       const { data, error } = await supabase.rpc('delete_user_theme_session', {
@@ -396,10 +386,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.error('Error deleting theme:', error);
     } finally {
       // Clean up session context
-      await supabase.rpc('set_config', {
-        setting_name: 'app.current_session_id',
-        setting_value: '',
-        is_local: false
+      await supabase.rpc('set_session_context', {
+        session_id_param: ''
       });
     }
   };
