@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useSessionRequest } from '@/hooks/useSessionRequest';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,7 +75,8 @@ const formatWeekRange = (start: Date) => {
 
 const Vertretungsplan = () => {
   const navigate = useNavigate();
-  const { user, profile, sessionId } = useAuth();
+  const { user, profile } = useAuth();
+  const { withSession } = useSessionRequest();
   const isMobile = useIsMobile();
   const [substitutions, setSubstitutions] = useState<SubstitutionEntry[]>([]);
   const [schedules, setSchedules] = useState<{ [key: string]: ScheduleEntry[] }>({});
@@ -341,60 +343,60 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
   };
 
   const handleCreateSubstitution = async () => {
-    if (!selectedScheduleEntry || !sessionId) return;
+    if (!selectedScheduleEntry) return;
 
     const targetDate = selectedScheduleEntry.targetDate || selectedDate;
     
     try {
-      // Set session context for RLS
-      await supabase.rpc('set_session_context', {
-        session_id_param: sessionId
+      await withSession(async () => {
+        if (selectedScheduleEntry.isEdit && selectedScheduleEntry.substitutionId) {
+          // Update existing substitution via session RPC
+          const { data, error } = await supabase.rpc('update_vertretung_session', {
+            v_id: selectedScheduleEntry.substitutionId,
+            v_substitute_teacher: substitutionData.substituteTeacher || null,
+            v_substitute_subject: substitutionData.substituteSubject || null,
+            v_substitute_room: substitutionData.substituteRoom || null,
+            v_note: substitutionData.note || null
+          });
+
+          if (error || !(data as any)?.success) {
+            throw new Error((data as any)?.error || (error as any)?.message || 'Aktualisierung fehlgeschlagen');
+          }
+          
+          toast({
+            title: "Vertretung aktualisiert",
+            description: "Die Vertretung wurde erfolgreich aktualisiert."
+          });
+        } else {
+          // Create new substitution via session RPC
+          const { data, error } = await supabase.rpc('create_vertretung_session', {
+            v_date: targetDate,
+            v_class_name: selectedScheduleEntry.class,
+            v_period: selectedScheduleEntry.period,
+            v_original_subject: selectedScheduleEntry.entry.subject,
+            v_original_teacher: selectedScheduleEntry.entry.teacher,
+            v_original_room: selectedScheduleEntry.entry.room,
+            v_substitute_teacher: substitutionData.substituteTeacher || null,
+            v_substitute_subject: substitutionData.substituteSubject || selectedScheduleEntry.entry.subject,
+            v_substitute_room: substitutionData.substituteRoom || selectedScheduleEntry.entry.room,
+            v_note: substitutionData.note || null
+          });
+
+          if (error || !(data as any)?.success) {
+            throw new Error((data as any)?.error || (error as any)?.message || 'Erstellung fehlgeschlagen');
+          }
+          
+          toast({
+            title: "Vertretung erstellt",
+            description: "Die Vertretung wurde erfolgreich erstellt."
+          });
+        }
+
+        // Refresh data and close dialog
+        await fetchSubstitutions();
+        setShowSubstitutionDialog(false);
+        setSelectedScheduleEntry(null);
       });
-
-      if (selectedScheduleEntry.isEdit && selectedScheduleEntry.substitutionId) {
-        // Update existing substitution via session RPC
-        const { data, error } = await supabase.rpc('update_vertretung_session', {
-          v_id: selectedScheduleEntry.substitutionId,
-          v_substitute_teacher: substitutionData.substituteTeacher || null,
-          v_substitute_subject: substitutionData.substituteSubject || null,
-          v_substitute_room: substitutionData.substituteRoom || null,
-          v_note: substitutionData.note || null
-        });
-
-        if (error || !(data as any)?.success) throw new Error((data as any)?.error || (error as any)?.message || 'Aktualisierung fehlgeschlagen');
-        
-        toast({
-          title: "Vertretung aktualisiert",
-          description: "Die Vertretung wurde erfolgreich aktualisiert."
-        });
-      } else {
-        // Create new substitution via session RPC
-        const { data, error } = await supabase.rpc('create_vertretung_session', {
-          v_date: targetDate,
-          v_class_name: selectedScheduleEntry.class,
-          v_period: selectedScheduleEntry.period,
-          v_original_subject: selectedScheduleEntry.entry.subject,
-          v_original_teacher: selectedScheduleEntry.entry.teacher,
-          v_original_room: selectedScheduleEntry.entry.room,
-          v_substitute_teacher: substitutionData.substituteTeacher || null,
-          v_substitute_subject: substitutionData.substituteSubject || selectedScheduleEntry.entry.subject,
-          v_substitute_room: substitutionData.substituteRoom || selectedScheduleEntry.entry.room,
-          v_note: substitutionData.note || null
-        });
-
-        if (error || !(data as any)?.success) throw new Error((data as any)?.error || (error as any)?.message || 'Erstellung fehlgeschlagen');
-        
-        toast({
-          title: "Vertretung erstellt",
-          description: "Die Vertretung wurde erfolgreich erstellt."
-        });
-      }
-
-      // Refresh data and close dialog
-      await fetchSubstitutions();
-      setShowSubstitutionDialog(false);
-      setSelectedScheduleEntry(null);
-      
     } catch (error) {
       console.error('Error handling substitution:', error);
       toast({
@@ -402,39 +404,32 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
         title: "Fehler",
         description: "Die Vertretung konnte nicht verarbeitet werden."
       });
-    } finally {
-      // Clean up session context
-      await supabase.rpc('set_session_context', {
-        session_id_param: ''
-      });
     }
   };
 
   const handleDeleteSubstitution = async () => {
-    if (!selectedScheduleEntry?.substitutionId || !sessionId) return;
+    if (!selectedScheduleEntry?.substitutionId) return;
 
     try {
-      // Set session context for RLS
-      await supabase.rpc('set_session_context', {
-        session_id_param: sessionId
+      await withSession(async () => {
+        const { data, error } = await supabase.rpc('delete_vertretung_session', {
+          v_id: selectedScheduleEntry.substitutionId
+        });
+
+        if (error || !(data as any)?.success) {
+          throw new Error((data as any)?.error || (error as any)?.message || 'Löschen fehlgeschlagen');
+        }
+
+        toast({
+          title: "Vertretung gelöscht",
+          description: "Die Vertretung wurde erfolgreich gelöscht."
+        });
+
+        // Refresh data and close dialog
+        await fetchSubstitutions();
+        setShowSubstitutionDialog(false);
+        setSelectedScheduleEntry(null);
       });
-
-      const { data, error } = await supabase.rpc('delete_vertretung_session', {
-        v_id: selectedScheduleEntry.substitutionId
-      });
-
-      if (error || !(data as any)?.success) throw new Error((data as any)?.error || (error as any)?.message || 'Löschen fehlgeschlagen');
-
-      toast({
-        title: "Vertretung gelöscht",
-        description: "Die Vertretung wurde erfolgreich gelöscht."
-      });
-
-      // Refresh data and close dialog
-      await fetchSubstitutions();
-      setShowSubstitutionDialog(false);
-      setSelectedScheduleEntry(null);
-      
     } catch (error) {
       console.error('Error deleting substitution:', error);
       toast({
@@ -442,46 +437,33 @@ const [selectedDate, setSelectedDate] = useState(toISODateLocal(new Date()));
         title: "Fehler",
         description: "Die Vertretung konnte nicht gelöscht werden."
       });
-    } finally {
-      // Clean up session context
-      await supabase.rpc('set_session_context', {
-        session_id_param: ''
-      });
     }
   };
 
   const handleDeleteSubstitutionById = async (id: string) => {
-    if (!sessionId) return;
-
     try {
-      // Set session context for RLS
-      await supabase.rpc('set_session_context', {
-        session_id_param: sessionId
+      await withSession(async () => {
+        const { data, error } = await supabase.rpc('delete_vertretung_session', {
+          v_id: id
+        });
+
+        if (error || !(data as any)?.success) {
+          throw new Error((data as any)?.error || (error as any)?.message || 'Löschen fehlgeschlagen');
+        }
+
+        toast({
+          title: "Vertretung gelöscht",
+          description: "Die Vertretung wurde erfolgreich gelöscht."
+        });
+
+        await fetchSubstitutions();
       });
-
-      const { data, error } = await supabase.rpc('delete_vertretung_session', {
-        v_id: id
-      });
-
-      if (error || !(data as any)?.success) throw new Error((data as any)?.error || (error as any)?.message || 'Löschen fehlgeschlagen');
-
-      toast({
-        title: "Vertretung gelöscht",
-        description: "Die Vertretung wurde erfolgreich gelöscht."
-      });
-
-      await fetchSubstitutions();
     } catch (error) {
       console.error('Error deleting substitution by id:', error);
       toast({
         variant: "destructive",
         title: "Fehler",
         description: "Die Vertretung konnte nicht gelöscht werden."
-      });
-    } finally {
-      // Clean up session context
-      await supabase.rpc('set_session_context', {
-        session_id_param: ''
       });
     }
   };

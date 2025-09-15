@@ -36,28 +36,45 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     // Check for stored login data in cookies
-    const storedProfile = localStorage.getItem('school_profile');
-    const storedSessionId = localStorage.getItem('school_session_id');
-    if (storedProfile && storedSessionId) {
-      try {
-        const profile = JSON.parse(storedProfile);
-        setProfile(profile);
-        setSessionId(storedSessionId);
-        setUser({
-          id: profile.username,
-          app_metadata: {},
-          user_metadata: { username: profile.username, full_name: profile.name },
-          aud: 'authenticated',
-          created_at: new Date().toISOString(),
-          email: `${profile.username}@internal.school`
-        });
-      } catch (error) {
-        console.error('Error loading stored profile:', error);
-        localStorage.removeItem('school_profile');
-        localStorage.removeItem('school_session_id');
+    const initializeAuth = async () => {
+      const storedProfile = localStorage.getItem('school_profile');
+      const storedSessionId = localStorage.getItem('school_session_id');
+      
+      if (storedProfile && storedSessionId) {
+        try {
+          const profile = JSON.parse(storedProfile);
+          
+          // Validate session before using it
+          const { data: isValid } = await supabase.rpc('validate_session_security', {
+            session_id_param: storedSessionId
+          });
+          
+          if (isValid) {
+            setProfile(profile);
+            setSessionId(storedSessionId);
+            setUser({
+              id: profile.username,
+              app_metadata: {},
+              user_metadata: { username: profile.username, full_name: profile.name },
+              aud: 'authenticated',
+              created_at: new Date().toISOString(),
+              email: `${profile.username}@internal.school`
+            });
+          } else {
+            // Session invalid, clear stored data
+            localStorage.removeItem('school_profile');
+            localStorage.removeItem('school_session_id');
+          }
+        } catch (error) {
+          console.error('Error loading stored profile:', error);
+          localStorage.removeItem('school_profile');
+          localStorage.removeItem('school_session_id');
+        }
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+    
+    initializeAuth();
   }, []);
 
   const signInWithUsername = async (username: string, password: string) => {

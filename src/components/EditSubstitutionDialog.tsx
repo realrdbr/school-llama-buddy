@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useSessionRequest } from '@/hooks/useSessionRequest';
 
 interface EditSubstitutionDialogProps {
   isOpen: boolean;
@@ -38,34 +39,37 @@ export const EditSubstitutionDialog = ({
     }
   }, [substitution]);
 
-  const { profile, sessionId } = useAuth();
+  const { profile } = useAuth();
+  const { withSession } = useSessionRequest();
+
+  // Only show delete button to level 10+ users
+  const canDelete = profile && profile.permission_lvl >= 10;
 
   const handleUpdate = async () => {
-    if (!substitution?.id || !sessionId) return;
+    if (!substitution?.id) return;
 
     try {
-      // Set session context for RLS
-      await supabase.rpc('set_session_context', {
-        session_id_param: sessionId
+      await withSession(async () => {
+        const { data, error } = await supabase.rpc('update_vertretung_session', {
+          v_id: substitution.id,
+          v_substitute_teacher: formData.substituteTeacher || null,
+          v_substitute_subject: formData.substituteSubject || null,
+          v_substitute_room: formData.substituteRoom || null,
+          v_note: formData.note || null
+        });
+
+        if (error || !(data as any)?.success) {
+          throw new Error((data as any)?.error || (error as any)?.message || 'Aktualisierung fehlgeschlagen');
+        }
+
+        toast({
+          title: "Vertretung aktualisiert",
+          description: "Die Vertretung wurde erfolgreich aktualisiert."
+        });
+
+        onUpdate();
+        onClose();
       });
-
-      const { data, error } = await supabase.rpc('update_vertretung_session', {
-        v_id: substitution.id,
-        v_substitute_teacher: formData.substituteTeacher || null,
-        v_substitute_subject: formData.substituteSubject || null,
-        v_substitute_room: formData.substituteRoom || null,
-        v_note: formData.note || null
-      });
-
-      if (error || !(data as any)?.success) throw new Error((data as any)?.error || (error as any)?.message || 'Aktualisierung fehlgeschlagen');
-
-      toast({
-        title: "Vertretung aktualisiert",
-        description: "Die Vertretung wurde erfolgreich aktualisiert."
-      });
-
-      onUpdate();
-      onClose();
     } catch (error) {
       console.error('Error updating substitution:', error);
       toast({
@@ -73,47 +77,36 @@ export const EditSubstitutionDialog = ({
         title: "Fehler",
         description: "Die Vertretung konnte nicht aktualisiert werden."
       });
-    } finally {
-      // Clean up session context
-      await supabase.rpc('set_session_context', {
-        session_id_param: ''
-      });
     }
   };
 
   const handleDelete = async () => {
-    if (!substitution?.id || !sessionId) return;
+    if (!substitution?.id || !canDelete) return;
 
     try {
-      // Set session context for RLS
-      await supabase.rpc('set_session_context', {
-        session_id_param: sessionId
-      });
+      await withSession(async () => {
+        const { data, error } = await supabase.rpc('delete_vertretung_session', {
+          v_id: substitution.id
+        });
 
-      const { data, error } = await supabase.rpc('delete_vertretung_session', {
-        v_id: substitution.id
-      });
+        if (error || !(data as any)?.success) {
+          throw new Error((data as any)?.error || (error as any)?.message || 'Löschen fehlgeschlagen');
+        }
 
-      if (error || !(data as any)?.success) throw new Error((data as any)?.error || (error as any)?.message || 'Löschen fehlgeschlagen');
-
-      toast({
+        toast({
           title: "Vertretung gelöscht",
           description: "Die Vertretung wurde erfolgreich gelöscht."
-      });
+        });
 
-      onUpdate();
-      onClose();
+        onUpdate();
+        onClose();
+      });
     } catch (error) {
       console.error('Error deleting substitution:', error);
       toast({
         variant: "destructive",
         title: "Fehler",
         description: "Die Vertretung konnte nicht gelöscht werden."
-      });
-    } finally {
-      // Clean up session context
-      await supabase.rpc('set_session_context', {
-        session_id_param: ''
       });
     }
   };
@@ -180,7 +173,11 @@ export const EditSubstitutionDialog = ({
           
           <div className="flex gap-2">
             <Button onClick={handleUpdate}>Änderungen speichern</Button>
-            <Button variant="destructive" onClick={handleDelete}>Vertretung löschen</Button>
+            {canDelete && (
+              <Button variant="destructive" onClick={handleDelete}>
+                Vertretung löschen
+              </Button>
+            )}
             <Button variant="outline" onClick={onClose}>
               Abbrechen
             </Button>
