@@ -212,7 +212,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       setUserThemes(themes);
 
-      // Find active theme from database
+      // Find active theme from database - this takes priority over localStorage
       const activeThemeData = data?.find((d: any) => d.is_active);
       
       if (activeThemeData) {
@@ -223,9 +223,22 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           is_preset: activeThemeData.is_preset
         };
         
-        // Only apply if different from current theme to avoid unnecessary re-renders
-        if (!currentTheme || currentTheme.name !== activeTheme.name) {
-          applyTheme(activeTheme);
+        // Always apply the database active theme to ensure persistence
+        applyTheme(activeTheme);
+      } else {
+        // No active theme in database, try localStorage as fallback
+        const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+        if (savedTheme) {
+          try {
+            const theme = JSON.parse(savedTheme);
+            // Apply the theme and also save it to database as active
+            await setTheme(theme);
+          } catch (error) {
+            console.error('Error parsing saved theme:', error);
+            applyTheme(presetThemes[0]);
+          }
+        } else {
+          applyTheme(presetThemes[0]);
         }
       }
     } catch (error) {
@@ -401,24 +414,26 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Initialize theme from localStorage immediately
+  // Initialize theme from localStorage only if not logged in
   useEffect(() => {
-    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
-    
-    if (savedTheme) {
-      try {
-        const theme = JSON.parse(savedTheme);
-        applyTheme(theme);
-      } catch (error) {
-        console.error('Error parsing saved theme:', error);
+    if (!profile) {
+      const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+      
+      if (savedTheme) {
+        try {
+          const theme = JSON.parse(savedTheme);
+          applyTheme(theme);
+        } catch (error) {
+          console.error('Error parsing saved theme:', error);
+          applyTheme(presetThemes[0]);
+        }
+      } else {
         applyTheme(presetThemes[0]);
       }
-    } else {
-      applyTheme(presetThemes[0]);
     }
-  }, []);
+  }, [profile]);
 
-  // Load user themes when profile is available
+  // Load user themes when profile is available - this will override localStorage
   useEffect(() => {
     if (profile) {
       loadUserThemes();
