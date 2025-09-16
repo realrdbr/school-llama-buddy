@@ -185,7 +185,9 @@ const ThemeSettings = () => {
                         </div>
                       ))}
                     </div>
-                    <Button size="sm" variant="outline" className="w-full">
+                    <Button size="sm" variant="outline" className="w-full"
+                      onClick={(e) => { e.stopPropagation(); handlePresetSelect(preset); }}
+                    >
                       <Eye className="h-4 w-4 mr-2" />
                       Anwenden
                     </Button>
