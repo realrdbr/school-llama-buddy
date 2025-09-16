@@ -223,16 +223,30 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           is_preset: activeThemeData.is_preset
         };
         
-        // Always apply the database active theme to ensure persistence
-        applyTheme(activeTheme);
+        // Only apply if it's different from current theme to prevent conflicts
+        if (!currentTheme || currentTheme.name !== activeTheme.name) {
+          applyTheme(activeTheme);
+        }
       } else {
         // No active theme in database, try localStorage as fallback
         const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
         if (savedTheme) {
           try {
             const theme = JSON.parse(savedTheme);
-            // Apply the theme and also save it to database as active
-            await setTheme(theme);
+            // Save to database without calling setTheme to avoid recursion
+            await supabase
+              .from('user_themes')
+              .insert({
+                user_id: profile.id,
+                name: theme.name,
+                colors: theme.colors as any,
+                is_preset: theme.is_preset || false,
+                is_active: true
+              })
+              .select()
+              .maybeSingle();
+            
+            applyTheme(theme);
           } catch (error) {
             console.error('Error parsing saved theme:', error);
             applyTheme(presetThemes[0]);
@@ -261,6 +275,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (sessionId) {
         await supabase.rpc('set_session_context', { session_id_param: sessionId });
       }
+
+      // First deactivate all existing themes
+      await supabase
+        .from('user_themes')
+        .update({ is_active: false })
+        .eq('user_id', profile.id);
 
       if (theme.id) {
         // Existing user theme - activate it
@@ -298,8 +318,22 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       }
 
-      // Refresh themes list without overriding current theme
-      await loadUserThemes();
+      // Refresh themes list without changing current theme
+      const { data } = await supabase
+        .from('user_themes')
+        .select('*')
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false });
+
+      const themes = data?.map(theme => ({
+        id: theme.id,
+        name: theme.name,
+        colors: theme.colors as unknown as ThemeColors,
+        is_preset: theme.is_preset,
+        is_active: theme.is_active
+      })) || [];
+
+      setUserThemes(themes);
     } catch (error) {
       console.error('Error setting theme:', error);
     } finally {
