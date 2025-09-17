@@ -104,6 +104,54 @@ export type Database = {
         }
         Relationships: []
       }
+      books: {
+        Row: {
+          author: string
+          available_copies: number
+          cover_image_url: string | null
+          created_at: string
+          description: string | null
+          genre: string | null
+          id: string
+          isbn: string | null
+          publication_year: number | null
+          publisher: string | null
+          title: string
+          total_copies: number
+          updated_at: string
+        }
+        Insert: {
+          author: string
+          available_copies?: number
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          genre?: string | null
+          id?: string
+          isbn?: string | null
+          publication_year?: number | null
+          publisher?: string | null
+          title: string
+          total_copies?: number
+          updated_at?: string
+        }
+        Update: {
+          author?: string
+          available_copies?: number
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          genre?: string | null
+          id?: string
+          isbn?: string | null
+          publication_year?: number | null
+          publisher?: string | null
+          title?: string
+          total_copies?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       chat_conversations: {
         Row: {
           created_at: string
@@ -242,6 +290,73 @@ export type Database = {
             columns: ["permission_id"]
             isOneToOne: false
             referencedRelation: "permission_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loans: {
+        Row: {
+          book_id: string
+          created_at: string
+          due_date: string
+          id: string
+          is_returned: boolean
+          keycard_number: string | null
+          librarian_id: number | null
+          loan_date: string
+          notes: string | null
+          return_date: string | null
+          updated_at: string
+          user_id: number
+        }
+        Insert: {
+          book_id: string
+          created_at?: string
+          due_date?: string
+          id?: string
+          is_returned?: boolean
+          keycard_number?: string | null
+          librarian_id?: number | null
+          loan_date?: string
+          notes?: string | null
+          return_date?: string | null
+          updated_at?: string
+          user_id: number
+        }
+        Update: {
+          book_id?: string
+          created_at?: string
+          due_date?: string
+          id?: string
+          is_returned?: boolean
+          keycard_number?: string | null
+          librarian_id?: number | null
+          loan_date?: string
+          notes?: string | null
+          return_date?: string | null
+          updated_at?: string
+          user_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loans_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loans_librarian_id_fkey"
+            columns: ["librarian_id"]
+            isOneToOne: false
+            referencedRelation: "permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loans_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "permissions"
             referencedColumns: ["id"]
           },
         ]
