@@ -21,6 +21,7 @@ import Vertretungsplan from "./pages/Vertretungsplan";
 import Klassenverwaltung from "./pages/Klassenverwaltung";
 import AIChat from "./pages/AIChat";
 import Keycard from "./pages/Keycard";
+import Bibliothek from "./pages/Bibliothek";
 import Settings from "./pages/Settings";
 import Permissions from "./pages/Permissions";
 import ThemeSettings from "./pages/ThemeSettings";
@@ -120,7 +121,16 @@ const SessionAwareApp = () => {
       />
       
       <Route 
-        path="/settings" 
+        path="/bibliothek" 
+        element={
+          <ProtectedRoute requiredPermission="library_view">
+            <Bibliothek />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/settings"
         element={
           <ProtectedRoute requiredPermission="system_settings">
             <Settings />

@@ -18,7 +18,8 @@ import {
   Volume2,
   FileText,
   Shield,
-  Palette
+  Palette,
+  Library
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import CreateUserModal from './CreateUserModal';
@@ -65,13 +66,15 @@ const Dashboard = () => {
     { icon: Calendar, title: "Vertretungsplan", description: "Stunden verwalten und Vertretungen planen", path: "/vertretungsplan" },
     { icon: Megaphone, title: "Ankündigungen", description: "Durchsagen erstellen und verwalten", path: "/announcements" },
     { icon: FileText, title: "Dokumenten-Analyse", description: "Material hochladen und KI-Fragen stellen", path: "/document-analysis" },
-    { icon: BookOpen, title: "Klassenverwaltung", description: "Klassen und Stundenpläne bearbeiten", path: "/klassenverwaltung" }
+    { icon: BookOpen, title: "Klassenverwaltung", description: "Klassen und Stundenpläne bearbeiten", path: "/klassenverwaltung" },
+    { icon: Library, title: "Bibliothek", description: "Bibliothek verwalten und Ausleihen bearbeiten", path: "/bibliothek" }
   ];
 
   const studentFeatures = [
     { icon: Clock, title: "Stundenplan", description: "Aktueller Stundenplan und Vertretungen", path: "/stundenplan" },
     { icon: Calendar, title: "Vertretungsplan", description: "Aktuelle Vertretungen einsehen", path: "/vertretungsplan" },
     { icon: Megaphone, title: "Ankündigungen", description: "Aktuelle Schulnachrichten", path: "/announcements" },
+    { icon: Library, title: "Bibliothek", description: "Bücher suchen und eigene Ausleihen verwalten", path: "/bibliothek" },
     { icon: Palette, title: "Design & Farben", description: "Farbschema der App anpassen", path: "/theme-settings" }
   ];
 
@@ -95,14 +98,16 @@ const Dashboard = () => {
     { ...teacherFeatures[0], permission: 'view_vertretungsplan' },
     { ...teacherFeatures[1], permission: 'create_announcements' },
     { ...teacherFeatures[2], permission: 'document_analysis' },
-    { ...teacherFeatures[3], permission: 'manage_schedules' }
+    { ...teacherFeatures[3], permission: 'manage_schedules' },
+    { ...teacherFeatures[4], permission: 'library_view' }
   ];
 
   const studentFeaturesWithPermissions = [
     { ...studentFeatures[0], permission: 'view_schedule' },
     { ...studentFeatures[1], permission: 'view_vertretungsplan' },
     { ...studentFeatures[2], permission: 'view_announcements' },
-    { ...studentFeatures[3], permission: 'theme_settings' }
+    { ...studentFeatures[3], permission: 'library_view' },
+    { ...studentFeatures[4], permission: 'theme_settings' }
   ];
 
   const renderFeatureCards = (features: any[]) => {
