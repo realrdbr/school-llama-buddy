@@ -32,6 +32,11 @@ const permissions: Permission[] = [
   { id: 'manage_substitutions', name: 'Vertretungen verwalten', description: 'Vertretungsplan bearbeiten', requiresLevel: 9 },
   { id: 'manage_schedules', name: 'Stundenpläne verwalten', description: 'Stundenpläne erstellen/bearbeiten', requiresLevel: 9 },
   { id: 'document_analysis', name: 'Dokumenten-Analyse', description: 'KI-Dokumentenanalyse verwenden', requiresLevel: 4 },
+  // Bibliothek – Basiszugriff für alle eingeloggten Nutzer, Verwaltung ab Level 6
+  { id: 'library_view', name: 'Bibliothek anzeigen', description: 'Bibliotheksseite nutzen', requiresLevel: 1 },
+  { id: 'library_manage_books', name: 'Bücher verwalten', description: 'Bücherbestand verwalten', requiresLevel: 6 },
+  { id: 'library_manage_loans', name: 'Ausleihen verwalten', description: 'Ausleihen und Rückgaben verwalten', requiresLevel: 6 },
+  { id: 'library_view_all_users', name: 'Alle Bibliotheksnutzer sehen', description: 'Nutzer und Ausleihen einsehen', requiresLevel: 6 },
   { id: 'audio_announcements', name: 'Audio-Durchsagen', description: 'TTS-Durchsagen erstellen/verwalten', requiresLevel: 10 },
   { id: 'user_management', name: 'Benutzerverwaltung', description: 'Benutzer erstellen/bearbeiten/löschen', requiresLevel: 10 },
   { id: 'permission_management', name: 'Berechtigungen verwalten', description: 'Benutzerberechtigungen ändern', requiresLevel: 10 },
