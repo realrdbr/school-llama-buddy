@@ -153,6 +153,7 @@ const handleDeleteUser = async () => {
   const getPermissionBadge = (level: number) => {
     if (level >= 10) return { text: "Schulleitung", variant: "default" as const };
     if (level >= 8) return { text: "Administrator", variant: "secondary" as const };
+    if (level === 6) return { text: "Bibliothekar/in", variant: "outline" as const };
     if (level >= 5) return { text: "Lehrkraft", variant: "outline" as const };
     if (level === 1) return { text: "Besucher", variant: "outline" as const };
     return { text: "Schüler", variant: "outline" as const };
@@ -225,7 +226,7 @@ const handleDeleteUser = async () => {
           <TabsContent value="users">
             <div className="space-y-4 sm:space-y-6">
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
             <Card>
               <CardContent className="p-3 sm:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
@@ -262,7 +263,21 @@ const handleDeleteUser = async () => {
                   </div>
                   <div>
                     <p className="text-xs sm:text-sm text-muted-foreground">Lehrkräfte</p>
-                    <p className="text-lg sm:text-2xl font-bold">{users.filter(u => u.permission_lvl >= 5 && u.permission_lvl < 10).length}</p>
+                    <p className="text-lg sm:text-2xl font-bold">{users.filter(u => u.permission_lvl >= 5 && u.permission_lvl < 10 && u.permission_lvl !== 6).length}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-3 sm:p-6">
+                <div className="flex items-center gap-2 sm:gap-4">
+                  <div className="p-1.5 sm:p-2 bg-purple-100 rounded-lg">
+                    <Users className="h-4 w-4 sm:h-6 sm:w-6 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Bibliothekar/innen</p>
+                    <p className="text-lg sm:text-2xl font-bold">{users.filter(u => u.permission_lvl === 6).length}</p>
                   </div>
                 </div>
               </CardContent>
