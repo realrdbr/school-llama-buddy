@@ -102,12 +102,16 @@ const Dashboard = () => {
     { ...teacherFeatures[4], permission: 'library_view' }
   ];
 
+  // Librarian and admin features 
+  const librarianFeatures = [
+    { icon: Library, title: "Bibliothek", description: "Bücher und Ausleihen verwalten", path: "/bibliothek", permission: 'library_view' }
+  ];
+
   const studentFeaturesWithPermissions = [
     { ...studentFeatures[0], permission: 'view_schedule' },
     { ...studentFeatures[1], permission: 'view_vertretungsplan' },
     { ...studentFeatures[2], permission: 'view_announcements' },
-    { ...studentFeatures[3], permission: 'library_view' },
-    { ...studentFeatures[4], permission: 'theme_settings' }
+    { ...studentFeatures[3], permission: 'theme_settings' }
   ];
 
   const renderFeatureCards = (features: any[]) => {
@@ -246,6 +250,16 @@ const Dashboard = () => {
                 {profile?.permission_lvl && profile.permission_lvl >= 8 ? "Lehrkraft-Funktionen" : "Ihre Funktionen"}
               </h2>
               {renderFeatureCards(teacherFeaturesWithPermissions)}
+            </div>
+          )}
+
+          {/* Librarian Features */}
+          {getFilteredFeatures(librarianFeatures).length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold text-foreground">
+                Bibliothek-Funktionen
+              </h2>
+              {renderFeatureCards(librarianFeatures)}
             </div>
           )}
 
