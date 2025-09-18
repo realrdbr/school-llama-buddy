@@ -506,8 +506,7 @@ const Bibliothek = () => {
       if (userLoansError) throw userLoansError;
       setUserLoans(userLoansData || []);
       
-      // Clear keycard field for next scan
-      setScanKeycard('');
+      // Don't clear keycard here - keep it for multiple actions
     } catch (error) {
       console.error('Error searching user:', error);
       toast({
@@ -615,7 +614,7 @@ const Bibliothek = () => {
 
       setScanBookBarcode('');
       setMultipleBarcodes('');
-      setScanKeycard(''); // Clear keycard field for next user
+      // Don't clear keycard - keep user selected for multiple actions
       handleSearchUser(); // Refresh user loans
       loadData(); // Refresh books
     } catch (error) {
@@ -715,7 +714,7 @@ const Bibliothek = () => {
 
       setScanBookBarcode('');
       setMultipleBarcodes('');
-      setScanKeycard(''); // Clear keycard field for next user
+      // Don't clear keycard - keep user selected for multiple actions
       handleSearchUser(); // Refresh user loans
       loadData(); // Refresh books
       setActiveTab('loans'); // Stay on loans tab after return
@@ -837,7 +836,7 @@ const Bibliothek = () => {
 
       handleSearchUser(); // Refresh user loans
       loadData(); // Refresh books
-      setScanKeycard(''); // Clear keycard field for next user
+      // Don't clear keycard - keep user selected for multiple actions
       setActiveTab('loans'); // Stay on loans tab after return
     } catch (error) {
       console.error('Error returning book:', error);
@@ -1095,6 +1094,18 @@ const Bibliothek = () => {
                       <UserSearch className="h-4 w-4 mr-2" />
                       Suchen
                     </Button>
+                    {selectedUser && (
+                      <Button 
+                        variant="outline" 
+                        onClick={() => {
+                          setScanKeycard('');
+                          setSelectedUser(null);
+                          setUserLoans([]);
+                        }}
+                      >
+                        Neuer Benutzer
+                      </Button>
+                    )}
                   </div>
                   
                   {selectedUser && (
