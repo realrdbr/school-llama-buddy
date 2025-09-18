@@ -728,6 +728,7 @@ const Bibliothek = () => {
       setMultipleBarcodes('');
       handleSearchUser(); // Refresh user loans
       loadData(); // Refresh books
+      setActiveTab('loans'); // Stay on loans tab after return
     } catch (error) {
       console.error('Error returning books:', error);
       toast({
