@@ -63,7 +63,8 @@ const ChangePasswordModal = ({ isOpen, onClose, isFirstLogin = false }: ChangePa
     setIsLoading(true);
     const { error } = await changePassword(
       '', 
-      formData.newPassword
+      formData.newPassword,
+      true // Force password change, no old password required
     );
 
     if (error) {

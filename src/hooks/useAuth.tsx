@@ -20,7 +20,7 @@ interface AuthContextType {
   loading: boolean;
   signInWithUsername: (username: string, password: string) => Promise<{ error: any; mustChangePassword?: boolean }>;
   signOut: () => Promise<void>;
-  changePassword: (oldPassword: string, newPassword: string) => Promise<{ error: any }>;
+  changePassword: (oldPassword: string, newPassword: string, isForced?: boolean) => Promise<{ error: any }>;
   createUser: (username: string, password: string, fullName: string, permissionLevel: number) => Promise<{ error: any }>;
   sessionId: string | null;
 }
@@ -172,15 +172,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const changePassword = async (oldPassword: string, newPassword: string) => {
+  const changePassword = async (oldPassword: string, newPassword: string, isForced: boolean = false) => {
     if (!user || !profile) return { error: { message: 'Nicht angemeldet' } };
 
     try {
-      const { data, error } = await supabase.rpc('change_user_password_secure', {
-        user_id_input: profile.id,
-        old_password: oldPassword,
-        new_password: newPassword
-      });
+      let data, error;
+      
+      if (isForced || profile.must_change_password) {
+        // For forced password changes, don't require old password
+        ({ data, error } = await supabase.rpc('change_user_password_forced_secure', {
+          user_id_input: profile.id,
+          new_password: newPassword
+        }));
+      } else {
+        // Normal password change requires old password
+        ({ data, error } = await supabase.rpc('change_user_password_secure', {
+          user_id_input: profile.id,
+          old_password: oldPassword,
+          new_password: newPassword
+        }));
+      }
 
       if (error) {
         console.error('Password change error:', error);

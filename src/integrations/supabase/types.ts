@@ -795,6 +795,10 @@ export type Database = {
         }
         Returns: Json
       }
+      change_user_password_forced_secure: {
+        Args: { new_password: string; user_id_input: number }
+        Returns: Json
+      }
       change_user_password_secure: {
         Args: {
           new_password: string
