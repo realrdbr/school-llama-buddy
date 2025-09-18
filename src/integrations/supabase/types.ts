@@ -451,6 +451,65 @@ export type Database = {
         }
         Relationships: []
       }
+      private_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          updated_at: string
+          user1_id: number
+          user2_id: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user1_id: number
+          user2_id: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user1_id?: number
+          user2_id?: number
+        }
+        Relationships: []
+      }
+      private_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          is_read: boolean
+          sender_id: number
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          sender_id: number
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          sender_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "private_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "private_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -592,6 +651,30 @@ export type Database = {
           "last name"?: string
           shortened?: string
           subjects?: string
+        }
+        Relationships: []
+      }
+      user_contacts: {
+        Row: {
+          added_at: string
+          contact_user_id: number
+          id: string
+          status: string
+          user_id: number
+        }
+        Insert: {
+          added_at?: string
+          contact_user_id: number
+          id?: string
+          status?: string
+          user_id: number
+        }
+        Update: {
+          added_at?: string
+          contact_user_id?: number
+          id?: string
+          status?: string
+          user_id?: number
         }
         Relationships: []
       }
@@ -961,6 +1044,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      get_or_create_conversation: {
+        Args: { other_user_id: number }
+        Returns: string
+      }
       has_active_sessions: {
         Args: { target_user_id: number }
         Returns: boolean
@@ -1000,6 +1087,10 @@ export type Database = {
           user_agent_input?: string
           username_input: string
         }
+        Returns: undefined
+      }
+      mark_messages_as_read: {
+        Args: { conversation_id_param: string }
         Returns: undefined
       }
       release_primary_session: {
