@@ -450,45 +450,6 @@ const Bibliothek = () => {
       });
     }
   };
-  const handleReturnBook = async (loan: LoanType) => {
-    if (!selectedUser) return;
-
-    try {
-      // Mark as returned
-      const { error: returnError } = await supabase
-        .from('loans')
-        .update({ is_returned: true, return_date: new Date().toISOString() })
-        .eq('id', loan.id);
-
-      if (returnError) throw returnError;
-
-      // Update available copies
-      const { error: updateError } = await supabase
-        .from('books')
-        .update({ available_copies: loan.books.available_copies + 1 })
-        .eq('id', loan.book_id);
-
-      if (updateError) throw updateError;
-
-      toast({
-        title: "Erfolg",
-        description: `"${loan.books.title}" wurde zurückgegeben.`
-      });
-
-      handleSearchUser(); // Refresh user loans
-      loadData(); // Refresh books
-      setActiveTab('loans'); // Stay on loans tab after operation
-      setActiveTab('loans'); // Stay on loans tab after operation
-      setActiveTab('loans'); // Stay on loans tab
-    } catch (error) {
-      console.error('Error returning book:', error);
-      toast({
-        variant: "destructive",
-        title: "Fehler",
-        description: "Buch konnte nicht zurückgegeben werden."
-      });
-    }
-  };
 
   const handleSearchUser = async () => {
     if (!scanKeycard.trim()) {
