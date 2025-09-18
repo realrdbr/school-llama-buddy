@@ -254,8 +254,8 @@ const Dashboard = () => {
             </div>
           )}
 
-          {/* Teacher Features - Not shown for librarians (Level 6) */}
-          {getFilteredFeatures(teacherFeaturesWithPermissions).length > 0 && profile?.permission_lvl !== 6 && (
+          {/* Teacher Features - Only for Level 5-7 and 8+ (but not librarians Level 6) */}
+          {getFilteredFeatures(teacherFeaturesWithPermissions).length > 0 && profile?.permission_lvl !== 6 && (profile?.permission_lvl || 1) >= 5 && (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-foreground">
                 {profile?.permission_lvl && profile.permission_lvl >= 8 ? "Lehrkraft-Funktionen" : "Ihre Funktionen"}
@@ -268,14 +268,14 @@ const Dashboard = () => {
           {getFilteredFeatures(librarianFeatures).length > 0 && profile?.permission_lvl === 6 && (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-foreground">
-                Bibliothek-Funktionen
+                Ihre Funktionen
               </h2>
               {renderFeatureCards(librarianFeatures)}
             </div>
           )}
 
-          {/* Student/Visitor Features - Show for students and visitors, but not for teachers/admins/librarians */}
-          {getFilteredFeatures(studentFeaturesWithPermissions).length > 0 && profile?.permission_lvl !== 6 && (profile?.permission_lvl || 1) <= 4 && (
+          {/* Student/Visitor Features - Only for Level 1-4 */}
+          {getFilteredFeatures(studentFeaturesWithPermissions).length > 0 && (profile?.permission_lvl || 1) <= 4 && (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-foreground">
                 {profile?.permission_lvl && profile.permission_lvl > 1 ? "Ihre Funktionen" : "Verfügbare Funktionen"}
