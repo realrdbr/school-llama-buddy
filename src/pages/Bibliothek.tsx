@@ -831,10 +831,19 @@ const Bibliothek = () => {
 
         if (returnError) throw returnError;
 
-        // Update available copies
+        // Get current available copies
+        const { data: bookData, error: bookError } = await supabase
+          .from('books')
+          .select('available_copies')
+          .eq('id', loan.book_id)
+          .single();
+
+        if (bookError) throw bookError;
+
+        // Update available copies by incrementing current count
         const { error: updateError } = await supabase
           .from('books')
-          .update({ available_copies: loan.books.available_copies + 1 })
+          .update({ available_copies: bookData.available_copies + 1 })
           .eq('id', loan.book_id);
 
         if (updateError) throw updateError;
