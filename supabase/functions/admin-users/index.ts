@@ -43,7 +43,7 @@ serve(async (req) => {
     if (actorUserId) {
       const result = await supabase
         .from('permissions')
-        .select('id, permission_lvl, username, name')
+        .select('id, permission_lvl, username, name, user_class, keycard_number, keycard_active')
         .eq('id', actorUserId)
         .maybeSingle();
       actor = result.data;
@@ -51,7 +51,7 @@ serve(async (req) => {
     } else if (actorUsername) {
       const result = await supabase
         .from('permissions')
-        .select('id, permission_lvl, username, name')
+        .select('id, permission_lvl, username, name, user_class, keycard_number, keycard_active')
         .eq('username', actorUsername)
         .maybeSingle();
       actor = result.data;
@@ -65,12 +65,13 @@ serve(async (req) => {
       return deny(500, "Actor lookup failed");
     }
 
-    if (!actor || (actor.permission_lvl ?? 0) < 10) {
-      return deny(403, "Insufficient permissions");
+    if (!actor) {
+      return deny(403, "Missing or invalid actor");
     }
 
     switch (action) {
       case "list_users": {
+        if ((actor.permission_lvl ?? 0) < 10) return deny(403, "Insufficient permissions");
         const { data, error } = await supabase
           .from("permissions")
           .select("id, username, name, permission_lvl, created_at, user_class, keycard_number, keycard_active")
@@ -87,6 +88,7 @@ serve(async (req) => {
       }
 
       case "update_user": {
+        if ((actor.permission_lvl ?? 0) < 10) return deny(403, "Insufficient permissions");
         const { targetUserId, targetUsername, updates } = payload;
         console.log('[admin-users] update_user input', { targetUserId, targetUsername, updates });
 
@@ -200,6 +202,7 @@ serve(async (req) => {
       }
 
       case "delete_user": {
+        if ((actor.permission_lvl ?? 0) < 10) return deny(403, "Insufficient permissions");
         const { targetUserId, targetUsername } = payload;
         console.log('[admin-users] delete_user input', { targetUserId, targetUsername });
         if (!targetUserId && !targetUsername) return deny(400, "Missing target identifier");
@@ -232,6 +235,13 @@ serve(async (req) => {
 
         return new Response(
           JSON.stringify({ success: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "get_self": {
+        return new Response(
+          JSON.stringify({ success: true, user: actor }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

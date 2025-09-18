@@ -11,6 +11,10 @@ interface Profile {
   password: string;
   created_at: string;
   must_change_password?: boolean;
+  // Extended fields from permissions table
+  user_class?: string | null;
+  keycard_number?: string | null;
+  keycard_active?: boolean;
 }
 
 interface AuthContextType {
@@ -50,7 +54,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           });
           
           if (isValid) {
-            setProfile(profile);
+            let enrichedProfile = profile;
+            // Attempt to enrich stored profile with keycard info if missing
+            try {
+              if (!('keycard_number' in profile)) {
+                const { data: selfData } = await supabase.functions.invoke('admin-users', {
+                  body: {
+                    action: 'get_self',
+                    actorUserId: profile.id,
+                    actorUsername: profile.username
+                  }
+                });
+                if (selfData?.user) {
+                  enrichedProfile = {
+                    ...profile,
+                    user_class: selfData.user.user_class ?? null,
+                    keycard_number: selfData.user.keycard_number ?? null,
+                    keycard_active: selfData.user.keycard_active ?? true,
+                  } as any;
+                  localStorage.setItem('school_profile', JSON.stringify(enrichedProfile));
+                }
+              }
+            } catch (e) {
+              console.warn('Profile enrichment skipped:', e);
+            }
+
+            setProfile(enrichedProfile);
             setSessionId(storedSessionId);
             setUser({
               id: profile.username,
@@ -125,7 +154,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         email: `${username}@internal.school`
       };
 
-      const profileData = {
+      let profileData = {
         id: userData.user_id,
         user_id: userData.user_id.toString(),
         username: username,
@@ -145,6 +174,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.error('Session creation error:', sessionError);
         setLoading(false);
         return { error: { message: 'Sitzung konnte nicht erstellt werden' } };
+      }
+
+      // Enrich profile with keycard info via edge function
+      try {
+        const { data: selfData } = await supabase.functions.invoke('admin-users', {
+          body: {
+            action: 'get_self',
+            actorUserId: userData.user_id,
+            actorUsername: username
+          }
+        });
+        if (selfData?.user) {
+          profileData = {
+            ...profileData,
+            user_class: selfData.user.user_class ?? null,
+            keycard_number: selfData.user.keycard_number ?? null,
+            keycard_active: selfData.user.keycard_active ?? true,
+          } as any;
+        }
+      } catch (e) {
+        console.warn('Could not enrich profile with keycard info:', e);
       }
 
       // Set user and profile state
