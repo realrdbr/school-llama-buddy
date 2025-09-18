@@ -201,23 +201,21 @@ const Bibliothek = () => {
     }
 
     try {
-      await withSession(async () => {
-        const { error } = await supabase
-          .from('books')
-          .insert({
-            isbn: newBook.isbn || null,
-            title: newBook.title,
-            author: newBook.author,
-            publisher: newBook.publisher || null,
-            publication_year: newBook.publication_year ? parseInt(newBook.publication_year) : null,
-            genre: newBook.genre || null,
-            total_copies: newBook.total_copies,
-            available_copies: newBook.total_copies,
-            description: newBook.description || null
-          });
-
-        if (error) throw error;
+      const { data, error } = await supabase.rpc('add_book_session', {
+        b_title: newBook.title,
+        b_author: newBook.author,
+        b_isbn: newBook.isbn || null,
+        b_publisher: newBook.publisher || null,
+        b_publication_year: newBook.publication_year ? parseInt(newBook.publication_year) : null,
+        b_genre: newBook.genre || null,
+        b_total_copies: newBook.total_copies,
+        b_description: newBook.description || null,
+        v_session_id: sessionId || ''
       });
+
+      if (error || (data && (data as any).success === false)) {
+        throw new Error((data as any)?.error || error?.message || 'Hinzufügen fehlgeschlagen');
+      }
 
       toast({
         title: "Erfolg",
@@ -257,23 +255,22 @@ const Bibliothek = () => {
     }
 
     try {
-      await withSession(async () => {
-        const { error } = await supabase
-          .from('books')
-          .update({
-            isbn: editingBook.isbn || null,
-            title: editingBook.title,
-            author: editingBook.author,
-            publisher: editingBook.publisher || null,
-            publication_year: editingBook.publication_year || null,
-            genre: editingBook.genre || null,
-            total_copies: editingBook.total_copies,
-            description: editingBook.description || null
-          })
-          .eq('id', editingBook.id);
-
-        if (error) throw error;
+      const { data, error } = await supabase.rpc('update_book_session', {
+        b_id: editingBook.id,
+        b_title: editingBook.title,
+        b_author: editingBook.author,
+        b_isbn: editingBook.isbn || null,
+        b_publisher: editingBook.publisher || null,
+        b_publication_year: editingBook.publication_year || null,
+        b_genre: editingBook.genre || null,
+        b_total_copies: editingBook.total_copies,
+        b_description: editingBook.description || null,
+        v_session_id: sessionId || ''
       });
+
+      if (error || (data && (data as any).success === false)) {
+        throw new Error((data as any)?.error || error?.message || 'Aktualisierung fehlgeschlagen');
+      }
 
       toast({
         title: "Erfolg",

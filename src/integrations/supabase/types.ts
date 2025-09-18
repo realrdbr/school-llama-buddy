@@ -775,6 +775,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_book_session: {
+        Args: {
+          b_author: string
+          b_description?: string
+          b_genre?: string
+          b_isbn?: string
+          b_publication_year?: number
+          b_publisher?: string
+          b_title: string
+          b_total_copies?: number
+          v_session_id?: string
+        }
+        Returns: Json
+      }
       admin_change_user_password: {
         Args: {
           admin_user_id: number
@@ -997,6 +1011,21 @@ export type Database = {
       set_session_context: {
         Args: { session_id_param: string }
         Returns: undefined
+      }
+      update_book_session: {
+        Args: {
+          b_author: string
+          b_description?: string
+          b_genre?: string
+          b_id: string
+          b_isbn?: string
+          b_publication_year?: number
+          b_publisher?: string
+          b_title: string
+          b_total_copies?: number
+          v_session_id?: string
+        }
+        Returns: Json
       }
       update_user_theme_secure: {
         Args: {
