@@ -26,7 +26,10 @@ import {
   ScanLine,
   CalendarDays,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Edit,
+  Trash2,
+  UserSearch
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -87,8 +90,14 @@ const Bibliothek = () => {
     description: ''
   });
   const [scanKeycard, setScanKeycard] = useState('');
+  const [scanBookBarcode, setScanBookBarcode] = useState('');
+  const [multipleBarcodes, setMultipleBarcodes] = useState('');
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [userLoans, setUserLoans] = useState<LoanType[]>([]);
   const [showAddBookDialog, setShowAddBookDialog] = useState(false);
   const [showLoanDialog, setShowLoanDialog] = useState(false);
+  const [showEditBookDialog, setShowEditBookDialog] = useState(false);
+  const [editingBook, setEditingBook] = useState<BookType | null>(null);
 
   const canManageBooks = hasPermission('library_manage_books');
   const canManageLoans = hasPermission('library_manage_loans');
@@ -233,6 +242,336 @@ const Bibliothek = () => {
         variant: "destructive",
         title: "Fehler",
         description: "Buch konnte nicht hinzugefügt werden."
+      });
+    }
+  };
+
+  const handleEditBook = async () => {
+    if (!editingBook || !editingBook.title || !editingBook.author) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Titel und Autor sind Pflichtfelder."
+      });
+      return;
+    }
+
+    try {
+      await withSession(async () => {
+        const { error } = await supabase
+          .from('books')
+          .update({
+            isbn: editingBook.isbn || null,
+            title: editingBook.title,
+            author: editingBook.author,
+            publisher: editingBook.publisher || null,
+            publication_year: editingBook.publication_year || null,
+            genre: editingBook.genre || null,
+            total_copies: editingBook.total_copies,
+            description: editingBook.description || null
+          })
+          .eq('id', editingBook.id);
+
+        if (error) throw error;
+      });
+
+      toast({
+        title: "Erfolg",
+        description: "Buch wurde aktualisiert."
+      });
+
+      setShowEditBookDialog(false);
+      setEditingBook(null);
+      loadData();
+    } catch (error) {
+      console.error('Error updating book:', error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Buch konnte nicht aktualisiert werden."
+      });
+    }
+  };
+
+  const handleDeleteBook = async (book: BookType) => {
+    if (!confirm(`Sind Sie sicher, dass Sie "${book.title}" löschen möchten?`)) {
+      return;
+    }
+
+    try {
+      await withSession(async () => {
+        const { error } = await supabase
+          .from('books')
+          .delete()
+          .eq('id', book.id);
+
+        if (error) throw error;
+      });
+
+      toast({
+        title: "Erfolg",
+        description: "Buch wurde gelöscht."
+      });
+
+      loadData();
+    } catch (error) {
+      console.error('Error deleting book:', error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Buch konnte nicht gelöscht werden."
+      });
+    }
+  };
+
+  const handleSearchUser = async () => {
+    if (!scanKeycard.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Bitte Keycard-Nummer eingeben."
+      });
+      return;
+    }
+
+    try {
+      // Find user by keycard
+      const { data: userData, error: userError } = await supabase
+        .from('permissions')
+        .select('id, name, username, keycard_number')
+        .eq('keycard_number', scanKeycard.trim())
+        .maybeSingle();
+
+      if (userError) throw userError;
+      if (!userData) {
+        toast({
+          variant: "destructive",
+          title: "Fehler",
+          description: "Keycard nicht gefunden."
+        });
+        return;
+      }
+
+      setSelectedUser(userData);
+
+      // Load user's active loans
+      const { data: loansData, error: loansError } = await supabase
+        .from('loans')
+        .select(`
+          *,
+          books (*)
+        `)
+        .eq('user_id', userData.id)
+        .eq('is_returned', false);
+
+      if (loansError) throw loansError;
+      setUserLoans(loansData || []);
+    } catch (error) {
+      console.error('Error searching user:', error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Benutzer konnte nicht gefunden werden."
+      });
+    }
+  };
+
+  const handleLoanBookByBarcode = async () => {
+    if (!selectedUser) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Bitte zuerst einen Benutzer suchen."
+      });
+      return;
+    }
+
+    const barcodes = multipleBarcodes.trim() ? 
+      multipleBarcodes.split('\n').map(b => b.trim()).filter(b => b) : 
+      scanBookBarcode.trim() ? [scanBookBarcode.trim()] : [];
+
+    if (barcodes.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Bitte Barcode(s) eingeben."
+      });
+      return;
+    }
+
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const barcode of barcodes) {
+        // Find book by barcode (assuming ISBN or a barcode field exists)
+        const { data: bookData, error: bookError } = await supabase
+          .from('books')
+          .select('*')
+          .eq('isbn', barcode)
+          .maybeSingle();
+
+        if (bookError || !bookData) {
+          console.error(`Book with barcode ${barcode} not found`);
+          errorCount++;
+          continue;
+        }
+
+        if (bookData.available_copies <= 0) {
+          console.error(`Book ${bookData.title} not available`);
+          errorCount++;
+          continue;
+        }
+
+        await withSession(async () => {
+          // Create loan
+          const { error: loanError } = await supabase
+            .from('loans')
+            .insert({
+              book_id: bookData.id,
+              user_id: selectedUser.id,
+              keycard_number: selectedUser.keycard_number,
+              librarian_id: profile!.id
+            });
+
+          if (loanError) throw loanError;
+
+          // Update available copies
+          const { error: updateError } = await supabase
+            .from('books')
+            .update({ available_copies: bookData.available_copies - 1 })
+            .eq('id', bookData.id);
+
+          if (updateError) throw updateError;
+        });
+
+        successCount++;
+      }
+
+      if (successCount > 0) {
+        toast({
+          title: "Erfolg",
+          description: `${successCount} Buch${successCount > 1 ? 'er' : ''} ausgeliehen.`
+        });
+      }
+
+      if (errorCount > 0) {
+        toast({
+          variant: "destructive",
+          title: "Warnung",
+          description: `${errorCount} Buch${errorCount > 1 ? 'er' : ''} konnten nicht ausgeliehen werden.`
+        });
+      }
+
+      setScanBookBarcode('');
+      setMultipleBarcodes('');
+      handleSearchUser(); // Refresh user loans
+      loadData(); // Refresh books
+    } catch (error) {
+      console.error('Error loaning books:', error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Ausleihe konnte nicht erstellt werden."
+      });
+    }
+  };
+
+  const handleReturnBookByBarcode = async () => {
+    if (!selectedUser) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Bitte zuerst einen Benutzer suchen."
+      });
+      return;
+    }
+
+    const barcodes = multipleBarcodes.trim() ? 
+      multipleBarcodes.split('\n').map(b => b.trim()).filter(b => b) : 
+      scanBookBarcode.trim() ? [scanBookBarcode.trim()] : [];
+
+    if (barcodes.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Bitte Barcode(s) eingeben."
+      });
+      return;
+    }
+
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const barcode of barcodes) {
+        // Find active loan by barcode
+        const { data: loanData, error: loanError } = await supabase
+          .from('loans')
+          .select(`
+            *,
+            books (*)
+          `)
+          .eq('user_id', selectedUser.id)
+          .eq('is_returned', false)
+          .eq('books.isbn', barcode)
+          .maybeSingle();
+
+        if (loanError || !loanData) {
+          console.error(`Active loan for barcode ${barcode} not found`);
+          errorCount++;
+          continue;
+        }
+
+        await withSession(async () => {
+          // Mark as returned
+          const { error: returnError } = await supabase
+            .from('loans')
+            .update({
+              is_returned: true,
+              return_date: new Date().toISOString()
+            })
+            .eq('id', loanData.id);
+
+          if (returnError) throw returnError;
+
+          // Update available copies
+          const { error: updateError } = await supabase
+            .from('books')
+            .update({ available_copies: loanData.books.available_copies + 1 })
+            .eq('id', loanData.book_id);
+
+          if (updateError) throw updateError;
+        });
+
+        successCount++;
+      }
+
+      if (successCount > 0) {
+        toast({
+          title: "Erfolg",
+          description: `${successCount} Buch${successCount > 1 ? 'er' : ''} zurückgegeben.`
+        });
+      }
+
+      if (errorCount > 0) {
+        toast({
+          variant: "destructive",
+          title: "Warnung",
+          description: `${errorCount} Buch${errorCount > 1 ? 'er' : ''} konnten nicht zurückgegeben werden.`
+        });
+      }
+
+      setScanBookBarcode('');
+      setMultipleBarcodes('');
+      handleSearchUser(); // Refresh user loans
+      loadData(); // Refresh books
+    } catch (error) {
+      console.error('Error returning books:', error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Rückgabe konnte nicht verarbeitet werden."
       });
     }
   };
@@ -420,10 +759,18 @@ const Bibliothek = () => {
               <BookOpen className="h-4 w-4 mr-2" />
               Bücher
             </TabsTrigger>
-            <TabsTrigger value="my-loans">
-              <Clock className="h-4 w-4 mr-2" />
-              Meine Ausleihen ({myLoans.length})
-            </TabsTrigger>
+            {!canManageBooks && (
+              <TabsTrigger value="my-loans">
+                <Clock className="h-4 w-4 mr-2" />
+                Meine Ausleihen ({myLoans.length})
+              </TabsTrigger>
+            )}
+            {canManageLoans && (
+              <TabsTrigger value="loan-management">
+                <UserSearch className="h-4 w-4 mr-2" />
+                Ausleihen verwalten
+              </TabsTrigger>
+            )}
             {canManageLoans && (
               <TabsTrigger value="all-loans">
                 <Users className="h-4 w-4 mr-2" />
@@ -481,18 +828,44 @@ const Bibliothek = () => {
                       </p>
                     )}
 
-                    {canManageLoans && book.available_copies > 0 && (
-                      <Button
-                        size="sm"
-                        className="w-full"
-                        onClick={() => {
-                          setSelectedBook(book);
-                          setShowLoanDialog(true);
-                        }}
-                      >
-                        <ScanLine className="h-4 w-4 mr-2" />
-                        Ausleihen
-                      </Button>
+                    {canManageBooks ? (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => {
+                            setEditingBook(book);
+                            setShowEditBookDialog(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Bearbeiten
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="flex-1"
+                          onClick={() => handleDeleteBook(book)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Löschen
+                        </Button>
+                      </div>
+                    ) : (
+                      canManageLoans && book.available_copies > 0 && (
+                        <Button
+                          size="sm"
+                          className="w-full"
+                          onClick={() => {
+                            setSelectedBook(book);
+                            setShowLoanDialog(true);
+                          }}
+                        >
+                          <ScanLine className="h-4 w-4 mr-2" />
+                          Ausleihen
+                        </Button>
+                      )
                     )}
                   </CardContent>
                 </Card>
@@ -500,46 +873,174 @@ const Bibliothek = () => {
             </div>
           </TabsContent>
 
-          {/* My Loans Tab */}
-          <TabsContent value="my-loans" className="space-y-4">
-            {myLoans.length === 0 ? (
+          {/* My Loans Tab - Only for non-librarians */}
+          {!canManageBooks && (
+            <TabsContent value="my-loans" className="space-y-4">
+              {myLoans.length === 0 ? (
+                <Card>
+                  <CardContent className="text-center py-8">
+                    <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-lg font-medium">Keine Ausleihen</p>
+                    <p className="text-muted-foreground">Sie haben derzeit keine Bücher ausgeliehen.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4">
+                  {myLoans.map((loan) => (
+                    <Card key={loan.id}>
+                      <CardContent className="p-6">
+                        <div className="flex justify-between items-start">
+                          <div className="space-y-2">
+                            <h3 className="font-semibold text-lg">{loan.books.title}</h3>
+                            <p className="text-muted-foreground">{loan.books.author}</p>
+                            <div className="flex items-center gap-4 text-sm">
+                              <div className="flex items-center gap-1">
+                                <CalendarDays className="h-4 w-4" />
+                                Ausgeliehen: {format(new Date(loan.loan_date), 'dd.MM.yyyy', { locale: de })}
+                              </div>
+                              <div className={`flex items-center gap-1 ${isOverdue(loan.due_date) ? 'text-red-600' : 'text-green-600'}`}>
+                                {isOverdue(loan.due_date) ? <AlertCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                                Rückgabe bis: {format(new Date(loan.due_date), 'dd.MM.yyyy', { locale: de })}
+                              </div>
+                            </div>
+                            {isOverdue(loan.due_date) && (
+                              <Badge variant="destructive">Überfällig</Badge>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          )}
+
+          {/* Loan Management Tab - Only for librarians */}
+          {canManageLoans && (
+            <TabsContent value="loan-management" className="space-y-6">
               <Card>
-                <CardContent className="text-center py-8">
-                  <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-lg font-medium">Keine Ausleihen</p>
-                  <p className="text-muted-foreground">Sie haben derzeit keine Bücher ausgeliehen.</p>
+                <CardHeader>
+                  <CardTitle>Benutzer suchen</CardTitle>
+                  <CardDescription>Scannen Sie die Keycard eines Schülers</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <ScanLine className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        value={scanKeycard}
+                        onChange={(e) => setScanKeycard(e.target.value)}
+                        placeholder="Keycard scannen..."
+                        className="pl-10"
+                      />
+                    </div>
+                    <Button onClick={handleSearchUser}>
+                      <UserSearch className="h-4 w-4 mr-2" />
+                      Suchen
+                    </Button>
+                  </div>
+                  
+                  {selectedUser && (
+                    <div className="p-4 border rounded-lg bg-muted/50">
+                      <h3 className="font-semibold">{selectedUser.name}</h3>
+                      <p className="text-sm text-muted-foreground">Keycard: {selectedUser.keycard_number}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Aktuelle Ausleihen: {userLoans.length}
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
-            ) : (
-              <div className="grid gap-4">
-                {myLoans.map((loan) => (
-                  <Card key={loan.id}>
-                    <CardContent className="p-6">
-                      <div className="flex justify-between items-start">
+
+              {selectedUser && (
+                <>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Bücher ausleihen/zurückgeben</CardTitle>
+                      <CardDescription>Scannen Sie Barcodes einzeln oder mehrere auf einmal</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <h3 className="font-semibold text-lg">{loan.books.title}</h3>
-                          <p className="text-muted-foreground">{loan.books.author}</p>
-                          <div className="flex items-center gap-4 text-sm">
-                            <div className="flex items-center gap-1">
-                              <CalendarDays className="h-4 w-4" />
-                              Ausgeliehen: {format(new Date(loan.loan_date), 'dd.MM.yyyy', { locale: de })}
-                            </div>
-                            <div className={`flex items-center gap-1 ${isOverdue(loan.due_date) ? 'text-red-600' : 'text-green-600'}`}>
-                              {isOverdue(loan.due_date) ? <AlertCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
-                              Rückgabe bis: {format(new Date(loan.due_date), 'dd.MM.yyyy', { locale: de })}
-                            </div>
-                          </div>
-                          {isOverdue(loan.due_date) && (
-                            <Badge variant="destructive">Überfällig</Badge>
-                          )}
+                          <Label>Einzelner Barcode</Label>
+                          <Input
+                            value={scanBookBarcode}
+                            onChange={(e) => setScanBookBarcode(e.target.value)}
+                            placeholder="Barcode scannen..."
+                          />
                         </div>
+                        <div className="space-y-2">
+                          <Label>Mehrere Barcodes (einen pro Zeile)</Label>
+                          <Textarea
+                            value={multipleBarcodes}
+                            onChange={(e) => setMultipleBarcodes(e.target.value)}
+                            placeholder="Barcode 1&#10;Barcode 2&#10;Barcode 3..."
+                            rows={3}
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button 
+                          onClick={handleLoanBookByBarcode}
+                          disabled={!scanBookBarcode.trim() && !multipleBarcodes.trim()}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Ausleihen
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          onClick={handleReturnBookByBarcode}
+                          disabled={!scanBookBarcode.trim() && !multipleBarcodes.trim()}
+                        >
+                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          Zurückgeben
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Aktuelle Ausleihen von {selectedUser.name}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {userLoans.length === 0 ? (
+                        <p className="text-muted-foreground">Keine aktiven Ausleihen</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {userLoans.map((loan) => (
+                            <div key={loan.id} className="flex justify-between items-center p-3 border rounded">
+                              <div>
+                                <h4 className="font-medium">{loan.books.title}</h4>
+                                <p className="text-sm text-muted-foreground">{loan.books.author}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Rückgabe bis: {format(new Date(loan.due_date), 'dd.MM.yyyy', { locale: de })}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {isOverdue(loan.due_date) && (
+                                  <Badge variant="destructive">Überfällig</Badge>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleReturnBook(loan)}
+                                >
+                                  Zurückgeben
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </TabsContent>
+          )}
 
           {/* All Loans Tab (Librarians only) */}
           {canManageLoans && (
@@ -716,6 +1217,85 @@ const Bibliothek = () => {
                 disabled={!scanKeycard.trim()}
               >
                 Ausleihen
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Book Dialog */}
+        <Dialog open={showEditBookDialog} onOpenChange={setShowEditBookDialog}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Buch bearbeiten</DialogTitle>
+              <DialogDescription>
+                Bearbeiten Sie die Buchinformationen.
+              </DialogDescription>
+            </DialogHeader>
+            {editingBook && (
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-isbn">ISBN (optional)</Label>
+                  <Input
+                    id="edit-isbn"
+                    value={editingBook.isbn || ''}
+                    onChange={(e) => setEditingBook({ ...editingBook, isbn: e.target.value })}
+                    placeholder="978-3-..."
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-title">Titel *</Label>
+                  <Input
+                    id="edit-title"
+                    value={editingBook.title}
+                    onChange={(e) => setEditingBook({ ...editingBook, title: e.target.value })}
+                    placeholder="Buchtitel"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-author">Autor *</Label>
+                  <Input
+                    id="edit-author"
+                    value={editingBook.author}
+                    onChange={(e) => setEditingBook({ ...editingBook, author: e.target.value })}
+                    placeholder="Autorname"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-genre">Genre</Label>
+                  <Input
+                    id="edit-genre"
+                    value={editingBook.genre || ''}
+                    onChange={(e) => setEditingBook({ ...editingBook, genre: e.target.value })}
+                    placeholder="z.B. Roman, Sachbuch"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-copies">Anzahl Exemplare</Label>
+                  <Input
+                    id="edit-copies"
+                    type="number"
+                    min="1"
+                    value={editingBook.total_copies}
+                    onChange={(e) => setEditingBook({ ...editingBook, total_copies: parseInt(e.target.value) || 1 })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-description">Beschreibung</Label>
+                  <Textarea
+                    id="edit-description"
+                    value={editingBook.description || ''}
+                    onChange={(e) => setEditingBook({ ...editingBook, description: e.target.value })}
+                    placeholder="Kurzbeschreibung des Buchs"
+                  />
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowEditBookDialog(false)}>
+                Abbrechen
+              </Button>
+              <Button type="button" onClick={handleEditBook}>
+                Speichern
               </Button>
             </DialogFooter>
           </DialogContent>
