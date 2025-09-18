@@ -265,7 +265,7 @@ const Dashboard = () => {
           )}
 
           {/* Librarian Features */}
-          {getFilteredFeatures(librarianFeatures).length > 0 && (
+          {getFilteredFeatures(librarianFeatures).length > 0 && profile?.permission_lvl === 6 && (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-foreground">
                 Bibliothek-Funktionen
