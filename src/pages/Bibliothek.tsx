@@ -399,7 +399,7 @@ const Bibliothek = () => {
         </div>
 
         <Tabs defaultValue="books" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className={`grid w-full ${canManageLoans ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <TabsTrigger value="books">
               <BookOpen className="h-4 w-4 mr-2" />
               Bücher
@@ -412,12 +412,6 @@ const Bibliothek = () => {
               <TabsTrigger value="all-loans">
                 <Users className="h-4 w-4 mr-2" />
                 Alle Ausleihen
-              </TabsTrigger>
-            )}
-            {canViewAllUsers && (
-              <TabsTrigger value="users">
-                <Users className="h-4 w-4 mr-2" />
-                Benutzer
               </TabsTrigger>
             )}
           </TabsList>
