@@ -111,7 +111,8 @@ const Dashboard = () => {
     { ...studentFeatures[0], permission: 'view_schedule' },
     { ...studentFeatures[1], permission: 'view_vertretungsplan' },
     { ...studentFeatures[2], permission: 'view_announcements' },
-    { ...studentFeatures[3], permission: 'theme_settings' }
+    { ...studentFeatures[3], permission: 'library_view' },
+    { ...studentFeatures[4], permission: 'theme_settings' }
   ];
 
   const renderFeatureCards = (features: any[]) => {

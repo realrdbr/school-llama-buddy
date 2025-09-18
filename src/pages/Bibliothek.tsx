@@ -65,7 +65,7 @@ interface LoanType {
 const Bibliothek = () => {
   const navigate = useNavigate();
   const { profile, loading } = useAuth();
-  const { hasPermission } = useEnhancedPermissions();
+  const { hasPermission, isLoaded } = useEnhancedPermissions();
   const { withSession } = useSessionRequest();
   const { toast } = useToast();
 
@@ -100,13 +100,15 @@ const Bibliothek = () => {
       return;
     }
 
+    if (!isLoaded) return; // wait for permissions to load
+
     if (profile && !hasPermission('library_view')) {
       navigate('/');
       return;
     }
 
     loadData();
-  }, [profile, loading, hasPermission, navigate]);
+  }, [profile, loading, isLoaded, hasPermission, navigate]);
 
   const loadData = async () => {
     if (!profile) return;
