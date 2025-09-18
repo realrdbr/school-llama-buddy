@@ -167,7 +167,7 @@ const Dashboard = () => {
                   <div className="flex items-center justify-center gap-3 mb-2">
                     <p className="font-medium text-foreground text-sm">{profile?.name || user?.email}</p>
                     <Badge variant={getPermissionBadgeVariant(profile?.permission_lvl || 1)} className="text-xs">
-                      {profile?.permission_lvl >= 10 ? "Schulleitung" : profile?.permission_lvl >= 8 ? "Verwaltung" : profile?.permission_lvl >= 5 ? "Lehrkraft" : profile?.permission_lvl > 1 ? "Schüler" : "Besucher"}
+                      {profile?.permission_lvl >= 10 ? "Schulleitung" : profile?.permission_lvl >= 8 ? "Verwaltung" : profile?.permission_lvl === 6 ? "Bibliothekarin" : profile?.permission_lvl >= 5 ? "Lehrkraft" : profile?.permission_lvl > 1 ? "Schüler" : "Besucher"}
                     </Badge>
                   </div>
                   {hasPermission('user_management') && (
@@ -184,7 +184,7 @@ const Dashboard = () => {
                 </div>
                 <div className="hidden sm:flex items-center gap-2 flex-wrap">
                   <Badge variant={getPermissionBadgeVariant(profile?.permission_lvl || 1)} className="text-xs">
-                    {profile?.permission_lvl >= 10 ? "Schulleitung" : profile?.permission_lvl >= 8 ? "Verwaltung" : profile?.permission_lvl >= 5 ? "Lehrkraft" : profile?.permission_lvl > 1 ? "Schüler" : "Besucher"}
+                    {profile?.permission_lvl >= 10 ? "Schulleitung" : profile?.permission_lvl >= 8 ? "Verwaltung" : profile?.permission_lvl === 6 ? "Bibliothekarin" : profile?.permission_lvl >= 5 ? "Lehrkraft" : profile?.permission_lvl > 1 ? "Schüler" : "Besucher"}
                   </Badge>
                 </div>
               </div>
@@ -217,6 +217,8 @@ const Dashboard = () => {
                   ? "Als Schulleitung haben Sie Zugriff auf alle Systemfunktionen."
                   : profile?.permission_lvl && profile.permission_lvl >= 8
                   ? "Als Verwaltung/Administrator haben Sie Zugriff auf erweiterte Systemfunktionen."
+                  : profile?.permission_lvl === 6
+                  ? "Als Bibliothekarin können Sie die Bibliothek und Bücher verwalten."
                   : profile?.permission_lvl && profile.permission_lvl >= 5
                   ? "Als Lehrkraft können Sie Stundenpläne und Ankündigungen verwalten."
                   : profile?.permission_lvl && profile.permission_lvl > 1
