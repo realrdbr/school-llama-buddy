@@ -19,12 +19,14 @@ import {
   FileText,
   Shield,
   Palette,
-  Library
+  Library,
+  MessageCircle
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import CreateUserModal from './CreateUserModal';
 import AIAssistant from './AIAssistant';
 import MobileNavigation from './MobileNavigation';
+import { MessageNotificationWidget } from './MessageNotificationWidget';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -74,6 +76,7 @@ const Dashboard = () => {
     { icon: Calendar, title: "Vertretungsplan", description: "Aktuelle Vertretungen einsehen", path: "/vertretungsplan" },
     { icon: Megaphone, title: "Ankündigungen", description: "Aktuelle Schulnachrichten", path: "/announcements" },
     { icon: Library, title: "Bibliothek", description: "Bücher ausleihen und verwalten", path: "/bibliothek" },
+    { icon: MessageCircle, title: "Private Nachrichten", description: "Mit anderen Mitgliedern chatten", path: "/private-messages" },
     { icon: Palette, title: "Design & Farben", description: "Farbschema der App anpassen", path: "/theme-settings" }
   ];
 
@@ -243,6 +246,9 @@ const Dashboard = () => {
           
           {/* AI Assistant */}
           <AIAssistant />
+          
+          {/* Message Notifications */}
+          <MessageNotificationWidget />
           
           {/* Admin Features */}
           {getFilteredFeatures(adminFeaturesWithPermissions).length > 0 && (
