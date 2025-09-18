@@ -901,6 +901,10 @@ export type Database = {
         Args: { resource_user_id: number }
         Returns: boolean
       }
+      delete_book_session: {
+        Args: { b_id: string; v_session_id?: string }
+        Returns: Json
+      }
       delete_user_theme_secure: {
         Args: {
           password_input: string

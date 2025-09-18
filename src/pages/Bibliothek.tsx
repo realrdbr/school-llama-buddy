@@ -67,7 +67,7 @@ interface LoanType {
 
 const Bibliothek = () => {
   const navigate = useNavigate();
-  const { profile, loading } = useAuth();
+  const { profile, loading, sessionId } = useAuth();
   const { hasPermission, isLoaded, reloadPermissions } = useEnhancedPermissions();
   const { withSession } = useSessionRequest();
   const { toast } = useToast();
@@ -299,14 +299,15 @@ const Bibliothek = () => {
     }
 
     try {
-      await withSession(async () => {
-        const { error } = await supabase
-          .from('books')
-          .delete()
-          .eq('id', book.id);
-
-        if (error) throw error;
+      const { data, error } = await supabase.rpc('delete_book_session', {
+        b_id: book.id,
+        v_session_id: sessionId || ''
       });
+
+      if (error || (data && (data as any).success === false)) {
+        throw new Error((data as any)?.error || error?.message || 'Löschen fehlgeschlagen');
+      }
+
 
       toast({
         title: "Erfolg",
