@@ -65,7 +65,7 @@ interface LoanType {
 const Bibliothek = () => {
   const navigate = useNavigate();
   const { profile, loading } = useAuth();
-  const { hasPermission, isLoaded } = useEnhancedPermissions();
+  const { hasPermission, isLoaded, reloadPermissions } = useEnhancedPermissions();
   const { withSession } = useSessionRequest();
   const { toast } = useToast();
 
@@ -94,6 +94,14 @@ const Bibliothek = () => {
   const canManageLoans = hasPermission('library_manage_loans');
   const canViewAllUsers = hasPermission('library_view_all_users');
 
+  console.log('Permissions:', { 
+    canManageBooks, 
+    canManageLoans, 
+    canViewAllUsers,
+    permissionLevel: profile?.permission_lvl,
+    isLoaded 
+  });
+
   useEffect(() => {
     if (!loading && !profile) {
       navigate('/auth');
@@ -109,6 +117,14 @@ const Bibliothek = () => {
 
     loadData();
   }, [profile, loading, isLoaded, hasPermission, navigate]);
+
+  // Force permission reload when component mounts
+  useEffect(() => {
+    if (profile?.id) {
+      console.log('Reloading permissions for user:', profile.id, profile.permission_lvl);
+      reloadPermissions();
+    }
+  }, [profile?.id, reloadPermissions]);
 
   const loadData = async () => {
     if (!profile) return;
