@@ -244,8 +244,8 @@ const Dashboard = () => {
             </div>
           )}
 
-          {/* Teacher Features */}
-          {getFilteredFeatures(teacherFeaturesWithPermissions).length > 0 && (
+          {/* Teacher Features - Not shown for librarians (Level 6) */}
+          {getFilteredFeatures(teacherFeaturesWithPermissions).length > 0 && profile?.permission_lvl !== 6 && (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-foreground">
                 {profile?.permission_lvl && profile.permission_lvl >= 8 ? "Lehrkraft-Funktionen" : "Ihre Funktionen"}
