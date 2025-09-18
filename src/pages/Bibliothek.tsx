@@ -448,27 +448,35 @@ const Bibliothek = () => {
           continue;
         }
 
-        await withSession(async () => {
-          // Create loan
-          const { error: loanError } = await supabase
-            .from('loans')
-            .insert({
+        try {
+          console.log('Creating loan with session:', sessionId, 'for user:', selectedUser.id, 'book:', bookData.id, 'librarian:', profile!.id);
+          
+          // Try Edge Function approach first
+          const { data: loanResult, error: loanFunctionError } = await supabase.functions.invoke('loan-book', {
+            body: {
               book_id: bookData.id,
               user_id: selectedUser.id,
               keycard_number: selectedUser.keycard_number,
-              librarian_id: profile!.id
-            });
+              librarian_id: profile!.id,
+              actorUserId: profile?.id,
+              actorUsername: profile?.username
+            }
+          });
 
-          if (loanError) throw loanError;
+          console.log('Loan function result:', { loanResult, loanFunctionError });
 
-          // Update available copies
-          const { error: updateError } = await supabase
-            .from('books')
-            .update({ available_copies: bookData.available_copies - 1 })
-            .eq('id', bookData.id);
-
-          if (updateError) throw updateError;
-        });
+          if (loanFunctionError) {
+            throw new Error(`Edge Function Error: ${loanFunctionError.message}`);
+          }
+          
+          if (!loanResult?.success) {
+            throw new Error(loanResult?.error || 'Ausleihe fehlgeschlagen');
+          }
+        } catch (sessionError) {
+          console.error('Loan operation failed:', sessionError);
+          errorCount++;
+          continue;
+        }
 
         successCount++;
       }

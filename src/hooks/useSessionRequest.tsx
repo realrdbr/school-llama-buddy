@@ -12,10 +12,14 @@ export const useSessionRequest = () => {
       throw new Error('No active session');
     }
 
+    console.log('Setting session context:', sessionId);
+    
     // Set session context for the database to use in RLS policies
-    await supabase.rpc('set_session_context', {
+    const { data: contextResult, error: contextError } = await supabase.rpc('set_session_context', {
       session_id_param: sessionId
     });
+    
+    console.log('Session context result:', { contextResult, contextError });
 
     try {
       return await operation();
