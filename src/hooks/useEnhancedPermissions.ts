@@ -21,9 +21,26 @@ export interface LevelPermissions {
   };
 }
 
+const permissions: Permission[] = [
+  { id: 'view_chat', name: 'KI-Chat verwenden', description: 'Zugriff auf den KI-Assistenten', requiresLevel: 1 },
+  { id: 'view_schedule', name: 'Stundenplan einsehen', description: 'Eigenen Stundenplan anzeigen', requiresLevel: 1 },
+  { id: 'view_announcements', name: 'Ankündigungen lesen', description: 'Schulankündigungen einsehen', requiresLevel: 1 },
+  { id: 'view_vertretungsplan', name: 'Vertretungsplan einsehen', description: 'Vertretungen anzeigen', requiresLevel: 1 },
+  { id: 'theme_settings', name: 'Theme-Einstellungen', description: 'Farben & Design anpassen', requiresLevel: 1 },
+  { id: 'create_announcements', name: 'Ankündigungen erstellen', description: 'Neue Ankündigungen verfassen', requiresLevel: 4 },
+  { id: 'edit_announcements', name: 'Ankündigungen bearbeiten', description: 'Bestehende Ankündigungen ändern', requiresLevel: 4 },
+  { id: 'manage_substitutions', name: 'Vertretungen verwalten', description: 'Vertretungsplan bearbeiten', requiresLevel: 9 },
+  { id: 'manage_schedules', name: 'Stundenpläne verwalten', description: 'Stundenpläne erstellen/bearbeiten', requiresLevel: 9 },
+  { id: 'document_analysis', name: 'Dokumenten-Analyse', description: 'KI-Dokumentenanalyse verwenden', requiresLevel: 4 },
+  { id: 'audio_announcements', name: 'Audio-Durchsagen', description: 'TTS-Durchsagen erstellen/verwalten', requiresLevel: 10 },
+  { id: 'user_management', name: 'Benutzerverwaltung', description: 'Benutzer erstellen/bearbeiten/löschen', requiresLevel: 10 },
+  { id: 'permission_management', name: 'Berechtigungen verwalten', description: 'Benutzerberechtigungen ändern', requiresLevel: 10 },
+  { id: 'keycard_system', name: 'Keycard-System', description: 'Zugangskontrolle konfigurieren', requiresLevel: 10 },
+  { id: 'system_settings', name: 'Systemeinstellungen', description: 'Arduino-Geräte und System verwalten', requiresLevel: 10 }
+];
+
 export const useEnhancedPermissions = () => {
   const { profile } = useAuth();
-  const [permissions, setPermissions] = useState<Permission[]>([]);
   const [userPermissions, setUserPermissions] = useState<UserPermissions>({});
   const [levelPermissions, setLevelPermissions] = useState<LevelPermissions>({});
   const [isLoaded, setIsLoaded] = useState(false);
@@ -36,24 +53,6 @@ export const useEnhancedPermissions = () => {
     }
 
     try {
-      // Load permission definitions first
-      const { data: permDefs, error: permDefError } = await supabase
-        .from('permission_definitions')
-        .select('*')
-        .order('name');
-
-      if (permDefError) console.error('Error loading permission definitions:', permDefError);
-
-      // Convert to Permission format
-      const loadedPermissions: Permission[] = (permDefs || []).map(def => ({
-        id: def.id,
-        name: def.name,
-        description: def.description || '',
-        requiresLevel: def.requires_level
-      }));
-
-      setPermissions(loadedPermissions);
-
       // Load user-specific permissions
       const { data: userPerms, error: userError } = await supabase
         .from('user_permissions')
