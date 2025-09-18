@@ -448,6 +448,7 @@ const Bibliothek = () => {
       });
     }
   };
+  const handleSearchUser = async () => {
     if (!scanKeycard.trim()) {
       toast({
         variant: "destructive",
