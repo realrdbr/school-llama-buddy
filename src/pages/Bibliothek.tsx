@@ -615,6 +615,7 @@ const Bibliothek = () => {
 
       setScanBookBarcode('');
       setMultipleBarcodes('');
+      setScanKeycard(''); // Clear keycard field for next user
       handleSearchUser(); // Refresh user loans
       loadData(); // Refresh books
     } catch (error) {
@@ -714,6 +715,7 @@ const Bibliothek = () => {
 
       setScanBookBarcode('');
       setMultipleBarcodes('');
+      setScanKeycard(''); // Clear keycard field for next user
       handleSearchUser(); // Refresh user loans
       loadData(); // Refresh books
       setActiveTab('loans'); // Stay on loans tab after return
@@ -835,6 +837,7 @@ const Bibliothek = () => {
 
       handleSearchUser(); // Refresh user loans
       loadData(); // Refresh books
+      setScanKeycard(''); // Clear keycard field for next user
       setActiveTab('loans'); // Stay on loans tab after return
     } catch (error) {
       console.error('Error returning book:', error);
