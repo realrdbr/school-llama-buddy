@@ -99,6 +99,7 @@ const Bibliothek = () => {
   const [showLoanDialog, setShowLoanDialog] = useState(false);
   const [showEditBookDialog, setShowEditBookDialog] = useState(false);
   const [editingBook, setEditingBook] = useState<BookType | null>(null);
+  const [activeTab, setActiveTab] = useState('loans'); // Default to loans management
 
   const canManageBooks = hasPermission('library_manage_books');
   const canManageLoans = hasPermission('library_manage_loans');
@@ -439,6 +440,7 @@ const Bibliothek = () => {
       setScannedBooks([]);
       handleSearchUser(); // Refresh user loans
       loadData(); // Refresh books
+      setActiveTab('loans'); // Stay on loans tab after operation
     } catch (error) {
       console.error('Error loaning books:', error);
       toast({
@@ -448,6 +450,46 @@ const Bibliothek = () => {
       });
     }
   };
+  const handleReturnBook = async (loan: LoanType) => {
+    if (!selectedUser) return;
+
+    try {
+      // Mark as returned
+      const { error: returnError } = await supabase
+        .from('loans')
+        .update({ is_returned: true, return_date: new Date().toISOString() })
+        .eq('id', loan.id);
+
+      if (returnError) throw returnError;
+
+      // Update available copies
+      const { error: updateError } = await supabase
+        .from('books')
+        .update({ available_copies: loan.books.available_copies + 1 })
+        .eq('id', loan.book_id);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Erfolg",
+        description: `"${loan.books.title}" wurde zurückgegeben.`
+      });
+
+      handleSearchUser(); // Refresh user loans
+      loadData(); // Refresh books
+      setActiveTab('loans'); // Stay on loans tab after operation
+      setActiveTab('loans'); // Stay on loans tab after operation
+      setActiveTab('loans'); // Stay on loans tab
+    } catch (error) {
+      console.error('Error returning book:', error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Buch konnte nicht zurückgegeben werden."
+      });
+    }
+  };
+
   const handleSearchUser = async () => {
     if (!scanKeycard.trim()) {
       toast({
@@ -841,7 +883,9 @@ const Bibliothek = () => {
         description: "Buch wurde zurückgegeben."
       });
 
-      loadData();
+      handleSearchUser(); // Refresh user loans
+      loadData(); // Refresh books
+      setActiveTab('loans'); // Stay on loans tab after return
     } catch (error) {
       console.error('Error returning book:', error);
       toast({
@@ -912,7 +956,7 @@ const Bibliothek = () => {
           )}
         </div>
 
-        <Tabs defaultValue="books" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className={`grid w-full ${canManageLoans ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <TabsTrigger value="books">
               <BookOpen className="h-4 w-4 mr-2" />
