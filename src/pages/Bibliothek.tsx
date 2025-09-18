@@ -1111,39 +1111,10 @@ const Bibliothek = () => {
                 </Card>
               </div>
 
-              {/* Main Layout: Scanner left, Preview right */}
+              {/* Main Layout: User Selection left, Preview right */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Left Column - Book Scanner */}
+                {/* Left Column - User Selection and Book Scanner */}
                 <div className="space-y-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Buchscanner</CardTitle>
-                      <CardDescription>Scannen Sie Bücher und fügen Sie sie zur Vorschau hinzu</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex gap-2">
-                        <div className="relative flex-1">
-                          <ScanLine className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            value={scanBookBarcode}
-                            onChange={(e) => setScanBookBarcode(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                handleAddScannedBook();
-                              }
-                            }}
-                            placeholder="Buch-Barcode scannen..."
-                            className="pl-10"
-                          />
-                        </div>
-                        <Button onClick={handleAddScannedBook} disabled={!scanBookBarcode.trim()}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Hinzufügen
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-
                   {/* User Selection */}
                   <Card>
                     <CardHeader>
@@ -1181,6 +1152,35 @@ const Bibliothek = () => {
                           </p>
                         </div>
                       )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Buchscanner</CardTitle>
+                      <CardDescription>Scannen Sie Bücher und fügen Sie sie zur Vorschau hinzu</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <ScanLine className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            value={scanBookBarcode}
+                            onChange={(e) => setScanBookBarcode(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleAddScannedBook();
+                              }
+                            }}
+                            placeholder="Buch-Barcode scannen..."
+                            className="pl-10"
+                          />
+                        </div>
+                        <Button onClick={handleAddScannedBook} disabled={!scanBookBarcode.trim()}>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Hinzufügen
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
 

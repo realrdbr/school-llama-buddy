@@ -73,6 +73,7 @@ const Dashboard = () => {
     { icon: Clock, title: "Stundenplan", description: "Aktueller Stundenplan und Vertretungen", path: "/stundenplan" },
     { icon: Calendar, title: "Vertretungsplan", description: "Aktuelle Vertretungen einsehen", path: "/vertretungsplan" },
     { icon: Megaphone, title: "Ankündigungen", description: "Aktuelle Schulnachrichten", path: "/announcements" },
+    { icon: Library, title: "Bibliothek", description: "Bücher ausleihen und verwalten", path: "/bibliothek" },
     { icon: Palette, title: "Design & Farben", description: "Farbschema der App anpassen", path: "/theme-settings" }
   ];
 
@@ -110,7 +111,8 @@ const Dashboard = () => {
     { ...studentFeatures[0], permission: 'view_schedule' },
     { ...studentFeatures[1], permission: 'view_vertretungsplan' },
     { ...studentFeatures[2], permission: 'view_announcements' },
-    { ...studentFeatures[3], permission: 'theme_settings' }
+    { ...studentFeatures[3], permission: 'library_view' },
+    { ...studentFeatures[4], permission: 'theme_settings' }
   ];
 
   const renderFeatureCards = (features: any[]) => {
@@ -272,11 +274,11 @@ const Dashboard = () => {
             </div>
           )}
 
-          {/* Student/Visitor Features - Not shown for librarians (Level 6) */}
-          {getFilteredFeatures(studentFeaturesWithPermissions).length > 0 && profile?.permission_lvl !== 6 && (
+          {/* Student/Visitor Features - Show for students and visitors, but not for teachers/admins/librarians */}
+          {getFilteredFeatures(studentFeaturesWithPermissions).length > 0 && profile?.permission_lvl !== 6 && (profile?.permission_lvl || 1) <= 4 && (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-foreground">
-                {profile?.permission_lvl && profile.permission_lvl >= 5 ? "Schüler-Funktionen" : profile?.permission_lvl && profile.permission_lvl > 1 ? "Ihre Funktionen" : "Verfügbare Funktionen"}
+                {profile?.permission_lvl && profile.permission_lvl > 1 ? "Ihre Funktionen" : "Verfügbare Funktionen"}
               </h2>
               {renderFeatureCards(studentFeaturesWithPermissions)}
             </div>
