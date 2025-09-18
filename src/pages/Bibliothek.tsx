@@ -494,6 +494,21 @@ const Bibliothek = () => {
       setSelectedUser(data.user);
 
       // Load user's active loans
+      const { data: loansData, error: loansError } = await supabase
+        .from('loans')
+        .select(`
+          *,
+          books (*)
+        `)
+        .eq('user_id', data.user.id)
+        .eq('is_returned', false);
+
+      if (loansError) throw loansError;
+      setUserLoans(loansData || []);
+
+      setSelectedUser(data.user);
+
+      // Load user's active loans
       const { data: userLoansData, error: userLoansError } = await supabase
         .from('loans')
         .select(`
@@ -505,8 +520,6 @@ const Bibliothek = () => {
 
       if (userLoansError) throw userLoansError;
       setUserLoans(userLoansData || []);
-      
-      // Don't clear keycard here - keep it for multiple actions
     } catch (error) {
       console.error('Error searching user:', error);
       toast({
@@ -614,7 +627,6 @@ const Bibliothek = () => {
 
       setScanBookBarcode('');
       setMultipleBarcodes('');
-      // Don't clear keycard - keep user selected for multiple actions
       handleSearchUser(); // Refresh user loans
       loadData(); // Refresh books
     } catch (error) {
@@ -714,7 +726,6 @@ const Bibliothek = () => {
 
       setScanBookBarcode('');
       setMultipleBarcodes('');
-      // Don't clear keycard - keep user selected for multiple actions
       handleSearchUser(); // Refresh user loans
       loadData(); // Refresh books
       setActiveTab('loans'); // Stay on loans tab after return
@@ -836,7 +847,6 @@ const Bibliothek = () => {
 
       handleSearchUser(); // Refresh user loans
       loadData(); // Refresh books
-      // Don't clear keycard - keep user selected for multiple actions
       setActiveTab('loans'); // Stay on loans tab after return
     } catch (error) {
       console.error('Error returning book:', error);
@@ -1094,18 +1104,6 @@ const Bibliothek = () => {
                       <UserSearch className="h-4 w-4 mr-2" />
                       Suchen
                     </Button>
-                    {selectedUser && (
-                      <Button 
-                        variant="outline" 
-                        onClick={() => {
-                          setScanKeycard('');
-                          setSelectedUser(null);
-                          setUserLoans([]);
-                        }}
-                      >
-                        Neuer Benutzer
-                      </Button>
-                    )}
                   </div>
                   
                   {selectedUser && (
