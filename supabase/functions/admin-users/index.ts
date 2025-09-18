@@ -261,13 +261,18 @@ serve(async (req) => {
       
       const searchResult = await supabase
         .from('permissions')
-        .select('id, name, username, keycard_number')
+        .select('id, name, username, keycard_number, keycard_active')
         .eq('keycard_number', payload.keycard_number)
+        .eq('keycard_active', true)
         .maybeSingle();
       
       if (searchResult.error) {
         console.error('Search error:', searchResult.error);
         return deny(500, `Fehler bei der Suche: ${searchResult.error.message}`);
+      }
+      
+      if (!searchResult.data) {
+        return deny(404, 'Keycard nicht gefunden oder deaktiviert');
       }
       
       return new Response(JSON.stringify({ 
