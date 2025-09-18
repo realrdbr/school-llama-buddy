@@ -494,21 +494,6 @@ const Bibliothek = () => {
       setSelectedUser(data.user);
 
       // Load user's active loans
-      const { data: loansData, error: loansError } = await supabase
-        .from('loans')
-        .select(`
-          *,
-          books (*)
-        `)
-        .eq('user_id', data.user.id)
-        .eq('is_returned', false);
-
-      if (loansError) throw loansError;
-      setUserLoans(loansData || []);
-
-      setSelectedUser(data.user);
-
-      // Load user's active loans
       const { data: userLoansData, error: userLoansError } = await supabase
         .from('loans')
         .select(`
@@ -520,6 +505,9 @@ const Bibliothek = () => {
 
       if (userLoansError) throw userLoansError;
       setUserLoans(userLoansData || []);
+      
+      // Clear keycard field for next scan
+      setScanKeycard('');
     } catch (error) {
       console.error('Error searching user:', error);
       toast({
