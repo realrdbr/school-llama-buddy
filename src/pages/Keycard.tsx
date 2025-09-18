@@ -80,6 +80,15 @@ const Keycard = () => {
     return 'Besucher - Gänge';
   };
 
+  const getPermissionLevel = (accessLevel: string) => {
+    switch (accessLevel) {
+      case 'Schulleitung': return 10;
+      case 'Verwaltung': return 8;
+      case 'Lehrer': return 5;
+      default: return 2;
+    }
+  };
+
   const canManageKeycards = profile?.permission_lvl && profile.permission_lvl >= 10;
 
   const handleCreateKeycard = async () => {
@@ -93,20 +102,21 @@ const Keycard = () => {
     }
 
     try {
-      const permissionLevel = newKeycard.accessLevel === 'Schulleitung' ? 10 : 
-                            newKeycard.accessLevel === 'Verwaltung' ? 8 :
-                            newKeycard.accessLevel === 'Lehrer' ? 5 : 2;
+      const permissionLevel = getPermissionLevel(newKeycard.accessLevel);
+      
+      const { data, error } = await supabase.rpc('create_school_user_secure', {
+        username_input: `keycard_${newKeycard.cardNumber}`,
+        password_input: 'defaultpassword',
+        full_name_input: newKeycard.owner,
+        permission_level_input: permissionLevel,
+        creator_user_id: profile?.id,
+        keycard_number_input: newKeycard.cardNumber,
+        keycard_active_input: true
+      });
 
-      const { error } = await supabase
-        .from('permissions')
-        .insert({
-          name: newKeycard.owner,
-          permission_lvl: permissionLevel,
-          keycard_number: newKeycard.cardNumber,
-          keycard_active: true
-        });
-
-      if (error) throw error;
+      if (error || (data && typeof data === 'object' && data !== null && 'success' in data && !(data as any).success)) {
+        throw new Error((data as any)?.error || error?.message || 'Keycard konnte nicht erstellt werden');
+      }
 
       await fetchKeycards();
       setNewKeycard({ cardNumber: '', owner: '', accessLevel: 'Schüler' });
@@ -121,7 +131,7 @@ const Keycard = () => {
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Keycard konnte nicht erstellt werden."
+        description: error instanceof Error ? error.message : "Keycard konnte nicht erstellt werden."
       });
     }
   };
@@ -137,31 +147,37 @@ const Keycard = () => {
     }
 
     try {
-      const { error } = await supabase
-        .from('permissions')
-        .update({
-          keycard_number: selectedKeycard.cardNumber,
-          name: selectedKeycard.owner,
-          keycard_active: selectedKeycard.isActive
-        })
-        .eq('id', parseInt(selectedKeycard.id));
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: {
+          action: 'update_user',
+          actorUserId: profile?.id,
+          actorUsername: profile?.username,
+          targetUserId: parseInt(selectedKeycard.id),
+          updates: {
+            keycard_number: selectedKeycard.cardNumber,
+            keycard_active: selectedKeycard.isActive
+          }
+        }
+      });
 
-      if (error) throw error;
+      if (error || (data && typeof data === 'object' && data !== null && 'success' in data && !(data as any).success)) {
+        throw new Error((data as any)?.error || error?.message || 'Keycard konnte nicht aktualisiert werden');
+      }
 
       await fetchKeycards();
-      setShowEditKeycard(false);
       setSelectedKeycard(null);
+      setShowEditKeycard(false);
       
       toast({
-        title: "Keycard bearbeitet",
-        description: `Keycard wurde erfolgreich aktualisiert.`
+        title: "Keycard aktualisiert",
+        description: `Keycard für ${selectedKeycard.owner} wurde erfolgreich aktualisiert.`
       });
     } catch (error) {
-      console.error('Error updating keycard:', error);
+      console.error('Error editing keycard:', error);
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Keycard konnte nicht aktualisiert werden."
+        description: error instanceof Error ? error.message : "Keycard konnte nicht aktualisiert werden."
       });
     }
   };
@@ -172,15 +188,22 @@ const Keycard = () => {
     }
 
     try {
-      const { error } = await supabase
-        .from('permissions')
-        .update({
-          keycard_number: null,
-          keycard_active: false
-        })
-        .eq('id', parseInt(id));
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: {
+          action: 'update_user',
+          actorUserId: profile?.id,
+          actorUsername: profile?.username,
+          targetUserId: parseInt(id),
+          updates: {
+            keycard_number: null,
+            keycard_active: false
+          }
+        }
+      });
 
-      if (error) throw error;
+      if (error || (data && typeof data === 'object' && data !== null && 'success' in data && !(data as any).success)) {
+        throw new Error((data as any)?.error || error?.message || 'Keycard konnte nicht gelöscht werden');
+      }
 
       await fetchKeycards();
       toast({
@@ -192,21 +215,45 @@ const Keycard = () => {
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Keycard konnte nicht gelöscht werden."
+        description: error instanceof Error ? error.message : "Keycard konnte nicht gelöscht werden."
       });
     }
   };
 
-  const toggleKeycard = (id: string) => {
-    setKeycards(keycards.map(card => 
-      card.id === id ? { ...card, isActive: !card.isActive } : card
-    ));
-    
+  const toggleKeycard = async (id: string) => {
     const card = keycards.find(c => c.id === id);
-    toast({
-      title: card?.isActive ? "Keycard deaktiviert" : "Keycard aktiviert",
-      description: `Die Keycard wurde ${card?.isActive ? 'deaktiviert' : 'aktiviert'}.`
-    });
+    if (!card) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: {
+          action: 'update_user',
+          actorUserId: profile?.id,
+          actorUsername: profile?.username,
+          targetUserId: parseInt(id),
+          updates: {
+            keycard_active: !card.isActive
+          }
+        }
+      });
+
+      if (error || (data && typeof data === 'object' && data !== null && 'success' in data && !(data as any).success)) {
+        throw new Error((data as any)?.error || error?.message || 'Keycard-Status konnte nicht geändert werden');
+      }
+
+      await fetchKeycards();
+      toast({
+        title: card.isActive ? "Keycard deaktiviert" : "Keycard aktiviert",
+        description: `Die Keycard wurde ${card.isActive ? 'deaktiviert' : 'aktiviert'}.`
+      });
+    } catch (error) {
+      console.error('Error toggling keycard:', error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: error instanceof Error ? error.message : "Keycard-Status konnte nicht geändert werden."
+      });
+    }
   };
 
   const getStatusBadge = (isActive: boolean) => {
@@ -409,7 +456,11 @@ const Keycard = () => {
                   value={selectedKeycard.owner}
                   onChange={(e) => setSelectedKeycard({...selectedKeycard, owner: e.target.value})}
                   placeholder="z.B. Max Mustermann"
+                  disabled
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Der Besitzername kann nicht über die Keycard-Verwaltung geändert werden.
+                </p>
               </div>
               <div>
                 <Label htmlFor="editAccessLevel">Zugriffsebene</Label>
@@ -418,11 +469,15 @@ const Keycard = () => {
                   value={selectedKeycard.accessLevel}
                   onChange={(e) => setSelectedKeycard({...selectedKeycard, accessLevel: e.target.value})}
                   className="w-full p-2 border border-border rounded-md"
+                  disabled
                 >
                   <option value="Schüler">Schüler</option>
                   <option value="Lehrer">Lehrer</option>
                   <option value="Verwaltung">Verwaltung</option>
                 </select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Die Zugriffsebene kann nur über die Benutzerverwaltung geändert werden.
+                </p>
               </div>
               <div className="flex gap-2">
                 <Button onClick={handleEditKeycard}>Speichern</Button>
