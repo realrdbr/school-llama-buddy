@@ -238,6 +238,29 @@ serve(async (req) => {
 
       default:
         return deny(400, "Unknown action");
+    
+    case 'search_by_keycard':
+      if (!payload.keycard_number) {
+        return deny(400, 'Keycard-Nummer fehlt');
+      }
+      
+      const searchResult = await supabase
+        .from('permissions')
+        .select('id, name, username, keycard_number')
+        .eq('keycard_number', payload.keycard_number)
+        .maybeSingle();
+      
+      if (searchResult.error) {
+        console.error('Search error:', searchResult.error);
+        return deny(500, `Fehler bei der Suche: ${searchResult.error.message}`);
+      }
+      
+      return new Response(JSON.stringify({ 
+        success: true, 
+        user: searchResult.data 
+      }), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
     }
   } catch (e) {
     console.error("admin-users error:", e);

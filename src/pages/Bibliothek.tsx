@@ -333,15 +333,25 @@ const Bibliothek = () => {
     }
 
     try {
-      // Find user by keycard
-      const { data: userData, error: userError } = await supabase
-        .from('permissions')
-        .select('id, name, username, keycard_number')
-        .eq('keycard_number', scanKeycard.trim())
-        .maybeSingle();
+      // Use the admin-users edge function to search by keycard
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: {
+          action: 'search_by_keycard',
+          keycard_number: scanKeycard.trim()
+        }
+      });
 
-      if (userError) throw userError;
-      if (!userData) {
+      if (error) throw error;
+      if (data.error) {
+        toast({
+          variant: "destructive",
+          title: "Fehler",
+          description: data.error
+        });
+        return;
+      }
+
+      if (!data.user) {
         toast({
           variant: "destructive",
           title: "Fehler",
@@ -350,7 +360,7 @@ const Bibliothek = () => {
         return;
       }
 
-      setSelectedUser(userData);
+      setSelectedUser(data.user);
 
       // Load user's active loans
       const { data: loansData, error: loansError } = await supabase
@@ -359,11 +369,26 @@ const Bibliothek = () => {
           *,
           books (*)
         `)
-        .eq('user_id', userData.id)
+        .eq('user_id', data.user.id)
         .eq('is_returned', false);
 
       if (loansError) throw loansError;
       setUserLoans(loansData || []);
+
+      setSelectedUser(data.user);
+
+      // Load user's active loans
+      const { data: userLoansData, error: userLoansError } = await supabase
+        .from('loans')
+        .select(`
+          *,
+          books (*)
+        `)
+        .eq('user_id', data.user.id)
+        .eq('is_returned', false);
+
+      if (userLoansError) throw userLoansError;
+      setUserLoans(userLoansData || []);
     } catch (error) {
       console.error('Error searching user:', error);
       toast({
@@ -617,7 +642,7 @@ const Bibliothek = () => {
           .from('loans')
           .insert({
             book_id: book.id,
-            user_id: userData.id,
+            user_id: selectedUser.id,
             keycard_number: scanKeycard.trim(),
             librarian_id: profile!.id
           });

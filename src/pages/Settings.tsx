@@ -145,6 +145,38 @@ const Settings = () => {
             </Card>
           </div>
 
+          {/* User Profile */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Benutzerprofil</CardTitle>
+              <CardDescription>
+                Ihre persönlichen Informationen und Keycard-Details
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Name</Label>
+                  <p className="text-sm text-muted-foreground mt-1">{profile?.name}</p>
+                </div>
+                <div>
+                  <Label>Benutzername</Label>
+                  <p className="text-sm text-muted-foreground mt-1">{profile?.username}</p>
+                </div>
+                <div>
+                  <Label>Berechtigung</Label>
+                  <p className="text-sm text-muted-foreground mt-1">Level {profile?.permission_lvl}</p>
+                </div>
+                <div>
+                  <Label>Keycard-Nummer</Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {(profile as any)?.keycard_number || 'Keine Keycard zugewiesen'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* System Settings */}
           <Card>
             <CardHeader>
