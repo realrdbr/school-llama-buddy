@@ -99,9 +99,11 @@ const Dashboard = () => {
     { ...teacherFeatures[3], permission: 'manage_schedules' }
   ];
 
-  // Librarian and admin features 
+  // Librarian features (Level 6) 
   const librarianFeatures = [
-    { icon: Library, title: "Bibliothek", description: "Bücher und Ausleihen verwalten", path: "/bibliothek", permission: 'library_view' }
+    { icon: Library, title: "Bibliothek", description: "Bücher und Ausleihen verwalten", path: "/bibliothek", permission: 'library_view' },
+    { icon: Calendar, title: "Vertretungsplan", description: "Aktuelle Vertretungen einsehen", path: "/vertretungsplan", permission: 'view_vertretungsplan' },
+    { icon: Megaphone, title: "Ankündigungen", description: "Aktuelle Schulnachrichten", path: "/announcements", permission: 'view_announcements' }
   ];
 
   const studentFeaturesWithPermissions = [
@@ -262,8 +264,8 @@ const Dashboard = () => {
             </div>
           )}
 
-          {/* Student/Visitor Features */}
-          {getFilteredFeatures(studentFeaturesWithPermissions).length > 0 && (
+          {/* Student/Visitor Features - Not shown for librarians (Level 6) */}
+          {getFilteredFeatures(studentFeaturesWithPermissions).length > 0 && profile?.permission_lvl !== 6 && (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-foreground">
                 {profile?.permission_lvl && profile.permission_lvl >= 5 ? "Schüler-Funktionen" : profile?.permission_lvl && profile.permission_lvl > 1 ? "Ihre Funktionen" : "Verfügbare Funktionen"}
