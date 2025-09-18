@@ -91,6 +91,7 @@ const Bibliothek = () => {
   });
   const [scanKeycard, setScanKeycard] = useState('');
   const [scanBookBarcode, setScanBookBarcode] = useState('');
+  const [scannedBooks, setScannedBooks] = useState<BookType[]>([]);
   const [multipleBarcodes, setMultipleBarcodes] = useState('');
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [userLoans, setUserLoans] = useState<LoanType[]>([]);
@@ -322,7 +323,131 @@ const Bibliothek = () => {
     }
   };
 
-  const handleSearchUser = async () => {
+  const handleAddScannedBook = async () => {
+    if (!scanBookBarcode.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Bitte Barcode eingeben."
+      });
+      return;
+    }
+
+    // Find book by barcode
+    const { data: bookData, error: bookError } = await supabase
+      .from('books')
+      .select('*')
+      .eq('isbn', scanBookBarcode.trim())
+      .maybeSingle();
+
+    if (bookError || !bookData) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Buch mit diesem Barcode nicht gefunden."
+      });
+      return;
+    }
+
+    // Check if already in list
+    if (scannedBooks.find(book => book.id === bookData.id)) {
+      toast({
+        variant: "destructive",
+        title: "Hinweis",
+        description: "Buch bereits in der Liste."
+      });
+      return;
+    }
+
+    setScannedBooks(prev => [...prev, bookData]);
+    setScanBookBarcode('');
+  };
+
+  const handleRemoveScannedBook = (bookId: string) => {
+    setScannedBooks(prev => prev.filter(book => book.id !== bookId));
+  };
+
+  const handleBulkLoanBooks = async () => {
+    if (!selectedUser) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Bitte zuerst einen Benutzer suchen."
+      });
+      return;
+    }
+
+    if (scannedBooks.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Keine Bücher ausgewählt."
+      });
+      return;
+    }
+
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const book of scannedBooks) {
+        if (book.available_copies <= 0) {
+          console.error(`Book ${book.title} not available`);
+          errorCount++;
+          continue;
+        }
+
+        try {
+          const { data: loanResult, error: loanFunctionError } = await supabase.functions.invoke('loan-book', {
+            body: {
+              book_id: book.id,
+              user_id: selectedUser.id,
+              keycard_number: selectedUser.keycard_number,
+              librarian_id: profile!.id,
+              actorUserId: profile?.id,
+              actorUsername: profile?.username
+            }
+          });
+
+          if (loanFunctionError || !loanResult?.success) {
+            throw new Error(loanResult?.error || 'Ausleihe fehlgeschlagen');
+          }
+
+          successCount++;
+        } catch (sessionError) {
+          console.error('Loan operation failed:', sessionError);
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast({
+          title: "Erfolg",
+          description: `${successCount} Buch${successCount > 1 ? 'er' : ''} ausgeliehen.`
+        });
+      }
+
+      if (errorCount > 0) {
+        toast({
+          variant: "destructive",
+          title: "Warnung",
+          description: `${errorCount} Buch${errorCount > 1 ? 'er' : ''} konnten nicht ausgeliehen werden.`
+        });
+      }
+
+      // Clear scanned books and refresh data
+      setScannedBooks([]);
+      handleSearchUser(); // Refresh user loans
+      loadData(); // Refresh books
+    } catch (error) {
+      console.error('Error loaning books:', error);
+      toast({
+        variant: "destructive",
+        title: "Fehler",
+        description: "Ausleihe konnte nicht erstellt werden."
+      });
+    }
+  };
     if (!scanKeycard.trim()) {
       toast({
         variant: "destructive",
