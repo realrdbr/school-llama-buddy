@@ -1084,125 +1084,227 @@ const Bibliothek = () => {
           {/* Loan Management Tab - Only for librarians */}
           {canManageLoans && (
             <TabsContent value="loan-management" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Benutzer suchen</CardTitle>
-                  <CardDescription>Scannen Sie die Keycard eines Schülers</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <ScanLine className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        value={scanKeycard}
-                        onChange={(e) => setScanKeycard(e.target.value)}
-                        placeholder="Keycard scannen..."
-                        className="pl-10"
-                      />
+              {/* Hidden user search - will be integrated later */}
+              <div className="hidden">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Benutzer suchen</CardTitle>
+                    <CardDescription>Scannen Sie die Keycard eines Schülers</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <ScanLine className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          value={scanKeycard}
+                          onChange={(e) => setScanKeycard(e.target.value)}
+                          placeholder="Keycard scannen..."
+                          className="pl-10"
+                        />
+                      </div>
+                      <Button onClick={handleSearchUser}>
+                        <UserSearch className="h-4 w-4 mr-2" />
+                        Suchen
+                      </Button>
                     </div>
-                    <Button onClick={handleSearchUser}>
-                      <UserSearch className="h-4 w-4 mr-2" />
-                      Suchen
-                    </Button>
-                  </div>
-                  
-                  {selectedUser && (
-                    <div className="p-4 border rounded-lg bg-muted/50">
-                      <h3 className="font-semibold">{selectedUser.name}</h3>
-                      <p className="text-sm text-muted-foreground">Keycard: {selectedUser.keycard_number}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Aktuelle Ausleihen: {userLoans.length}
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </div>
 
-              {selectedUser && (
-                <>
+              {/* Main Layout: Scanner left, Preview right */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Column - Book Scanner */}
+                <div className="space-y-4">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Bücher ausleihen/zurückgeben</CardTitle>
-                      <CardDescription>Scannen Sie Barcodes einzeln oder mehrere auf einmal</CardDescription>
+                      <CardTitle>Buchscanner</CardTitle>
+                      <CardDescription>Scannen Sie Bücher und fügen Sie sie zur Vorschau hinzu</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Einzelner Barcode</Label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <ScanLine className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                           <Input
                             value={scanBookBarcode}
                             onChange={(e) => setScanBookBarcode(e.target.value)}
-                            placeholder="Barcode scannen..."
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleAddScannedBook();
+                              }
+                            }}
+                            placeholder="Buch-Barcode scannen..."
+                            className="pl-10"
                           />
                         </div>
-                        <div className="space-y-2">
-                          <Label>Mehrere Barcodes (einen pro Zeile)</Label>
-                          <Textarea
-                            value={multipleBarcodes}
-                            onChange={(e) => setMultipleBarcodes(e.target.value)}
-                            placeholder="Barcode 1&#10;Barcode 2&#10;Barcode 3..."
-                            rows={3}
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <Button 
-                          onClick={handleLoanBookByBarcode}
-                          disabled={!scanBookBarcode.trim() && !multipleBarcodes.trim()}
-                        >
+                        <Button onClick={handleAddScannedBook} disabled={!scanBookBarcode.trim()}>
                           <Plus className="h-4 w-4 mr-2" />
-                          Ausleihen
-                        </Button>
-                        <Button 
-                          variant="outline"
-                          onClick={handleReturnBookByBarcode}
-                          disabled={!scanBookBarcode.trim() && !multipleBarcodes.trim()}
-                        >
-                          <CheckCircle2 className="h-4 w-4 mr-2" />
-                          Zurückgeben
+                          Hinzufügen
                         </Button>
                       </div>
                     </CardContent>
                   </Card>
 
+                  {/* User Selection */}
                   <Card>
                     <CardHeader>
-                      <CardTitle>Aktuelle Ausleihen von {selectedUser.name}</CardTitle>
+                      <CardTitle>Benutzer auswählen</CardTitle>
+                      <CardDescription>Keycard scannen für Ausleihe/Rückgabe</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <ScanLine className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            value={scanKeycard}
+                            onChange={(e) => setScanKeycard(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleSearchUser();
+                              }
+                            }}
+                            placeholder="Keycard scannen..."
+                            className="pl-10"
+                          />
+                        </div>
+                        <Button onClick={handleSearchUser} disabled={!scanKeycard.trim()}>
+                          <UserSearch className="h-4 w-4 mr-2" />
+                          Suchen
+                        </Button>
+                      </div>
+                      
+                      {selectedUser && (
+                        <div className="p-4 border rounded-lg bg-muted/50">
+                          <h3 className="font-semibold">{selectedUser.name}</h3>
+                          <p className="text-sm text-muted-foreground">Keycard: {selectedUser.keycard_number}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Aktuelle Ausleihen: {userLoans.length}
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Action Buttons */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Aktionen</CardTitle>
+                      <CardDescription>Bücher aus der Vorschau ausleihen oder zurückgeben</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex gap-2">
+                        <Button 
+                          onClick={handleBulkLoanBooks}
+                          disabled={!selectedUser || scannedBooks.length === 0}
+                          className="flex-1"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Alle Ausleihen ({scannedBooks.length})
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          onClick={() => {
+                            // Clear the scanned books list
+                            setScannedBooks([]);
+                          }}
+                          disabled={scannedBooks.length === 0}
+                          className="flex-1"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Liste leeren
+                        </Button>
+                      </div>
+                      {!selectedUser && (
+                        <p className="text-sm text-muted-foreground text-center">
+                          Bitte erst einen Benutzer auswählen
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Right Column - Preview List */}
+                <div>
+                  <Card className="h-fit">
+                    <CardHeader>
+                      <CardTitle>Buchvorschau</CardTitle>
+                      <CardDescription>Gescannte Bücher ({scannedBooks.length})</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      {userLoans.length === 0 ? (
-                        <p className="text-muted-foreground">Keine aktiven Ausleihen</p>
+                      {scannedBooks.length === 0 ? (
+                        <div className="text-center py-8">
+                          <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                          <p className="text-lg font-medium">Keine Bücher gescannt</p>
+                          <p className="text-muted-foreground">Scannen Sie Bücher links, um sie hier anzuzeigen</p>
+                        </div>
                       ) : (
-                        <div className="space-y-3">
-                          {userLoans.map((loan) => (
-                            <div key={loan.id} className="flex justify-between items-center p-3 border rounded">
-                              <div>
-                                <h4 className="font-medium">{loan.books.title}</h4>
-                                <p className="text-sm text-muted-foreground">{loan.books.author}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  Rückgabe bis: {format(new Date(loan.due_date), 'dd.MM.yyyy', { locale: de })}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {isOverdue(loan.due_date) && (
-                                  <Badge variant="destructive">Überfällig</Badge>
+                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                          {scannedBooks.map((book) => (
+                            <div key={book.id} className="flex justify-between items-start p-3 border rounded-lg">
+                              <div className="flex-1">
+                                <h4 className="font-medium text-sm">{book.title}</h4>
+                                <p className="text-sm text-muted-foreground">{book.author}</p>
+                                {book.genre && (
+                                  <Badge variant="secondary" className="mt-1 text-xs">
+                                    {book.genre}
+                                  </Badge>
                                 )}
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleReturnBook(loan)}
-                                >
-                                  Zurückgeben
-                                </Button>
+                                <div className="flex justify-between text-xs mt-1">
+                                  <span>Verfügbar:</span>
+                                  <span className={book.available_copies > 0 ? 'text-green-600' : 'text-red-600'}>
+                                    {book.available_copies} / {book.total_copies}
+                                  </span>
+                                </div>
                               </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleRemoveScannedBook(book.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
                           ))}
                         </div>
                       )}
                     </CardContent>
                   </Card>
-                </>
+                </div>
+              </div>
+
+              {/* User's Current Loans */}
+              {selectedUser && userLoans.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Aktuelle Ausleihen von {selectedUser.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {userLoans.map((loan) => (
+                        <div key={loan.id} className="flex justify-between items-center p-3 border rounded">
+                          <div>
+                            <h4 className="font-medium">{loan.books.title}</h4>
+                            <p className="text-sm text-muted-foreground">{loan.books.author}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Rückgabe bis: {format(new Date(loan.due_date), 'dd.MM.yyyy', { locale: de })}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {isOverdue(loan.due_date) && (
+                              <Badge variant="destructive">Überfällig</Badge>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleReturnBook(loan)}
+                            >
+                              Zurückgeben
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
               )}
             </TabsContent>
           )}
