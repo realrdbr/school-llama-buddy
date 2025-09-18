@@ -133,7 +133,7 @@ const CreateUserModal = ({ isOpen, onClose }: CreateUserModalProps) => {
                   <SelectItem value="3">Level 3 - Schüler</SelectItem>
                   <SelectItem value="4">Level 4 - Schüler</SelectItem>
                   <SelectItem value="5">Level 5 - Lehrer</SelectItem>
-                  <SelectItem value="6">Level 6 - Bibliothek/in</SelectItem>
+                  <SelectItem value="6">Level 6 - Lehrer</SelectItem>
                   <SelectItem value="7">Level 7 - Lehrer</SelectItem>
                   <SelectItem value="8">Level 8 - Verwaltung</SelectItem>
                   <SelectItem value="9">Level 9 - Verwaltung</SelectItem>
