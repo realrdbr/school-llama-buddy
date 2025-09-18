@@ -240,6 +240,11 @@ serve(async (req) => {
         return deny(400, "Unknown action");
     
     case 'search_by_keycard':
+      // Allow librarians and above to search by keycard (Level 6+)
+      if (!actor || (actor.permission_lvl ?? 0) < 6) {
+        return deny(403, "Bibliotheks-Berechtigung erforderlich");
+      }
+      
       if (!payload.keycard_number) {
         return deny(400, 'Keycard-Nummer fehlt');
       }

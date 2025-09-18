@@ -214,19 +214,27 @@ const Dashboard = () => {
           <Card>
             <CardHeader>
               <CardTitle>Willkommen, {profile?.name || "Benutzer"}!</CardTitle>
-              <CardDescription>
-                {profile?.permission_lvl && profile.permission_lvl >= 10 
-                  ? "Als Schulleitung haben Sie Zugriff auf alle Systemfunktionen."
-                  : profile?.permission_lvl && profile.permission_lvl >= 8
-                  ? "Als Verwaltung/Administrator haben Sie Zugriff auf erweiterte Systemfunktionen."
-                  : profile?.permission_lvl === 6
-                  ? "Als Bibliothekarin können Sie die Bibliothek und Bücher verwalten."
-                  : profile?.permission_lvl && profile.permission_lvl >= 5
-                  ? "Als Lehrkraft können Sie Stundenpläne und Ankündigungen verwalten."
-                  : profile?.permission_lvl && profile.permission_lvl > 1
-                  ? `Als Schüler der Klasse 10b (Klassenlehrer: Frau Kunadt) können Sie Ihren Stundenplan einsehen und den Hausaufgaben-Assistenten nutzen.`
-                  : "Als Besucher haben Sie eingeschränkten Zugriff auf öffentliche Inhalte."
-                }
+              <CardDescription className="space-y-2">
+                <div>
+                  {profile?.permission_lvl && profile.permission_lvl >= 10 
+                    ? "Als Schulleitung haben Sie Zugriff auf alle Systemfunktionen."
+                    : profile?.permission_lvl && profile.permission_lvl >= 8
+                    ? "Als Verwaltung/Administrator haben Sie Zugriff auf erweiterte Systemfunktionen."
+                    : profile?.permission_lvl === 6
+                    ? "Als Bibliothekarin können Sie die Bibliothek und Bücher verwalten."
+                    : profile?.permission_lvl && profile.permission_lvl >= 5
+                    ? "Als Lehrkraft können Sie Stundenpläne und Ankündigungen verwalten."
+                    : profile?.permission_lvl && profile.permission_lvl > 1
+                    ? `Als Schüler der Klasse 10b (Klassenlehrer: Frau Kunadt) können Sie Ihren Stundenplan einsehen und den Hausaufgaben-Assistenten nutzen.`
+                    : "Als Besucher haben Sie eingeschränkten Zugriff auf öffentliche Inhalte."
+                  }
+                </div>
+                {(profile as any)?.keycard_number && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <KeyRound className="h-4 w-4" />
+                    <span>Ihre Keycard-Nummer: <strong>{(profile as any).keycard_number}</strong></span>
+                  </div>
+                )}
               </CardDescription>
             </CardHeader>
           </Card>

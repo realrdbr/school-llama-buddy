@@ -337,7 +337,9 @@ const Bibliothek = () => {
       const { data, error } = await supabase.functions.invoke('admin-users', {
         body: {
           action: 'search_by_keycard',
-          keycard_number: scanKeycard.trim()
+          keycard_number: scanKeycard.trim(),
+          actorUserId: profile?.id,
+          actorUsername: profile?.username
         }
       });
 
