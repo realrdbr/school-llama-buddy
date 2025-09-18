@@ -22,6 +22,8 @@ interface User {
   permission_lvl: number;
   created_at: string;
   user_class?: string;
+  keycard_number?: string;
+  keycard_active?: boolean;
 }
 
 const UserManagement = () => {
@@ -291,13 +293,14 @@ const handleDeleteUser = async () => {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left p-4 font-semibold">Benutzername</th>
-                      <th className="text-left p-4 font-semibold">Name</th>
-                      <th className="text-left p-4 font-semibold">Berechtigung</th>
-                      <th className="text-left p-4 font-semibold">Klasse</th>
-                      <th className="text-left p-4 font-semibold">Level</th>
-                      <th className="text-left p-4 font-semibold">Erstellt</th>
-                      <th className="text-left p-4 font-semibold">Aktionen</th>
+                       <th className="text-left p-4 font-semibold">Benutzername</th>
+                       <th className="text-left p-4 font-semibold">Name</th>
+                       <th className="text-left p-4 font-semibold">Berechtigung</th>
+                       <th className="text-left p-4 font-semibold">Klasse</th>
+                       <th className="text-left p-4 font-semibold">Keycard</th>
+                       <th className="text-left p-4 font-semibold">Level</th>
+                       <th className="text-left p-4 font-semibold">Erstellt</th>
+                       <th className="text-left p-4 font-semibold">Aktionen</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -310,14 +313,28 @@ const handleDeleteUser = async () => {
                           <td className="p-4">
                             <Badge variant={badge.variant}>{badge.text}</Badge>
                           </td>
-                          <td className="p-4">
-                            {userItem.user_class ? (
-                              <Badge variant="outline">{userItem.user_class}</Badge>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </td>
-                          <td className="p-4">{userItem.permission_lvl}</td>
+                           <td className="p-4">
+                             {userItem.user_class ? (
+                               <Badge variant="outline">{userItem.user_class}</Badge>
+                             ) : (
+                               <span className="text-muted-foreground">-</span>
+                             )}
+                           </td>
+                           <td className="p-4">
+                             {userItem.keycard_number ? (
+                               <div className="flex items-center gap-1">
+                                 <Badge variant={userItem.keycard_active ? "default" : "secondary"}>
+                                   {userItem.keycard_number}
+                                 </Badge>
+                                 {!userItem.keycard_active && (
+                                   <span className="text-xs text-muted-foreground">(inaktiv)</span>
+                                 )}
+                               </div>
+                             ) : (
+                               <span className="text-muted-foreground">-</span>
+                             )}
+                           </td>
+                           <td className="p-4">{userItem.permission_lvl}</td>
                           <td className="p-4 text-muted-foreground">
                             {formatDate(userItem.created_at)}
                           </td>

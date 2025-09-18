@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useUserDataSync } from '@/hooks/usePermissionSync';
+import { Switch } from '@/components/ui/switch';
 
 interface EditUserModalProps {
   isOpen: boolean;
@@ -17,11 +17,15 @@ interface EditUserModalProps {
     username: string;
     name: string;
     user_class?: string | null;
+    keycard_number?: string | null;
+    keycard_active?: boolean;
   };
 }
 
 const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
   const [selectedClass, setSelectedClass] = useState<string>(user.user_class || 'none');
+  const [keycardNumber, setKeycardNumber] = useState<string>(user.keycard_number || '');
+  const [keycardActive, setKeycardActive] = useState<boolean>(user.keycard_active ?? true);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -58,6 +62,8 @@ const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
   // Reset form when user changes
   useEffect(() => {
     setSelectedClass(user.user_class || 'none');
+    setKeycardNumber(user.keycard_number || '');
+    setKeycardActive(user.keycard_active ?? true);
     setNewPassword('');
     setConfirmPassword('');
   }, [user]);
@@ -103,7 +109,9 @@ const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
           targetUsername: user.username,
           updates: {
             user_class: selectedClass === 'none' ? null : selectedClass,
-            new_password: newPassword || null
+            new_password: newPassword || null,
+            keycard_number: keycardNumber || null,
+            keycard_active: keycardActive
           }
         }
       });
@@ -154,6 +162,26 @@ const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-4">
+            <Label className="text-base font-medium">Keycard-Einstellungen</Label>
+            <div className="space-y-2">
+              <Label>Keycard-Nummer</Label>
+              <Input
+                placeholder="z.B. 12345"
+                value={keycardNumber}
+                onChange={(e) => setKeycardNumber(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="keycard-active"
+                checked={keycardActive}
+                onCheckedChange={setKeycardActive}
+              />
+              <Label htmlFor="keycard-active">Keycard aktiv</Label>
+            </div>
           </div>
 
           <div className="space-y-2">

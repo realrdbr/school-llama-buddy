@@ -73,7 +73,7 @@ serve(async (req) => {
       case "list_users": {
         const { data, error } = await supabase
           .from("permissions")
-          .select("id, username, name, permission_lvl, created_at, user_class")
+          .select("id, username, name, permission_lvl, created_at, user_class, keycard_number, keycard_active")
           .order("permission_lvl", { ascending: false })
           .order("name", { ascending: true });
         
@@ -133,6 +133,15 @@ serve(async (req) => {
           updatePayload.user_class = updates.user_class ?? null;
         }
         
+        // Handle keycard updates
+        if ("keycard_number" in updates) {
+          updatePayload.keycard_number = updates.keycard_number || null;
+        }
+        
+        if ("keycard_active" in updates) {
+          updatePayload.keycard_active = updates.keycard_active ?? true;
+        }
+        
         // Handle password update using secure function
         if (updates?.new_password && updates.new_password.trim()) {
           // Use admin password override function
@@ -171,7 +180,7 @@ serve(async (req) => {
           .from("permissions")
           .update(updatePayload)
           .eq("id", targetUserIdResolved)
-          .select("id, username, name, user_class")
+          .select("id, username, name, user_class, keycard_number, keycard_active")
           .maybeSingle();
 
         if (error) {

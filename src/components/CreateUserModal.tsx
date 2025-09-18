@@ -20,7 +20,9 @@ const CreateUserModal = ({ isOpen, onClose }: CreateUserModalProps) => {
     username: '',
     password: '',
     fullName: '',
-    permissionLevel: '1'
+    permissionLevel: '1',
+    keycardNumber: '',
+    keycardActive: true
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -56,7 +58,9 @@ const CreateUserModal = ({ isOpen, onClose }: CreateUserModalProps) => {
       formData.username,
       formData.password,
       formData.fullName,
-      parseInt(formData.permissionLevel)
+      parseInt(formData.permissionLevel),
+      formData.keycardNumber,
+      formData.keycardActive
     );
 
     if (error) {
@@ -70,7 +74,7 @@ const CreateUserModal = ({ isOpen, onClose }: CreateUserModalProps) => {
         title: "Benutzer erstellt",
         description: `Benutzer ${formData.username} wurde erfolgreich erstellt.`
       });
-      setFormData({ username: '', password: '', fullName: '', permissionLevel: '1' });
+      setFormData({ username: '', password: '', fullName: '', permissionLevel: '1', keycardNumber: '', keycardActive: true });
       onClose();
     }
     setIsLoading(false);
@@ -140,6 +144,20 @@ const CreateUserModal = ({ isOpen, onClose }: CreateUserModalProps) => {
                   <SelectItem value="10">Schulleitung</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="keycardNumber">Keycard-Nummer (optional)</Label>
+              <Input
+                id="keycardNumber"
+                name="keycardNumber"
+                value={formData.keycardNumber}
+                onChange={handleInputChange}
+                placeholder="z.B. 12345"
+              />
+              <p className="text-xs text-muted-foreground">
+                Die Keycard wird für die Bibliothek und andere Services benötigt.
+              </p>
             </div>
 
             <div className="space-y-2">

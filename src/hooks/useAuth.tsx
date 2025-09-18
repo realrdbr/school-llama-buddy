@@ -21,7 +21,7 @@ interface AuthContextType {
   signInWithUsername: (username: string, password: string) => Promise<{ error: any; mustChangePassword?: boolean }>;
   signOut: () => Promise<void>;
   changePassword: (oldPassword: string, newPassword: string, isForced?: boolean) => Promise<{ error: any }>;
-  createUser: (username: string, password: string, fullName: string, permissionLevel: number) => Promise<{ error: any }>;
+  createUser: (username: string, password: string, fullName: string, permissionLevel: number, keycardNumber?: string, keycardActive?: boolean) => Promise<{ error: any }>;
   sessionId: string | null;
 }
 
@@ -211,7 +211,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const createUser = async (username: string, password: string, fullName: string, permissionLevel: number) => {
+  const createUser = async (username: string, password: string, fullName: string, permissionLevel: number, keycardNumber?: string, keycardActive: boolean = true) => {
     if (!user || !profile) return { error: { message: 'Nicht angemeldet' } };
 
     // Check if creator has permission level 10 (Schulleitung)
@@ -225,7 +225,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         password_input: password,
         full_name_input: fullName,
         permission_level_input: permissionLevel,
-        creator_user_id: profile.id
+        creator_user_id: profile.id,
+        keycard_number_input: keycardNumber || null,
+        keycard_active_input: keycardActive
       });
 
       if (error) {

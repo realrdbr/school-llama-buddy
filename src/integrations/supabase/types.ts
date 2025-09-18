@@ -848,13 +848,23 @@ export type Database = {
         Returns: Json
       }
       create_school_user_secure: {
-        Args: {
-          creator_user_id: number
-          full_name_input: string
-          password_input: string
-          permission_level_input: number
-          username_input: string
-        }
+        Args:
+          | {
+              creator_user_id: number
+              full_name_input: string
+              keycard_active_input?: boolean
+              keycard_number_input?: string
+              password_input: string
+              permission_level_input: number
+              username_input: string
+            }
+          | {
+              creator_user_id: number
+              full_name_input: string
+              password_input: string
+              permission_level_input: number
+              username_input: string
+            }
         Returns: Json
       }
       create_user_session: {
