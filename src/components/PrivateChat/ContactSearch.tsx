@@ -87,6 +87,10 @@ export const ContactSearch: React.FC<ContactSearchProps> = ({ onContactAdded, on
   // Search users
   useEffect(() => {
     const searchUsers = async () => {
+      console.log('🔍 Search triggered with term:', searchTerm);
+      console.log('🔍 Profile ID:', profile?.id);
+      console.log('🔍 Existing contacts:', contacts);
+      
       if (searchTerm.length < 2) {
         setSearchResults([]);
         return;
@@ -94,6 +98,7 @@ export const ContactSearch: React.FC<ContactSearchProps> = ({ onContactAdded, on
 
       setLoading(true);
       try {
+        console.log('🔍 Starting Supabase query...');
         const { data, error } = await supabase
           .from('permissions')
           .select('id, username, name, permission_lvl')
@@ -101,17 +106,25 @@ export const ContactSearch: React.FC<ContactSearchProps> = ({ onContactAdded, on
           .neq('id', profile?.id || 0)
           .limit(10);
 
-        if (error) throw error;
+        console.log('🔍 Query result:', { data, error });
+
+        if (error) {
+          console.error('🔍 Search error:', error);
+          throw error;
+        }
         
         // Filter out users that are already contacts
         const existingContactIds = contacts.map(c => c.contact_user_id);
+        console.log('🔍 Existing contact IDs:', existingContactIds);
+        
         const filteredResults = (data || []).filter(user => 
           !existingContactIds.includes(user.id)
         );
         
+        console.log('🔍 Filtered results:', filteredResults);
         setSearchResults(filteredResults);
       } catch (error) {
-        console.error('Error searching users:', error);
+        console.error('🔍 Error searching users:', error);
         setSearchResults([]);
       } finally {
         setLoading(false);
