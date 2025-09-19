@@ -1101,6 +1101,15 @@ export type Database = {
         Args: { old_session_token: string }
         Returns: string
       }
+      search_user_directory: {
+        Args: { current_user_id?: number; search_term: string }
+        Returns: {
+          id: number
+          name: string
+          permission_lvl: number
+          username: string
+        }[]
+      }
       session_has_admin_rights: {
         Args: { session_id_param: string }
         Returns: boolean

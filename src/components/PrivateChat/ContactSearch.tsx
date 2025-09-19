@@ -98,15 +98,14 @@ export const ContactSearch: React.FC<ContactSearchProps> = ({ onContactAdded, on
 
       setLoading(true);
       try {
-        console.log('🔍 Starting Supabase query...');
+        console.log('🔍 Starting RPC call...');
         const { data, error } = await supabase
-          .from('permissions')
-          .select('id, username, name, permission_lvl')
-          .ilike('name', `%${searchTerm}%`)
-          .neq('id', profile?.id || 0)
-          .limit(10);
+          .rpc('search_user_directory', {
+            search_term: searchTerm,
+            current_user_id: profile?.id || null
+          });
 
-        console.log('🔍 Query result:', { data, error });
+        console.log('🔍 RPC result:', { data, error });
 
         if (error) {
           console.error('🔍 Search error:', error);
