@@ -102,7 +102,7 @@ export const ContactSearch: React.FC<ContactSearchProps> = ({ onContactAdded, on
         const { data, error } = await supabase
           .from('permissions')
           .select('id, username, name, permission_lvl')
-          .or(`username.ilike.%${searchTerm}%,name.ilike.%${searchTerm}%`)
+          .ilike('name', `%${searchTerm}%`)
           .neq('id', profile?.id || 0)
           .limit(10);
 
