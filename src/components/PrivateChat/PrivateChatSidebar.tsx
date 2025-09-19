@@ -125,16 +125,20 @@ export const PrivateChatSidebar: React.FC<PrivateChatSidebarProps> = ({
           
           console.log('🔍 Looking up user data for ID:', otherUserId);
           
-          // Get other user data by querying directly
-          const { data: userData, error: userError } = await supabase
-            .from('permissions')
-            .select('id, name, username')
-            .eq('id', otherUserId)
-            .maybeSingle();
+          // Get other user data via secure RPC to avoid exposing sensitive columns
+          const userData = await withSession(async () => {
+            const { data, error } = await (supabase as any).rpc('get_user_public_info', {
+              user_id_param: otherUserId
+            });
+            if (error) {
+              console.error('❌ Error fetching user data for ID', otherUserId, ':', error);
+              return null;
+            }
+            const row = Array.isArray(data) ? data[0] : data;
+            return row as { id: number; name: string; username: string } | null;
+          });
 
-          if (userError) {
-            console.error('❌ Error fetching user data for ID', otherUserId, ':', userError);
-          }
+          console.log('✅ Found user data for ID', otherUserId, ':', userData);
 
           console.log('✅ Found user data for ID', otherUserId, ':', userData);
 

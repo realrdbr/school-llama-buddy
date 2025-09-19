@@ -23,6 +23,7 @@ export interface LevelPermissions {
 
 const permissions: Permission[] = [
   { id: 'view_chat', name: 'KI-Chat verwenden', description: 'Zugriff auf den KI-Assistenten', requiresLevel: 1 },
+  { id: 'private_messages', name: 'Private Nachrichten', description: 'Zugriff auf private Nachrichten', requiresLevel: 1 },
   { id: 'view_schedule', name: 'Stundenplan einsehen', description: 'Eigenen Stundenplan anzeigen', requiresLevel: 1 },
   { id: 'view_announcements', name: 'Ankündigungen lesen', description: 'Schulankündigungen einsehen', requiresLevel: 1 },
   { id: 'view_vertretungsplan', name: 'Vertretungsplan einsehen', description: 'Vertretungen anzeigen', requiresLevel: 1 },
