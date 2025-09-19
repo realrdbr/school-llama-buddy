@@ -71,12 +71,25 @@ export const PrivateChatSidebar: React.FC<PrivateChatSidebarProps> = ({
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'private_messages'
         },
         () => {
-          fetchConversations();
+          // Delay to ensure message is processed
+          setTimeout(fetchConversations, 200);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'private_messages'
+        },
+        () => {
+          // Update conversation when messages are marked as read
+          setTimeout(fetchConversations, 200);
         }
       )
       .subscribe();
@@ -134,19 +147,22 @@ export const PrivateChatSidebar: React.FC<PrivateChatSidebarProps> = ({
             .limit(1)
             .maybeSingle();
 
-          // Get unread count
-          const { count: unreadCount } = await supabase
-            .from('private_messages')
-            .select('id', { count: 'exact' })
-            .eq('conversation_id', conv.id)
-            .eq('is_read', false)
-            .neq('sender_id', profile.id);
+          // Get unread count using session context for correct authentication
+          const unreadCount = await withSession(async () => {
+            const { count } = await supabase
+              .from('private_messages')
+              .select('id', { count: 'exact' })
+              .eq('conversation_id', conv.id)
+              .eq('is_read', false)
+              .neq('sender_id', profile.id);
+            return count || 0;
+          });
 
           return {
             ...conv,
             other_user: userData || { id: otherUserId, name: 'Unbekannter Benutzer', username: 'unknown' },
             last_message: lastMessage,
-            unread_count: unreadCount || 0
+            unread_count: unreadCount
           };
         })
       );

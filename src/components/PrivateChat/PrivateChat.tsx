@@ -68,7 +68,7 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
           
           // Mark as read if not sent by current user
           if (newMessage.sender_id !== profile?.id) {
-            markMessagesAsRead();
+            setTimeout(() => markMessagesAsRead(), 500); // Small delay to ensure message is processed
           }
         }
       )
