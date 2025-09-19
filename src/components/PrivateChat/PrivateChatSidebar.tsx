@@ -71,7 +71,7 @@ export const PrivateChatSidebar: React.FC<PrivateChatSidebarProps> = ({
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'private_messages'
         },
@@ -112,20 +112,16 @@ export const PrivateChatSidebar: React.FC<PrivateChatSidebarProps> = ({
           
           console.log('🔍 Looking up user data for ID:', otherUserId);
           
-          // Get other user data using session context
+          // Get other user data using secure RPC to bypass RLS
           const userData = await withSession(async () => {
-            const { data, error } = await supabase
-              .from('permissions')
-              .select('id, name, username')
-              .eq('id', otherUserId)
-              .maybeSingle();
-            
+            const { data, error } = await supabase.rpc('get_user_public_info', {
+              user_id_param: otherUserId
+            });
             if (error) {
               console.error('❌ Error fetching user data for ID', otherUserId, ':', error);
               return null;
             }
-            
-            return data;
+            return data as { id: number; name: string; username: string } | null;
           });
 
           console.log('✅ Found user data for ID', otherUserId, ':', userData);

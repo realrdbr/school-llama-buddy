@@ -127,9 +127,12 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
 
     try {
       await withSession(async () => {
-        const { error } = await supabase.rpc('mark_messages_as_read', {
-          conversation_id_param: conversationId
-        });
+        const { error } = await supabase
+          .from('private_messages')
+          .update({ is_read: true })
+          .eq('conversation_id', conversationId)
+          .neq('sender_id', profile.id)
+          .eq('is_read', false);
         if (error) throw error;
       });
     } catch (error) {
