@@ -112,17 +112,16 @@ export const PrivateChatSidebar: React.FC<PrivateChatSidebarProps> = ({
           
           console.log('🔍 Looking up user data for ID:', otherUserId);
           
-          // Get other user data using secure RPC to bypass RLS
-          const userData = await withSession(async () => {
-            const { data, error } = await supabase.rpc('get_user_public_info', {
-              user_id_param: otherUserId
-            });
-            if (error) {
-              console.error('❌ Error fetching user data for ID', otherUserId, ':', error);
-              return null;
-            }
-            return data as { id: number; name: string; username: string } | null;
-          });
+          // Get other user data by querying directly
+          const { data: userData, error: userError } = await supabase
+            .from('permissions')
+            .select('id, name, username')
+            .eq('id', otherUserId)
+            .maybeSingle();
+
+          if (userError) {
+            console.error('❌ Error fetching user data for ID', otherUserId, ':', userError);
+          }
 
           console.log('✅ Found user data for ID', otherUserId, ':', userData);
 

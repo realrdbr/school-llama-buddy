@@ -1059,6 +1059,15 @@ export type Database = {
           contact_username: string
         }[]
       }
+      get_user_public_info: {
+        Args: { user_id_param: number }
+        Returns: {
+          id: number
+          name: string
+          permission_lvl: number
+          username: string
+        }[]
+      }
       has_active_sessions: {
         Args: { target_user_id: number }
         Returns: boolean
