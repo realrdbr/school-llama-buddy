@@ -1048,6 +1048,17 @@ export type Database = {
         Args: { other_user_id: number }
         Returns: string
       }
+      get_user_contacts: {
+        Args: { user_id_param: number }
+        Returns: {
+          added_at: string
+          contact_id: string
+          contact_name: string
+          contact_permission_lvl: number
+          contact_user_id: number
+          contact_username: string
+        }[]
+      }
       has_active_sessions: {
         Args: { target_user_id: number }
         Returns: boolean

@@ -45,11 +45,13 @@ export const ContactSearch: React.FC<ContactSearchProps> = ({ onContactAdded, on
 
   const loadContacts = async () => {
     try {
+      console.log('📇 Loading contacts for user:', profile?.id);
       const { data: contactsData, error: contactsError } = await supabase
-        .from('user_contacts')
-        .select('id, contact_user_id')
-        .eq('user_id', profile?.id)
-        .eq('status', 'active');
+        .rpc('get_user_contacts', {
+          user_id_param: profile?.id || 0
+        });
+
+      console.log('📇 Contacts loaded:', { contactsData, contactsError });
 
       if (contactsError) throw contactsError;
 
@@ -58,21 +60,19 @@ export const ContactSearch: React.FC<ContactSearchProps> = ({ onContactAdded, on
         return;
       }
 
-      // Get user details for contacts
-      const contactUserIds = contactsData.map(c => c.contact_user_id);
-      const { data: usersData, error: usersError } = await supabase
-        .from('permissions')
-        .select('id, username, name, permission_lvl')
-        .in('id', contactUserIds);
-
-      if (usersError) throw usersError;
-
-      // Combine contact and user data
+      // Transform the data to match our interface
       const contactsWithUsers = contactsData.map(contact => ({
-        ...contact,
-        contact_user: usersData?.find(user => user.id === contact.contact_user_id)
-      })).filter(contact => contact.contact_user) as Contact[];
+        id: contact.contact_id,
+        contact_user_id: contact.contact_user_id,
+        contact_user: {
+          id: contact.contact_user_id,
+          username: contact.contact_username,
+          name: contact.contact_name,
+          permission_lvl: contact.contact_permission_lvl
+        }
+      })) as Contact[];
 
+      console.log('📇 Transformed contacts:', contactsWithUsers);
       setContacts(contactsWithUsers);
     } catch (error) {
       console.error('Error loading contacts:', error);
