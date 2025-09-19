@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useSessionRequest } from '@/hooks/useSessionRequest';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -42,6 +43,7 @@ export const PrivateChatSidebar: React.FC<PrivateChatSidebarProps> = ({
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const { profile } = useAuth();
+  const { withSession } = useSessionRequest();
 
   useEffect(() => {
     if (profile?.id) {
@@ -110,18 +112,23 @@ export const PrivateChatSidebar: React.FC<PrivateChatSidebarProps> = ({
           
           console.log('🔍 Looking up user data for ID:', otherUserId);
           
-          // Get other user data
-          const { data: userData, error: userError } = await supabase
-            .from('permissions')
-            .select('id, name, username')
-            .eq('id', otherUserId)
-            .maybeSingle();
+          // Get other user data using session context
+          const userData = await withSession(async () => {
+            const { data, error } = await supabase
+              .from('permissions')
+              .select('id, name, username')
+              .eq('id', otherUserId)
+              .maybeSingle();
+            
+            if (error) {
+              console.error('❌ Error fetching user data for ID', otherUserId, ':', error);
+              return null;
+            }
+            
+            return data;
+          });
 
-          if (userError) {
-            console.error('❌ Error fetching user data for ID', otherUserId, ':', userError);
-          } else {
-            console.log('✅ Found user data for ID', otherUserId, ':', userData);
-          }
+          console.log('✅ Found user data for ID', otherUserId, ':', userData);
 
           // Get last message
           const { data: lastMessage } = await supabase
