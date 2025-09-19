@@ -38,7 +38,7 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const { profile } = useAuth();
+  const { profile, sessionId } = useAuth();
   const { withSession } = useSessionRequest();
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -150,16 +150,12 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
 
     try {
       await withSession(async () => {
-        const { error } = await supabase
-          .from('private_messages')
-          .insert({
-            conversation_id: conversationId,
-            sender_id: profile.id,
-            content: messageContent,
-            is_read: false
-          });
-
-        if (error) throw error;
+        const { error } = await (supabase as any).rpc('send_private_message_session', {
+          conversation_id_param: conversationId,
+          content_param: messageContent,
+          v_session_id: sessionId || ''
+        });
+        if (error) throw error as any;
       });
     } catch (error) {
       console.error('Error sending message:', error);
