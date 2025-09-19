@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useSessionRequest } from '@/hooks/useSessionRequest';
+import { supabase } from '@/integrations/supabase/client';
 import { PrivateChatSidebar } from '@/components/PrivateChat/PrivateChatSidebar';
 import { PrivateChat } from '@/components/PrivateChat/PrivateChat';
 import { ContactSearch } from '@/components/PrivateChat/ContactSearch';
@@ -21,6 +23,7 @@ const PrivateMessaging = () => {
   const [currentView, setCurrentView] = useState<View>('sidebar');
   const [currentChat, setCurrentChat] = useState<CurrentChat | null>(null);
   const { profile } = useAuth();
+  const { withSession } = useSessionRequest();
   const navigate = useNavigate();
 
   // Check if user has sufficient permission level (level 2+)
@@ -52,12 +55,14 @@ const PrivateMessaging = () => {
   const handleStartChat = async (userId: number, userName: string) => {
     // Create or get conversation with this user
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { data, error } = await supabase.rpc('get_or_create_conversation', {
-        other_user_id: userId
-      });
+      const data = await withSession(async () => {
+        const { data, error } = await supabase.rpc('get_or_create_conversation', {
+          other_user_id: userId
+        });
 
-      if (error) throw error;
+        if (error) throw error;
+        return data;
+      });
 
       setCurrentChat({
         conversationId: data,
