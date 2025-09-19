@@ -106,7 +106,7 @@ const SessionAwareApp = () => {
       <Route 
         path="/private-messages" 
         element={
-          <ProtectedRoute requiredPermission="chat_access">
+          <ProtectedRoute requiredPermission="private_messages">
             <PrivateMessaging />
           </ProtectedRoute>
         } 
