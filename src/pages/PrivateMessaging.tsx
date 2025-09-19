@@ -3,6 +3,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { PrivateChatSidebar } from '@/components/PrivateChat/PrivateChatSidebar';
 import { PrivateChat } from '@/components/PrivateChat/PrivateChat';
 import { ContactSearch } from '@/components/PrivateChat/ContactSearch';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft, Home } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 type View = 'sidebar' | 'chat' | 'contacts';
 
@@ -18,6 +21,7 @@ const PrivateMessaging = () => {
   const [currentView, setCurrentView] = useState<View>('sidebar');
   const [currentChat, setCurrentChat] = useState<CurrentChat | null>(null);
   const { profile } = useAuth();
+  const navigate = useNavigate();
 
   // Check if user has sufficient permission level (level 2+)
   if (!profile || (profile.permission_lvl || 0) < 2) {
@@ -72,6 +76,20 @@ const PrivateMessaging = () => {
 
   return (
     <div className="container mx-auto p-6 h-[calc(100vh-6rem)]">
+      {/* Header with Back Button */}
+      <div className="flex items-center gap-4 mb-6">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate('/')}
+          className="flex items-center gap-2"
+        >
+          <Home className="h-4 w-4" />
+          Startseite
+        </Button>
+        <h1 className="text-2xl font-bold">Private Nachrichten</h1>
+      </div>
+      
       <div className="h-full max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
           {/* Sidebar - Always visible on desktop, conditional on mobile */}

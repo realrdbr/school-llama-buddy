@@ -48,6 +48,7 @@ export const ContactSearch: React.FC<ContactSearchProps> = ({ onContactAdded, on
       const { data: contactsData, error: contactsError } = await supabase
         .from('user_contacts')
         .select('id, contact_user_id')
+        .eq('user_id', profile?.id)
         .eq('status', 'active');
 
       if (contactsError) throw contactsError;
