@@ -80,6 +80,11 @@ const Dashboard = () => {
     { icon: Palette, title: "Design & Farben", description: "Farbschema der App anpassen", path: "/theme-settings" }
   ];
 
+  // Chat feature for all users (Level 2+)
+  const chatFeature = [
+    { icon: MessageCircle, title: "Private Nachrichten", description: "Mit anderen Mitgliedern chatten", path: "/private-messages", permission: 'private_messages' }
+  ];
+
   // Filter features based on permissions
   const getFilteredFeatures = (features: any[]) => {
     return features.filter(feature => {
@@ -115,7 +120,7 @@ const Dashboard = () => {
     { ...studentFeatures[1], permission: 'view_vertretungsplan' },
     { ...studentFeatures[2], permission: 'view_announcements' },
     { ...studentFeatures[3], permission: 'library_view' },
-    { ...studentFeatures[4], permission: 'theme_settings' }
+    { ...studentFeatures[5], permission: 'theme_settings' }
   ];
 
   const renderFeatureCards = (features: any[]) => {
@@ -277,6 +282,14 @@ const Dashboard = () => {
                 Ihre Funktionen
               </h2>
               {renderFeatureCards(librarianFeatures)}
+            </div>
+          )}
+
+          {/* Chat Feature - Available for all users with permission */}
+          {getFilteredFeatures(chatFeature).length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold text-foreground">Kommunikation</h2>
+              {renderFeatureCards(chatFeature)}
             </div>
           )}
 

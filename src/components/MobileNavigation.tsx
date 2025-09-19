@@ -21,6 +21,7 @@ import {
   FileText,
   Shield,
   MessageSquare,
+  MessageCircle,
   Palette,
   X
 } from 'lucide-react';
@@ -71,6 +72,12 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ className = "" }) =
       label: "KI-Chat", 
       path: "/ai-chat", 
       permission: "view_chat" 
+    },
+    { 
+      icon: MessageCircle, 
+      label: "Private Nachrichten", 
+      path: "/private-messages", 
+      permission: "private_messages" 
     },
     { 
       icon: Clock, 

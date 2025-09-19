@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSessionRequest } from '@/hooks/useSessionRequest';
+import { useEnhancedPermissions } from '@/hooks/useEnhancedPermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { PrivateChatSidebar } from '@/components/PrivateChat/PrivateChatSidebar';
 import { PrivateChat } from '@/components/PrivateChat/PrivateChat';
@@ -24,15 +25,16 @@ const PrivateMessaging = () => {
   const [currentChat, setCurrentChat] = useState<CurrentChat | null>(null);
   const { profile } = useAuth();
   const { withSession } = useSessionRequest();
+  const { hasPermission } = useEnhancedPermissions();
   const navigate = useNavigate();
 
-  // Check if user has sufficient permission level (level 2+)
-  if (!profile || (profile.permission_lvl || 0) < 2) {
+  // Check if user has private messages permission
+  if (!profile || !hasPermission('private_messages')) {
     return (
       <div className="container mx-auto p-6">
         <div className="text-center">
           <h2 className="text-xl font-semibold mb-2">Zugriff verweigert</h2>
-          <p className="text-muted-foreground">Sie benötigen mindestens Berechtigung Level 2, um die Chat-Funktion zu nutzen.</p>
+          <p className="text-muted-foreground">Sie benötigen die Berechtigung für private Nachrichten, um die Chat-Funktion zu nutzen.</p>
         </div>
       </div>
     );
