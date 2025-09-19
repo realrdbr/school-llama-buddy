@@ -108,12 +108,20 @@ export const PrivateChatSidebar: React.FC<PrivateChatSidebarProps> = ({
         conversationsData.map(async (conv) => {
           const otherUserId = conv.user1_id === profile.id ? conv.user2_id : conv.user1_id;
           
+          console.log('🔍 Looking up user data for ID:', otherUserId);
+          
           // Get other user data
-          const { data: userData } = await supabase
+          const { data: userData, error: userError } = await supabase
             .from('permissions')
             .select('id, name, username')
             .eq('id', otherUserId)
-            .single();
+            .maybeSingle();
+
+          if (userError) {
+            console.error('❌ Error fetching user data for ID', otherUserId, ':', userError);
+          } else {
+            console.log('✅ Found user data for ID', otherUserId, ':', userData);
+          }
 
           // Get last message
           const { data: lastMessage } = await supabase
