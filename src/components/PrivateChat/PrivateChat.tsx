@@ -150,12 +150,15 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
 
     try {
       await withSession(async () => {
-        const { error } = await (supabase as any).rpc('send_private_message_session', {
+        const { data, error } = await supabase.rpc('send_private_message_session', {
           conversation_id_param: conversationId,
           content_param: messageContent,
           v_session_id: sessionId || ''
         });
-        if (error) throw error as any;
+        
+        if (error || (data && !(data as any).success)) {
+          throw new Error((data as any)?.error || error?.message || 'Nachricht konnte nicht gesendet werden');
+        }
       });
     } catch (error) {
       console.error('Error sending message:', error);

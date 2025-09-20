@@ -99,7 +99,7 @@ const Bibliothek = () => {
   const [showLoanDialog, setShowLoanDialog] = useState(false);
   const [showEditBookDialog, setShowEditBookDialog] = useState(false);
   const [editingBook, setEditingBook] = useState<BookType | null>(null);
-  const [activeTab, setActiveTab] = useState('loans'); // Default to loans management
+  const [activeTab, setActiveTab] = useState('books'); // Default to books tab
 
   const canManageBooks = hasPermission('library_manage_books');
   const canManageLoans = hasPermission('library_manage_loans');

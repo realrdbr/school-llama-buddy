@@ -1130,6 +1130,14 @@ export type Database = {
           username: string
         }[]
       }
+      send_private_message_session: {
+        Args: {
+          content_param: string
+          conversation_id_param: string
+          v_session_id?: string
+        }
+        Returns: Json
+      }
       session_has_admin_rights: {
         Args: { session_id_param: string }
         Returns: boolean

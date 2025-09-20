@@ -76,7 +76,7 @@ const Dashboard = () => {
     { icon: Calendar, title: "Vertretungsplan", description: "Aktuelle Vertretungen einsehen", path: "/vertretungsplan" },
     { icon: Megaphone, title: "Ankündigungen", description: "Aktuelle Schulnachrichten", path: "/announcements" },
     { icon: Library, title: "Bibliothek", description: "Bücher ausleihen und verwalten", path: "/bibliothek" },
-    { icon: MessageCircle, title: "Private Nachrichten", description: "Mit anderen Mitgliedern chatten", path: "/private-messages" },
+    { icon: MessageCircle, title: "Nachrichten öffnen", description: "Mit anderen Mitgliedern chatten", path: "/private-messages" },
     { icon: Palette, title: "Design & Farben", description: "Farbschema der App anpassen", path: "/theme-settings" }
   ];
 
