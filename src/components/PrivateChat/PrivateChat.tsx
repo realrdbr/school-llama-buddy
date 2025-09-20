@@ -38,6 +38,7 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
   const { profile, sessionId } = useAuth();
   const { withSession } = useSessionRequest();
   const { toast } = useToast();
@@ -146,6 +147,18 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
 
     setSending(true);
     const messageContent = newMessage.trim();
+    const tempId = `temp-${Date.now()}`;
+    
+    // Optimistic update - add message immediately
+    const optimisticMessage: Message = {
+      id: tempId,
+      content: messageContent,
+      sender_id: profile.id,
+      created_at: new Date().toISOString(),
+      is_read: false
+    };
+    
+    setOptimisticMessages(prev => [...prev, optimisticMessage]);
     setNewMessage('');
 
     try {
@@ -159,10 +172,16 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
         if (error || (data && !(data as any).success)) {
           throw new Error((data as any)?.error || error?.message || 'Nachricht konnte nicht gesendet werden');
         }
+        
+        // Remove optimistic message on success - real message will come via realtime
+        setOptimisticMessages(prev => prev.filter(msg => msg.id !== tempId));
       });
     } catch (error) {
       console.error('Error sending message:', error);
-      setNewMessage(messageContent); // Restore message on error
+      
+      // Remove failed optimistic message and restore input
+      setOptimisticMessages(prev => prev.filter(msg => msg.id !== tempId));
+      setNewMessage(messageContent);
       
       const errorMessage = error instanceof Error ? error.message : 'Nachricht konnte nicht gesendet werden';
       
@@ -176,7 +195,6 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
             size="sm"
             onClick={() => {
               setNewMessage(messageContent);
-              // Auto-focus the input after restoring message
               setTimeout(() => {
                 const input = document.querySelector('input[placeholder="Nachricht eingeben..."]') as HTMLInputElement;
                 input?.focus();
@@ -257,7 +275,7 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
       
       <CardContent className="flex-1 flex flex-col p-0">
         <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
-          {messages.length === 0 ? (
+          {messages.length === 0 && optimisticMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground space-y-4">
               <MessageCircle className="h-16 w-16 opacity-50" />
               <div className="text-center space-y-2">
@@ -272,9 +290,11 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
-              {messages.map((message, index) => {
+              {[...messages, ...optimisticMessages].map((message, index) => {
+                const allMessages = [...messages, ...optimisticMessages];
                 const isOwnMessage = message.sender_id === profile?.id;
-                const showAvatar = index === 0 || messages[index - 1].sender_id !== message.sender_id;
+                const showAvatar = index === 0 || allMessages[index - 1].sender_id !== message.sender_id;
+                const isOptimistic = message.id.startsWith('temp-');
                 
                 return (
                   <div
@@ -296,6 +316,7 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
                           ? 'bg-primary text-primary-foreground' 
                           : 'bg-muted'
                         }
+                        ${isOptimistic ? 'opacity-70' : ''}
                       `}
                     >
                       <div className="whitespace-pre-wrap break-words">

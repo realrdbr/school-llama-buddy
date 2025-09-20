@@ -329,23 +329,53 @@ const Bibliothek = () => {
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Bitte Barcode eingeben."
+        description: "Bitte Titel oder Barcode eingeben."
       });
       return;
     }
 
-    // Find book by barcode
-    const { data: bookData, error: bookError } = await supabase
+    const searchTerm = scanBookBarcode.trim().toLowerCase();
+
+    // Enhanced search: Try ISBN first, then title and author search
+    let bookData = null;
+    let searchError = null;
+
+    // First try exact ISBN match
+    const { data: isbnMatch, error: isbnError } = await supabase
       .from('books')
       .select('*')
       .eq('isbn', scanBookBarcode.trim())
       .maybeSingle();
 
-    if (bookError || !bookData) {
+    if (isbnMatch) {
+      bookData = isbnMatch;
+    } else {
+      // Then try title and author search
+      const { data: titleMatches, error: titleError } = await supabase
+        .from('books')
+        .select('*')
+        .or(`title.ilike.%${searchTerm}%,author.ilike.%${searchTerm}%`);
+
+      searchError = titleError;
+
+      if (titleMatches && titleMatches.length > 0) {
+        // Sort by relevance: exact title match first, then partial matches
+        const sortedMatches = titleMatches.sort((a, b) => {
+          const aExactTitle = a.title.toLowerCase() === searchTerm;
+          const bExactTitle = b.title.toLowerCase() === searchTerm;
+          if (aExactTitle && !bExactTitle) return -1;
+          if (!aExactTitle && bExactTitle) return 1;
+          return 0;
+        });
+        bookData = sortedMatches[0]; // Take the best match
+      }
+    }
+
+    if (searchError || !bookData) {
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Buch mit diesem Barcode nicht gefunden."
+        description: searchError?.message || `Kein Buch mit "${scanBookBarcode}" gefunden. Versuchen Sie einen anderen Titel oder Barcode.`
       });
       return;
     }
@@ -362,6 +392,11 @@ const Bibliothek = () => {
 
     setScannedBooks(prev => [...prev, bookData]);
     setScanBookBarcode('');
+    
+    toast({
+      title: "Buch hinzugefügt",
+      description: `"${bookData.title}" wurde hinzugefügt.`
+    });
   };
 
   const handleRemoveScannedBook = (bookId: string) => {
@@ -1199,7 +1234,7 @@ const Bibliothek = () => {
                                 handleAddScannedBook();
                               }
                             }}
-                            placeholder="Buch-Barcode scannen..."
+                            placeholder="Buchtitel oder Barcode eingeben..."
                             className="pl-10"
                           />
                         </div>
