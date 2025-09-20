@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send, ArrowLeft } from 'lucide-react';
+import { Send, ArrowLeft, MessageCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -163,10 +163,29 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
     } catch (error) {
       console.error('Error sending message:', error);
       setNewMessage(messageContent); // Restore message on error
+      
+      const errorMessage = error instanceof Error ? error.message : 'Nachricht konnte nicht gesendet werden';
+      
       toast({
-        title: "Fehler",
-        description: "Nachricht konnte nicht gesendet werden",
+        title: "Nachricht fehlgeschlagen",
+        description: errorMessage,
         variant: "destructive",
+        action: (
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => {
+              setNewMessage(messageContent);
+              // Auto-focus the input after restoring message
+              setTimeout(() => {
+                const input = document.querySelector('input[placeholder="Nachricht eingeben..."]') as HTMLInputElement;
+                input?.focus();
+              }, 100);
+            }}
+          >
+            Wiederholen
+          </Button>
+        ),
       });
     } finally {
       setSending(false);
@@ -239,10 +258,16 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
       <CardContent className="flex-1 flex flex-col p-0">
         <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
           {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground space-y-4">
+              <MessageCircle className="h-16 w-16 opacity-50" />
+              <div className="text-center space-y-2">
+                <p className="text-lg font-medium">Noch keine Nachrichten</p>
+                <p className="text-sm">Beginnen Sie die Unterhaltung mit {otherUser.name}</p>
+              </div>
               <div className="text-center">
-                <p>Noch keine Nachrichten</p>
-                <p className="text-sm mt-1">Senden Sie die erste Nachricht!</p>
+                <p className="text-xs text-muted-foreground/70">
+                  Schreiben Sie eine Nachricht unten, um zu beginnen
+                </p>
               </div>
             </div>
           ) : (

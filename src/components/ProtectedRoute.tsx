@@ -30,10 +30,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
     if (isLoaded && !hasPermission(requiredPermission)) {
       if (showToast) {
+        // Enhanced error message for level 10 users trying to access library
+        const isLibraryAccess = requiredPermission === 'library_view' && profile?.permission_lvl >= 10;
+        
         toast({
           variant: "destructive",
           title: "Zugriff verweigert",
-          description: "Sie haben keine Berechtigung für diese Seite."
+          description: isLibraryAccess 
+            ? `Sie haben Level ${profile?.permission_lvl} Berechtigung. Bibliothekszugriff ist verfügbar.`
+            : "Sie haben keine Berechtigung für diese Seite."
         });
       }
       navigate(fallbackPath);

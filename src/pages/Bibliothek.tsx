@@ -868,11 +868,29 @@ const Bibliothek = () => {
   };
 
   const filteredBooks = books
-    .filter(book =>
-      book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      book.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (book.genre && book.genre.toLowerCase().includes(searchTerm.toLowerCase()))
-    )
+    .filter(book => {
+      if (!searchTerm) return true;
+      
+      const search = searchTerm.toLowerCase().trim();
+      const title = book.title.toLowerCase();
+      const author = book.author.toLowerCase();
+      const genre = (book.genre || '').toLowerCase();
+      const isbn = (book.isbn || '').toLowerCase();
+      
+      // Exact matches first
+      if (title.includes(search) || author.includes(search) || isbn.includes(search)) {
+        return true;
+      }
+      
+      // Fuzzy matching for partial words
+      const searchWords = search.split(' ').filter(word => word.length > 2);
+      return searchWords.some(word => 
+        title.includes(word) || 
+        author.includes(word) || 
+        genre.includes(word) ||
+        isbn.includes(word)
+      );
+    })
     .sort((a, b) => {
       if (sortBy === 'title') return a.title.localeCompare(b.title);
       if (sortBy === 'author') return a.author.localeCompare(b.author);

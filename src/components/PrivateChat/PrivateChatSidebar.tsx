@@ -235,10 +235,20 @@ export const PrivateChatSidebar: React.FC<PrivateChatSidebarProps> = ({
       <CardContent className="flex-1 p-0">
         <ScrollArea className="h-full">
           {conversations.length === 0 ? (
-            <div className="p-6 text-center text-muted-foreground">
-              <MessageCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>Noch keine Unterhaltungen</p>
-              <p className="text-sm mt-1">Fügen Sie Kontakte hinzu, um zu chatten</p>
+            <div className="p-6 text-center text-muted-foreground space-y-3">
+              <MessageCircle className="h-12 w-12 mx-auto opacity-50" />
+              <div>
+                <p className="text-lg font-medium">Noch keine Unterhaltungen</p>
+                <p className="text-sm mt-1">Beginnen Sie eine Unterhaltung mit Ihren Kontakten</p>
+              </div>
+              <Button
+                onClick={onShowContacts}
+                className="mt-4"
+                variant="default"
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Kontakte anzeigen
+              </Button>
             </div>
           ) : (
             <div className="space-y-1 p-4">
