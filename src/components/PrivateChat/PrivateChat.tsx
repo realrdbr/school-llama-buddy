@@ -116,14 +116,16 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
 
   const fetchMessages = async () => {
     try {
-      const { data, error } = await supabase
-        .from('private_messages')
-        .select('id, content, sender_id, created_at, is_read')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true });
+      await withSession(async () => {
+        const { data, error } = await supabase
+          .from('private_messages')
+          .select('id, content, sender_id, created_at, is_read')
+          .eq('conversation_id', conversationId)
+          .order('created_at', { ascending: true });
 
-      if (error) throw error;
-      setMessages(data || []);
+        if (error) throw error;
+        setMessages(data || []);
+      });
     } catch (error) {
       console.error('Error fetching messages:', error);
       toast({

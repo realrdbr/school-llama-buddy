@@ -100,6 +100,7 @@ const Bibliothek = () => {
   const [showEditBookDialog, setShowEditBookDialog] = useState(false);
   const [editingBook, setEditingBook] = useState<BookType | null>(null);
   const [activeTab, setActiveTab] = useState('books'); // Default to books tab
+  const [keycardNameMap, setKeycardNameMap] = useState<Record<string, string>>({});
 
   const canManageBooks = hasPermission('library_manage_books');
   const canManageLoans = hasPermission('library_manage_loans');
@@ -179,6 +180,27 @@ const Bibliothek = () => {
 
         if (allLoansError) throw allLoansError;
         setLoans(allLoansData || []);
+
+        // Resolve user names by keycard number for loans without joined permissions
+        const keycardsToResolve = (allLoansData || [])
+          .map((l: any) => l.keycard_number)
+          .filter((kc: string | null | undefined) => !!kc) as string[];
+        const uniqueKeycards = Array.from(new Set(keycardsToResolve));
+        if (uniqueKeycards.length > 0) {
+          await withSession(async () => {
+            const { data: usersByKey, error: usersErr } = await supabase
+              .from('permissions')
+              .select('name, keycard_number')
+              .in('keycard_number', uniqueKeycards);
+            if (!usersErr && usersByKey) {
+              const map: Record<string, string> = {};
+              (usersByKey as any[]).forEach((u) => {
+                if (u.keycard_number) map[u.keycard_number] = u.name;
+              });
+              setKeycardNameMap(map);
+            }
+          });
+        }
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -1397,7 +1419,7 @@ const Bibliothek = () => {
                        <TableCell>
                          <div>
                            <div className="font-medium">
-                             {loan.permissions?.name || `Benutzer ${loan.user_id}`}
+                             {loan.permissions?.name || (loan.keycard_number ? keycardNameMap[loan.keycard_number] : undefined) || 'Unbekannt'}
                            </div>
                            <div className="text-sm text-muted-foreground">
                              Keycard: {loan.keycard_number || 'Keine'}
