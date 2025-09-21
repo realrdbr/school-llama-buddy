@@ -1394,13 +1394,17 @@ const Bibliothek = () => {
                           <div className="text-sm text-muted-foreground">{loan.books.author}</div>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{loan.permissions?.name || 'Unbekannt'}</div>
-                          <div className="text-sm text-muted-foreground">{loan.keycard_number}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{format(new Date(loan.loan_date), 'dd.MM.yyyy', { locale: de })}</TableCell>
+                       <TableCell>
+                         <div>
+                           <div className="font-medium">
+                             {loan.permissions?.name || `Benutzer ${loan.user_id}`}
+                           </div>
+                           <div className="text-sm text-muted-foreground">
+                             Keycard: {loan.keycard_number || 'Keine'}
+                           </div>
+                         </div>
+                       </TableCell>
+                       <TableCell>{format(new Date(loan.loan_date), 'dd.MM.yyyy', { locale: de })}</TableCell>
                       <TableCell className={isOverdue(loan.due_date) && !loan.is_returned ? 'text-red-600' : ''}>
                         {format(new Date(loan.due_date), 'dd.MM.yyyy', { locale: de })}
                       </TableCell>

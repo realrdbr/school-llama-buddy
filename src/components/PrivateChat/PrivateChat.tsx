@@ -50,7 +50,7 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
     markMessagesAsRead();
   }, [conversationId]);
 
-  // Real-time updates for messages
+  // Real-time updates for messages with immediate response
   useEffect(() => {
     const channel = supabase
       .channel(`private-messages-${conversationId}`)
@@ -64,12 +64,24 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
         },
         (payload) => {
           const newMessage = payload.new as Message;
-          setMessages(prev => [...prev, newMessage]);
-          scrollToBottom();
           
-          // Mark as read if not sent by current user
+          // Remove optimistic message if it exists and add real message
+          setOptimisticMessages(prev => prev.filter(msg => 
+            msg.content !== newMessage.content || msg.sender_id !== newMessage.sender_id
+          ));
+          
+          setMessages(prev => {
+            // Prevent duplicate messages
+            const exists = prev.some(msg => msg.id === newMessage.id);
+            if (exists) return prev;
+            return [...prev, newMessage];
+          });
+          
+          setTimeout(scrollToBottom, 50);
+          
+          // Mark as read immediately if not sent by current user
           if (newMessage.sender_id !== profile?.id) {
-            setTimeout(() => markMessagesAsRead(), 500); // Small delay to ensure message is processed
+            setTimeout(() => markMessagesAsRead(), 100);
           }
         }
       )
@@ -82,7 +94,8 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
           filter: `conversation_id=eq.${conversationId}`
         },
         () => {
-          fetchMessages();
+          // Only fetch if it's a read status update
+          setTimeout(fetchMessages, 100);
         }
       )
       .subscribe();
@@ -162,20 +175,21 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
     setNewMessage('');
 
     try {
-      await withSession(async () => {
-        const { data, error } = await supabase.rpc('send_private_message_session', {
-          conversation_id_param: conversationId,
-          content_param: messageContent,
-          v_session_id: sessionId || ''
-        });
-        
-        if (error || (data && !(data as any).success)) {
-          throw new Error((data as any)?.error || error?.message || 'Nachricht konnte nicht gesendet werden');
-        }
-        
-        // Remove optimistic message on success - real message will come via realtime
-        setOptimisticMessages(prev => prev.filter(msg => msg.id !== tempId));
+      // Use Promise without withSession wrapper for faster response
+      const { data, error } = await supabase.rpc('send_private_message_session', {
+        conversation_id_param: conversationId,
+        content_param: messageContent,
+        v_session_id: sessionId || ''
       });
+      
+      if (error || (data && !(data as any).success)) {
+        throw new Error((data as any)?.error || error?.message || 'Nachricht konnte nicht gesendet werden');
+      }
+      
+      // Remove optimistic message on success - real message will come via realtime
+      setTimeout(() => {
+        setOptimisticMessages(prev => prev.filter(msg => msg.id !== tempId));
+      }, 100);
     } catch (error) {
       console.error('Error sending message:', error);
       

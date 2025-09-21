@@ -292,7 +292,11 @@ export const ContactSearch: React.FC<ContactSearchProps> = ({ onContactAdded, on
                   <div className="flex items-center gap-2">
                     <Button
                       size="sm"
-                      onClick={() => onStartChat(contact.contact_user_id, contact.contact_user.name)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onStartChat(contact.contact_user_id, contact.contact_user.name);
+                      }}
                     >
                       Chat starten
                     </Button>
