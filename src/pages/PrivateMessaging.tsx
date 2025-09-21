@@ -23,7 +23,7 @@ interface CurrentChat {
 const PrivateMessaging = () => {
   const [currentView, setCurrentView] = useState<View>('sidebar');
   const [currentChat, setCurrentChat] = useState<CurrentChat | null>(null);
-  const { profile } = useAuth();
+  const { profile, sessionId } = useAuth();
   const { withSession } = useSessionRequest();
   const { hasPermission } = useEnhancedPermissions();
   const navigate = useNavigate();
@@ -55,7 +55,6 @@ const PrivateMessaging = () => {
   };
 
   const handleStartChat = async (userId: number, userName: string) => {
-    // Create or get conversation with this user
     try {
       console.log('🚀 Starting chat with user:', { userId, userName, currentUserId: profile?.id });
       
@@ -65,49 +64,18 @@ const PrivateMessaging = () => {
       }
 
       const conversationId = await withSession(async () => {
-        // Determine user order (smaller ID first for consistency)
-        const currentUserId = profile.id;
-        const user1Id = currentUserId < userId ? currentUserId : userId;
-        const user2Id = currentUserId < userId ? userId : currentUserId;
+        const { data, error } = await supabase.rpc('get_or_create_conversation_session', {
+          other_user_id: userId,
+          v_session_id: sessionId || ''
+        });
 
-        console.log('🔍 Looking for existing conversation:', { user1Id, user2Id });
-
-        // First, try to find existing conversation
-        const { data: existingConversation, error: searchError } = await supabase
-          .from('private_conversations')
-          .select('id')
-          .eq('user1_id', user1Id)
-          .eq('user2_id', user2Id)
-          .single();
-
-        if (searchError && searchError.code !== 'PGRST116') { // PGRST116 = no rows found
-          console.error('❌ Error searching for conversation:', searchError);
-          throw searchError;
+        if (error) {
+          console.error('❌ Error getting/creating conversation:', error);
+          throw error;
         }
 
-        if (existingConversation) {
-          console.log('✅ Found existing conversation:', existingConversation.id);
-          return existingConversation.id;
-        }
-
-        // Create new conversation
-        console.log('🆕 Creating new conversation');
-        const { data: newConversation, error: createError } = await supabase
-          .from('private_conversations')
-          .insert({
-            user1_id: user1Id,
-            user2_id: user2Id
-          })
-          .select('id')
-          .single();
-
-        if (createError) {
-          console.error('❌ Error creating conversation:', createError);
-          throw createError;
-        }
-
-        console.log('✅ Created new conversation:', newConversation.id);
-        return newConversation.id;
+        console.log('✅ Got/created conversation:', data);
+        return data;
       });
 
       console.log('✅ Setting up chat with conversation:', conversationId);
@@ -121,7 +89,6 @@ const PrivateMessaging = () => {
       console.log('✅ Chat setup complete');
     } catch (error) {
       console.error('❌ Error starting chat:', error);
-      // Add user-friendly error handling
       const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
       console.error('Chat konnte nicht gestartet werden:', errorMessage);
     }

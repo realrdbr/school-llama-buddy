@@ -42,7 +42,7 @@ export const PrivateChatSidebar: React.FC<PrivateChatSidebarProps> = ({
 }) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
-  const { profile } = useAuth();
+  const { profile, sessionId } = useAuth();
   const { withSession } = useSessionRequest();
 
   useEffect(() => {
@@ -103,14 +103,14 @@ export const PrivateChatSidebar: React.FC<PrivateChatSidebarProps> = ({
     if (!profile?.id) return;
 
     try {
-      // Get conversations
-      const { data: conversationsData, error: conversationsError } = await supabase
-        .from('private_conversations')
-        .select('id, user1_id, user2_id, updated_at')
-        .or(`user1_id.eq.${profile.id},user2_id.eq.${profile.id}`)
-        .order('updated_at', { ascending: false });
+      const conversationsData = await withSession(async () => {
+        const { data, error } = await supabase.rpc('list_private_conversations_session', {
+          v_session_id: sessionId || ''
+        });
 
-      if (conversationsError) throw conversationsError;
+        if (error) throw error;
+        return data;
+      });
 
       if (!conversationsData || conversationsData.length === 0) {
         setConversations([]);
@@ -143,23 +143,21 @@ export const PrivateChatSidebar: React.FC<PrivateChatSidebarProps> = ({
           console.log('✅ Found user data for ID', otherUserId, ':', userData);
 
           // Get last message
-          const { data: lastMessage } = await supabase
-            .from('private_messages')
-            .select('content, created_at, sender_id')
-            .eq('conversation_id', conv.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+          const lastMessage = await withSession(async () => {
+            const { data } = await supabase.rpc('list_private_last_message_session', {
+              conversation_id_param: conv.id,
+              v_session_id: sessionId || ''
+            });
+            return Array.isArray(data) && data.length > 0 ? data[0] : null;
+          });
 
           // Get unread count using session context for correct authentication
           const unreadCount = await withSession(async () => {
-            const { count } = await supabase
-              .from('private_messages')
-              .select('id', { count: 'exact' })
-              .eq('conversation_id', conv.id)
-              .eq('is_read', false)
-              .neq('sender_id', profile.id);
-            return count || 0;
+            const { data } = await supabase.rpc('count_unread_messages_session', {
+              conversation_id_param: conv.id,
+              v_session_id: sessionId || ''
+            });
+            return data || 0;
           });
 
           return {

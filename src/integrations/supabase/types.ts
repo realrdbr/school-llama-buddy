@@ -920,6 +920,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      count_unread_messages_session: {
+        Args: { conversation_id_param: string; v_session_id?: string }
+        Returns: number
+      }
       create_school_user: {
         Args: {
           creator_user_id: number
@@ -1048,6 +1052,10 @@ export type Database = {
         Args: { other_user_id: number }
         Returns: string
       }
+      get_or_create_conversation_session: {
+        Args: { other_user_id: number; v_session_id?: string }
+        Returns: string
+      }
       get_user_contacts: {
         Args: { user_id_param: number }
         Returns: {
@@ -1100,6 +1108,33 @@ export type Database = {
         Args: { session_id_param: string }
         Returns: boolean
       }
+      list_private_conversations_session: {
+        Args: { v_session_id?: string }
+        Returns: {
+          id: string
+          updated_at: string
+          user1_id: number
+          user2_id: number
+        }[]
+      }
+      list_private_last_message_session: {
+        Args: { conversation_id_param: string; v_session_id?: string }
+        Returns: {
+          content: string
+          created_at: string
+          sender_id: number
+        }[]
+      }
+      list_private_messages_session: {
+        Args: { conversation_id_param: string; v_session_id?: string }
+        Returns: {
+          content: string
+          created_at: string
+          id: string
+          is_read: boolean
+          sender_id: number
+        }[]
+      }
       log_login_attempt: {
         Args: {
           ip_address_input?: unknown
@@ -1113,9 +1148,20 @@ export type Database = {
         Args: { conversation_id_param: string }
         Returns: undefined
       }
+      mark_messages_as_read_session: {
+        Args: { conversation_id_param: string; v_session_id?: string }
+        Returns: undefined
+      }
       release_primary_session: {
         Args: { target_user_id: number }
         Returns: undefined
+      }
+      resolve_keycards_to_names: {
+        Args: { keycards: string[]; v_session_id?: string }
+        Returns: {
+          keycard_number: string
+          name: string
+        }[]
       }
       rotate_session_token: {
         Args: { old_session_token: string }

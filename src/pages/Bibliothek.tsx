@@ -183,23 +183,23 @@ const Bibliothek = () => {
 
         // Resolve user names by keycard number for loans without joined permissions
         const keycardsToResolve = (allLoansData || [])
-          .map((l: any) => l.keycard_number)
-          .filter((kc: string | null | undefined) => !!kc) as string[];
+          .filter((l: any) => l.keycard_number && !l.permissions?.name)
+          .map((l: any) => l.keycard_number) as string[];
+        
         const uniqueKeycards = Array.from(new Set(keycardsToResolve));
+        
         if (uniqueKeycards.length > 0) {
-          await withSession(async () => {
-            const { data: usersByKey, error: usersErr } = await supabase
-              .from('permissions')
-              .select('name, keycard_number')
-              .in('keycard_number', uniqueKeycards);
-            if (!usersErr && usersByKey) {
-              const map: Record<string, string> = {};
-              (usersByKey as any[]).forEach((u) => {
-                if (u.keycard_number) map[u.keycard_number] = u.name;
-              });
-              setKeycardNameMap(map);
-            }
+          const { data: usersByKey, error: usersErr } = await supabase.rpc('resolve_keycards_to_names', {
+            keycards: uniqueKeycards
           });
+          
+          if (!usersErr && usersByKey) {
+            const map: Record<string, string> = {};
+            (usersByKey as any[]).forEach((u) => {
+              if (u.keycard_number) map[u.keycard_number] = u.name;
+            });
+            setKeycardNameMap(map);
+          }
         }
       }
     } catch (error) {

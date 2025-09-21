@@ -117,11 +117,10 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
   const fetchMessages = async () => {
     try {
       await withSession(async () => {
-        const { data, error } = await supabase
-          .from('private_messages')
-          .select('id, content, sender_id, created_at, is_read')
-          .eq('conversation_id', conversationId)
-          .order('created_at', { ascending: true });
+        const { data, error } = await supabase.rpc('list_private_messages_session', {
+          conversation_id_param: conversationId,
+          v_session_id: sessionId || ''
+        });
 
         if (error) throw error;
         setMessages(data || []);
@@ -143,13 +142,10 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
 
     try {
       await withSession(async () => {
-        const { error } = await supabase
-          .from('private_messages')
-          .update({ is_read: true })
-          .eq('conversation_id', conversationId)
-          .neq('sender_id', profile.id)
-          .eq('is_read', false);
-        if (error) throw error;
+        await supabase.rpc('mark_messages_as_read_session', {
+          conversation_id_param: conversationId,
+          v_session_id: sessionId || ''
+        });
       });
     } catch (error) {
       console.error('Error marking messages as read:', error);
