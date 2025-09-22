@@ -110,6 +110,14 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
     scrollToBottom();
   }, [messages]);
 
+  // Poll as a fallback to ensure new messages appear if realtime is blocked by RLS
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchMessages();
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [conversationId]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -123,7 +131,12 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
         });
 
         if (error) throw error;
-        setMessages(data || []);
+        const serverMessages = data || [];
+        setMessages(serverMessages);
+        // Remove optimistic messages that now exist on server
+        setOptimisticMessages(prev => prev.filter(om =>
+          !serverMessages.some(sm => sm.content === om.content && sm.sender_id === om.sender_id)
+        ));
       });
     } catch (error) {
       console.error('Error fetching messages:', error);
@@ -184,10 +197,9 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
         throw new Error((data as any)?.error || error?.message || 'Nachricht konnte nicht gesendet werden');
       }
       
-      // Remove optimistic message on success - real message will come via realtime
-      setTimeout(() => {
-        setOptimisticMessages(prev => prev.filter(msg => msg.id !== tempId));
-      }, 100);
+      // Ensure UI reflects the persisted message even if realtime is blocked
+      await fetchMessages();
+      // Do not remove the optimistic message here; fetchMessages will dedupe
     } catch (error) {
       console.error('Error sending message:', error);
       
