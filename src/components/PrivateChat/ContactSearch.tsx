@@ -32,7 +32,7 @@ export const ContactSearch: React.FC<ContactSearchProps> = ({ onContactAdded, on
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(false);
-  const { profile } = useAuth();
+  const { profile, sessionId } = useAuth();
   const { withSession } = useSessionRequest();
   const { toast } = useToast();
 
@@ -139,15 +139,16 @@ export const ContactSearch: React.FC<ContactSearchProps> = ({ onContactAdded, on
 
     try {
       await withSession(async () => {
-        const { error } = await supabase
-          .from('user_contacts')
-          .insert({
-            user_id: profile.id,
-            contact_user_id: userId,
-            status: 'active'
-          });
+        const { data, error } = await supabase.rpc('add_contact_session', {
+          contact_user_id_param: userId,
+          v_session_id: sessionId || ''
+        });
 
         if (error) throw error;
+        
+        if (data && !(data as any).success) {
+          throw new Error((data as any).error || 'Kontakt konnte nicht hinzugefügt werden');
+        }
       });
 
       toast({
@@ -162,9 +163,10 @@ export const ContactSearch: React.FC<ContactSearchProps> = ({ onContactAdded, on
       setSearchResults(prev => prev.filter(user => user.id !== userId));
     } catch (error) {
       console.error('Error adding contact:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Kontakt konnte nicht hinzugefügt werden';
       toast({
         title: "Fehler",
-        description: "Kontakt konnte nicht hinzugefügt werden",
+        description: errorMessage,
         variant: "destructive",
       });
     }

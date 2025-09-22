@@ -872,6 +872,10 @@ export type Database = {
         }
         Returns: Json
       }
+      add_contact_session: {
+        Args: { contact_user_id_param: number; v_session_id?: string }
+        Returns: Json
+      }
       admin_change_user_password: {
         Args: {
           admin_user_id: number
