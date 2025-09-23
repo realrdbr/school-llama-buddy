@@ -4,7 +4,7 @@ import { toast } from './use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 interface SecurityEvent {
-  type: 'session_timeout' | 'suspicious_activity' | 'permission_change';
+  type: 'session_timeout' | 'suspicious_activity' | 'permission_change' | 'session_error';
   timestamp: Date;
   details: string;
 }
@@ -14,35 +14,54 @@ export const useSecurityMiddleware = () => {
   const [securityEvents, setSecurityEvents] = useState<SecurityEvent[]>([]);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
 
-  // Session validation and rotation
+  // Enhanced session validation and security
   useEffect(() => {
     if (!profile) return;
 
     const validateSession = async () => {
       try {
-        // Check if current session is still valid
-        const storedSession = localStorage.getItem('sb-session');
+        // Enhanced session validation with server-side verification
+        const storedSession = localStorage.getItem('sessionToken');
         if (!storedSession) {
-          await signOut();
+          await cleanupSession();
           return;
         }
 
-        const session = JSON.parse(storedSession);
-        const currentToken = session.access_token;
+        // Validate session with server
+        const { data, error } = await supabase.rpc('validate_session_security', {
+          session_id_param: storedSession
+        });
+        
+        if (error || !data) {
+          logSecurityEvent('session_timeout', 'Session validation failed - auto logout');
+          await cleanupSession();
+          return;
+        }
 
-        // Rotate session token every 30 minutes
-        const tokenAge = Date.now() - parseInt(currentToken.split('_')[2] || '0');
-        if (tokenAge > 30 * 60 * 1000) { // 30 minutes
-          await rotateSessionToken(currentToken);
+        // Check for token rotation need (every 20 minutes for enhanced security)
+        const sessionData = JSON.parse(localStorage.getItem('profile') || '{}');
+        const lastRotation = sessionData.lastTokenRotation || 0;
+        if (Date.now() - lastRotation > 20 * 60 * 1000) { // 20 minutes
+          await rotateSessionToken(storedSession);
         }
       } catch (error) {
         console.error('Session validation error:', error);
-        await signOut();
+        logSecurityEvent('session_error', 'Critical session validation error');
+        await cleanupSession();
       }
     };
 
-    // Validate session every 5 minutes
-    const interval = setInterval(validateSession, 5 * 60 * 1000);
+    const cleanupSession = async () => {
+      // Enhanced session cleanup
+      localStorage.removeItem('sessionToken');
+      localStorage.removeItem('profile');
+      localStorage.removeItem('lastRoute');
+      sessionStorage.clear();
+      await signOut();
+    };
+
+    // Validate session every 3 minutes (more frequent for security)
+    const interval = setInterval(validateSession, 3 * 60 * 1000);
     validateSession(); // Initial validation
 
     return () => clearInterval(interval);
@@ -117,20 +136,30 @@ export const useSecurityMiddleware = () => {
 
   const rotateSessionToken = async (oldToken: string) => {
     try {
-      // For now, create a new token locally until the RPC is available in types
-      const newTokenValue = `session_${profile?.id}_${Date.now()}`;
+      // Enhanced session rotation with server-side validation
+      const { data, error } = await supabase.rpc('rotate_session_token', {
+        old_session_token: oldToken
+      });
+
+      if (error || !data) {
+        logSecurityEvent('session_timeout', 'Session rotation failed');
+        await signOut();
+        return;
+      }
 
       // Update stored session with new token
-      const storedSession = localStorage.getItem('sb-session');
-      if (storedSession) {
-        const session = JSON.parse(storedSession);
-        session.access_token = newTokenValue;
-        localStorage.setItem('sb-session', JSON.stringify(session));
-        setSessionToken(newTokenValue);
-      }
+      localStorage.setItem('sessionToken', data);
+      setSessionToken(data);
+      
+      // Update last rotation timestamp
+      const profileData = JSON.parse(localStorage.getItem('profile') || '{}');
+      profileData.lastTokenRotation = Date.now();
+      localStorage.setItem('profile', JSON.stringify(profileData));
+      
+      logSecurityEvent('session_timeout', 'Session token rotated successfully');
     } catch (error) {
       console.error('Session rotation error:', error);
-      logSecurityEvent('session_timeout', 'Session rotation failed');
+      logSecurityEvent('session_timeout', 'Session rotation failed with error');
       await signOut();
     }
   };

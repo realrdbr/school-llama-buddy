@@ -104,9 +104,14 @@ const Keycard = () => {
     try {
       const permissionLevel = getPermissionLevel(newKeycard.accessLevel);
       
+      // Generate secure random password
+      const randomPassword = Math.random().toString(36).slice(-12) + 
+                            Math.random().toString(36).slice(-8).toUpperCase() + 
+                            Math.floor(Math.random() * 100);
+      
       const { data, error } = await supabase.rpc('create_school_user_secure', {
         username_input: `keycard_${newKeycard.cardNumber}`,
-        password_input: 'defaultpassword',
+        password_input: randomPassword,
         full_name_input: newKeycard.owner,
         permission_level_input: permissionLevel,
         creator_user_id: profile?.id,
