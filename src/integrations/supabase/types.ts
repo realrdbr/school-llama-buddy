@@ -1164,6 +1164,10 @@ export type Database = {
         Args: { contact_id_param: string; v_session_id?: string }
         Returns: Json
       }
+      resolve_current_user_from_session: {
+        Args: { v_session_id: string }
+        Returns: number
+      }
       resolve_keycards_to_names: {
         Args: { keycards: string[]; v_session_id?: string }
         Returns: {
