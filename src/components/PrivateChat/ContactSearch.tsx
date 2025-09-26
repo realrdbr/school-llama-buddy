@@ -175,12 +175,14 @@ export const ContactSearch: React.FC<ContactSearchProps> = ({ onContactAdded, on
   const removeContact = async (contactId: string) => {
     try {
       await withSession(async () => {
-        const { error } = await supabase
-          .from('user_contacts')
-          .delete()
-          .eq('id', contactId);
-
+        const { data, error } = await supabase.rpc('remove_contact_session', {
+          contact_id_param: contactId,
+          v_session_id: sessionId || ''
+        });
         if (error) throw error;
+        if (data && !(data as any).success) {
+          throw new Error((data as any).error || 'Kontakt konnte nicht entfernt werden');
+        }
       });
 
       toast({

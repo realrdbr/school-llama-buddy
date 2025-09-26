@@ -1160,6 +1160,10 @@ export type Database = {
         Args: { target_user_id: number }
         Returns: undefined
       }
+      remove_contact_session: {
+        Args: { contact_id_param: string; v_session_id?: string }
+        Returns: Json
+      }
       resolve_keycards_to_names: {
         Args: { keycards: string[]; v_session_id?: string }
         Returns: {

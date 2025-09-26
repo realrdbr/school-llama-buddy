@@ -153,19 +153,19 @@ const Bibliothek = () => {
       if (booksError) throw booksError;
       setBooks(booksData || []);
 
-      // Load my loans
-      const { data: myLoansData, error: myLoansError } = await supabase
-        .from('loans')
-        .select(`
-          *,
-          books (*),
-          permissions!loans_user_id_fkey (name, username)
-        `)
-        .eq('user_id', profile.id)
-        .eq('is_returned', false);
+      // Load my loans (via edge function to bypass RLS issues)
+      const { data: myLoansResp, error: myLoansErr } = await supabase.functions.invoke('loan-service', {
+        body: {
+          action: 'list_my_loans',
+          profileId: profile.id,
+          actorUserId: profile.id,
+          actorUsername: profile.username
+        }
+      });
 
-      if (myLoansError) throw myLoansError;
-      setMyLoans(myLoansData || []);
+      if (myLoansErr) throw myLoansErr;
+      if (myLoansResp?.error) throw new Error(myLoansResp.error);
+      setMyLoans(myLoansResp?.loans || []);
 
       // Load all loans if librarian
       if (canManageLoans) {
