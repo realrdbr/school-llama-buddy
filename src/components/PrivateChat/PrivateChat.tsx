@@ -138,6 +138,8 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
           !serverMessages.some(sm => sm.content === om.content && sm.sender_id === om.sender_id)
         ));
       });
+      // Mark as read immediately after syncing messages
+      await markMessagesAsRead();
     } catch (error) {
       console.error('Error fetching messages:', error);
       toast({

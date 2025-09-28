@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useSessionRequest } from '@/hooks/useSessionRequest';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -77,70 +78,67 @@ export const MessageNotificationWidget: React.FC = () => {
     if (!profile?.id) return;
 
     try {
-      // Get all conversations user is part of
-      const { data: conversations, error: convError } = await supabase
-        .from('private_conversations')
-        .select('id, user1_id, user2_id')
-        .or(`user1_id.eq.${profile.id},user2_id.eq.${profile.id}`);
+      setLoading(true);
+      const { withSession } = useSessionRequest();
+      const sessionFetch = async () => {
+        // Fetch conversations via session-aware RPC
+        const { data: conversations, error: convError } = await supabase
+          .rpc('list_private_conversations_session', {
+            v_session_id: (localStorage.getItem('school_session_id') || '')
+          });
+        if (convError) throw convError;
 
-      if (convError) throw convError;
+        if (!conversations || conversations.length === 0) {
+          setUnreadMessages([]);
+          setTotalUnread(0);
+          return;
+        }
 
-      if (!conversations || conversations.length === 0) {
-        setUnreadMessages([]);
-        setTotalUnread(0);
-        setLoading(false);
-        return;
-      }
+        const unreadData = await Promise.all(
+          conversations.map(async (conv: any) => {
+            const otherUserId = conv.user1_id === profile.id ? conv.user2_id : conv.user1_id;
 
-      // Get unread messages for each conversation
-      const unreadData = await Promise.all(
-        conversations.map(async (conv) => {
-          const otherUserId = conv.user1_id === profile.id ? conv.user2_id : conv.user1_id;
+            // Count unread messages for this conversation
+            const { data: unreadCount } = await supabase.rpc('count_unread_messages_session', {
+              conversation_id_param: conv.id,
+              v_session_id: (localStorage.getItem('school_session_id') || '')
+            });
 
-          // Get unread message count
-          const { count } = await supabase
-            .from('private_messages')
-            .select('id', { count: 'exact' })
-            .eq('conversation_id', conv.id)
-            .eq('is_read', false)
-            .neq('sender_id', profile.id);
+            if (!unreadCount || unreadCount === 0) return null;
 
-          if (!count || count === 0) return null;
+            // Get other user info
+            const { data: otherUserData } = await (supabase as any).rpc('get_user_public_info', {
+              user_id_param: otherUserId
+            });
+            const otherUser = Array.isArray(otherUserData) ? otherUserData[0] : otherUserData;
 
-          // Get sender info
-          const { data: senderData } = await supabase
-            .from('permissions')
-            .select('id, name, username')
-            .eq('id', otherUserId)
-            .single();
+            // Get last unread message
+            const { data: lastUnreadArr } = await supabase.rpc('list_private_last_message_session', {
+              conversation_id_param: conv.id,
+              v_session_id: (localStorage.getItem('school_session_id') || '')
+            });
+            const lastUnread = Array.isArray(lastUnreadArr) && lastUnreadArr.length > 0
+              ? lastUnreadArr[0]
+              : { content: '', created_at: new Date().toISOString() };
 
-          // Get last unread message
-          const { data: lastMessage } = await supabase
-            .from('private_messages')
-            .select('content, created_at')
-            .eq('conversation_id', conv.id)
-            .eq('is_read', false)
-            .neq('sender_id', profile.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+            return {
+              conversation_id: conv.id,
+              sender: otherUser || { id: otherUserId, name: 'Unbekannt', username: 'unknown' },
+              message_count: unreadCount as number,
+              last_message: lastUnread
+            } as UnreadMessage;
+          })
+        );
 
-          return {
-            conversation_id: conv.id,
-            sender: senderData || { id: otherUserId, name: 'Unbekannt', username: 'unknown' },
-            message_count: count,
-            last_message: lastMessage || { content: '', created_at: new Date().toISOString() }
-          };
-        })
-      );
+        const validUnread = (unreadData.filter(Boolean) as UnreadMessage[]);
+        setUnreadMessages(validUnread);
+        setTotalUnread(validUnread.reduce((sum, item) => sum + item.message_count, 0));
+      };
 
-      const validUnreadData = unreadData.filter(Boolean) as UnreadMessage[];
-      const total = validUnreadData.reduce((sum, item) => sum + item.message_count, 0);
-
-      setUnreadMessages(validUnreadData);
-      setTotalUnread(total);
+      // Execute within session context
+      await withSession(sessionFetch);
     } catch (error) {
-      console.error('Error fetching unread messages:', error);
+      console.error('Error fetching unread messages (session):', error);
     } finally {
       setLoading(false);
     }

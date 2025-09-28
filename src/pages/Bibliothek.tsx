@@ -167,32 +167,30 @@ const Bibliothek = () => {
       if (myLoansResp?.error) throw new Error(myLoansResp.error);
       setMyLoans(myLoansResp?.loans || []);
 
-      // Load all loans if librarian
       if (canManageLoans) {
-        const { data: allLoansData, error: allLoansError } = await supabase
-          .from('loans')
-          .select(`
-            *,
-            books (*),
-            permissions!loans_user_id_fkey (name, username)
-          `)
-          .order('loan_date', { ascending: false });
+        // Use Edge Function with service role to avoid RLS friction and ensure consistency
+        const { data: allLoansResp, error: allLoansErr } = await supabase.functions.invoke('loan-service', {
+          body: {
+            action: 'list_all_loans',
+            actorUserId: profile.id,
+            actorUsername: profile.username
+          }
+        });
 
-        if (allLoansError) throw allLoansError;
-        setLoans(allLoansData || []);
+        if (allLoansErr) throw allLoansErr;
+        if (allLoansResp?.error) throw new Error(allLoansResp.error);
+        const allLoansData = allLoansResp?.loans || [];
+        setLoans(allLoansData);
 
         // Resolve user names by keycard number for loans without joined permissions
         const keycardsToResolve = (allLoansData || [])
-          .filter((l: any) => l.keycard_number && !l.permissions?.name)
+          .filter((l: any) => l.keycard_number && !(l as any).permissions?.name)
           .map((l: any) => l.keycard_number) as string[];
-        
         const uniqueKeycards = Array.from(new Set(keycardsToResolve));
-        
         if (uniqueKeycards.length > 0) {
           const { data: usersByKey, error: usersErr } = await supabase.rpc('resolve_keycards_to_names', {
             keycards: uniqueKeycards
           });
-          
           if (!usersErr && usersByKey) {
             const map: Record<string, string> = {};
             (usersByKey as any[]).forEach((u) => {
