@@ -511,13 +511,15 @@ const Bibliothek = () => {
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Bitte Keycard-Nummer eingeben."
+        description: "Bitte Keycard-Nummer oder Namen eingeben."
       });
       return;
     }
 
     try {
-      // Use the admin-users edge function to search by keycard
+      let pickedUserId: number | null = null;
+
+      // 1) Try keycard lookup via Edge Function (preferred)
       const { data, error } = await supabase.functions.invoke('admin-users', {
         body: {
           action: 'search_by_keycard',
@@ -527,50 +529,44 @@ const Bibliothek = () => {
         }
       });
 
-      if (error) throw error;
-      if (data.error) {
-        toast({
-          variant: "destructive",
-          title: "Fehler",
-          description: data.error
+      if (!error && data?.user) {
+        setSelectedUser(data.user);
+        pickedUserId = data.user.id;
+      } else {
+        // 2) Fallback: search by username/name (SECURITY DEFINER RPC)
+        const { data: usersFound, error: usersErr } = await supabase.rpc('search_user_directory', {
+          search_term: scanKeycard.trim(),
+          current_user_id: profile?.id || null
         });
-        return;
+
+        if (usersErr) throw usersErr;
+        if (!usersFound || usersFound.length === 0) {
+          toast({
+            variant: "destructive",
+            title: "Fehler",
+            description: "Kein Benutzer gefunden."
+          });
+          return;
+        }
+
+        // Prefer exact username match, otherwise first result
+        const exactUser = usersFound.find((u: any) => u.username?.toLowerCase() === scanKeycard.trim().toLowerCase());
+        const picked = exactUser || usersFound[0];
+        pickedUserId = picked.id;
+        setSelectedUser({ ...picked, keycard_number: null, keycard_active: true });
+        toast({ title: 'Benutzer ausgewählt', description: `${picked.name} (@${picked.username})` });
       }
 
-      if (!data.user) {
-        toast({
-          variant: "destructive",
-          title: "Fehler",
-          description: "Keycard nicht gefunden."
-        });
+      if (!pickedUserId) {
+        toast({ variant: 'destructive', title: 'Fehler', description: 'Benutzer konnte nicht bestimmt werden.' });
         return;
       }
-
-      setSelectedUser(data.user);
-
-      // Load user's active loans
-      const { data: loansData, error: loansError } = await supabase
-        .from('loans')
-        .select(`
-          *,
-          books (*)
-        `)
-        .eq('user_id', data.user.id)
-        .eq('is_returned', false);
-
-      if (loansError) throw loansError;
-      setUserLoans(loansData || []);
-
-      setSelectedUser(data.user);
 
       // Load user's active loans
       const { data: userLoansData, error: userLoansError } = await supabase
         .from('loans')
-        .select(`
-          *,
-          books (*)
-        `)
-        .eq('user_id', data.user.id)
+        .select(`*, books (*)`)
+        .eq('user_id', pickedUserId)
         .eq('is_returned', false);
 
       if (userLoansError) throw userLoansError;
@@ -722,44 +718,46 @@ const Bibliothek = () => {
       let errorCount = 0;
 
       for (const barcode of barcodes) {
-        // Find active loan by barcode
-        const { data: loanData, error: loanError } = await supabase
-          .from('loans')
-          .select(`
-            *,
-            books (*)
-          `)
-          .eq('user_id', selectedUser.id)
-          .eq('is_returned', false)
-          .eq('books.isbn', barcode)
+        // Find book by ISBN first
+        const { data: book, error: bookErr } = await supabase
+          .from('books')
+          .select('id, available_copies')
+          .eq('isbn', barcode)
           .maybeSingle();
-
-        if (loanError || !loanData) {
-          console.error(`Active loan for barcode ${barcode} not found`);
+        if (bookErr || !book) {
+          console.error(`Book with ISBN ${barcode} not found`);
           errorCount++;
           continue;
         }
 
-        await withSession(async () => {
-          // Mark as returned
-          const { error: returnError } = await supabase
-            .from('loans')
-            .update({
-              is_returned: true,
-              return_date: new Date().toISOString()
-            })
-            .eq('id', loanData.id);
+        // Find active loan for this user and book
+        const { data: loan, error: loanErr } = await supabase
+          .from('loans')
+          .select('id')
+          .eq('user_id', selectedUser.id)
+          .eq('book_id', book.id)
+          .eq('is_returned', false)
+          .maybeSingle();
+        if (loanErr || !loan) {
+          console.error(`Active loan not found for user ${selectedUser.id} and book ${book.id}`);
+          errorCount++;
+          continue;
+        }
 
-          if (returnError) throw returnError;
-
-          // Update available copies
-          const { error: updateError } = await supabase
-            .from('books')
-            .update({ available_copies: loanData.books.available_copies + 1 })
-            .eq('id', loanData.book_id);
-
-          if (updateError) throw updateError;
+        // Use Edge Function to process return with service role (avoids RLS)
+        const { data: ret, error: retErr } = await supabase.functions.invoke('loan-service', {
+          body: {
+            action: 'return_book',
+            loan_id: loan.id,
+            actorUserId: profile!.id,
+            actorUsername: profile!.username
+          }
         });
+        if (retErr || ret?.error) {
+          console.error('Return via edge function failed:', retErr || ret?.error);
+          errorCount++;
+          continue;
+        }
 
         successCount++;
       }
@@ -781,9 +779,9 @@ const Bibliothek = () => {
 
       setScanBookBarcode('');
       setMultipleBarcodes('');
-      handleSearchUser(); // Refresh user loans
-      loadData(); // Refresh books
-      setActiveTab('loans'); // Stay on loans tab after return
+      handleSearchUser();
+      loadData();
+      setActiveTab('loans');
     } catch (error) {
       console.error('Error returning books:', error);
       toast({
@@ -874,44 +872,28 @@ const Bibliothek = () => {
 
   const handleReturnBook = async (loan: LoanType) => {
     try {
-      await withSession(async () => {
-        // Mark as returned
-        const { error: returnError } = await supabase
-          .from('loans')
-          .update({
-            is_returned: true,
-            return_date: new Date().toISOString()
-          })
-          .eq('id', loan.id);
-
-        if (returnError) throw returnError;
-
-        // Get current available copies
-        const { data: bookData, error: bookError } = await supabase
-          .from('books')
-          .select('available_copies')
-          .eq('id', loan.book_id)
-          .single();
-
-        if (bookError) throw bookError;
-
-        // Update available copies by incrementing current count
-        const { error: updateError } = await supabase
-          .from('books')
-          .update({ available_copies: bookData.available_copies + 1 })
-          .eq('id', loan.book_id);
-
-        if (updateError) throw updateError;
+      // Use Edge Function with service role credentials
+      const { data: ret, error: retErr } = await supabase.functions.invoke('loan-service', {
+        body: {
+          action: 'return_book',
+          loan_id: loan.id,
+          actorUserId: profile!.id,
+          actorUsername: profile!.username
+        }
       });
+
+      if (retErr || ret?.error) {
+        throw new Error(retErr?.message || ret?.error || 'Rückgabe fehlgeschlagen');
+      }
 
       toast({
         title: "Erfolg",
         description: "Buch wurde zurückgegeben."
       });
 
-      handleSearchUser(); // Refresh user loans
-      loadData(); // Refresh books
-      setActiveTab('loans'); // Stay on loans tab after return
+      handleSearchUser();
+      loadData();
+      setActiveTab('loans');
     } catch (error) {
       console.error('Error returning book:', error);
       toast({
