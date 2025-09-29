@@ -105,6 +105,11 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
     };
   }, [conversationId, profile?.id]);
 
+  // Ensure initial scroll to bottom on mount
+  useEffect(() => {
+    setTimeout(scrollToBottom, 120);
+  }, []);
+
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     scrollToBottom();
@@ -133,6 +138,8 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
         if (error) throw error;
         const serverMessages = data || [];
         setMessages(serverMessages);
+        // Scroll after syncing
+        setTimeout(scrollToBottom, 50);
         // Remove optimistic messages that now exist on server
         setOptimisticMessages(prev => prev.filter(om =>
           !serverMessages.some(sm => sm.content === om.content && sm.sender_id === om.sender_id)

@@ -29,6 +29,7 @@ export const MessageNotificationWidget: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const { withSession } = useSessionRequest();
 
   useEffect(() => {
     if (profile?.id) {
@@ -79,7 +80,6 @@ export const MessageNotificationWidget: React.FC = () => {
 
     try {
       setLoading(true);
-      const { withSession } = useSessionRequest();
       const sessionFetch = async () => {
         // Fetch conversations via session-aware RPC
         const { data: conversations, error: convError } = await supabase
