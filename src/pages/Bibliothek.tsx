@@ -48,6 +48,20 @@ interface BookType {
   cover_image_url?: string;
 }
 
+interface UserSuggestion {
+  id: number;
+  name: string;
+  username: string;
+  keycard_number?: string;
+}
+
+interface BookSuggestion {
+  id: string;
+  title: string;
+  author: string;
+  isbn?: string;
+}
+
 interface LoanType {
   id: string;
   book_id: string;
@@ -93,6 +107,10 @@ const Bibliothek = () => {
   const [scanBookBarcode, setScanBookBarcode] = useState('');
   const [scannedBooks, setScannedBooks] = useState<BookType[]>([]);
   const [multipleBarcodes, setMultipleBarcodes] = useState('');
+  const [userSuggestions, setUserSuggestions] = useState<UserSuggestion[]>([]);
+  const [bookSuggestions, setBookSuggestions] = useState<BookSuggestion[]>([]);
+  const [showUserSuggestions, setShowUserSuggestions] = useState(false);
+  const [showBookSuggestions, setShowBookSuggestions] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [userLoans, setUserLoans] = useState<LoanType[]>([]);
   const [showAddBookDialog, setShowAddBookDialog] = useState(false);
@@ -793,33 +811,16 @@ const Bibliothek = () => {
   };
 
   const handleLoanBook = async (book: BookType) => {
-    if (!scanKeycard.trim()) {
+    if (!selectedUser) {
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Bitte Keycard-Nummer eingeben."
+        description: "Bitte zuerst einen Benutzer suchen."
       });
       return;
     }
 
     try {
-      // Find user by keycard
-      const { data: userData, error: userError } = await supabase
-        .from('permissions')
-        .select('id, name, username')
-        .eq('keycard_number', scanKeycard.trim())
-        .maybeSingle();
-
-      if (userError) throw userError;
-      if (!userData) {
-        toast({
-          variant: "destructive",
-          title: "Fehler",
-          description: "Keycard nicht gefunden."
-        });
-        return;
-      }
-
       if (book.available_copies <= 0) {
         toast({
           variant: "destructive",
@@ -829,44 +830,94 @@ const Bibliothek = () => {
         return;
       }
 
-      await withSession(async () => {
-        // Create loan
-        const { error: loanError } = await supabase
-          .from('loans')
-          .insert({
-            book_id: book.id,
-            user_id: selectedUser.id,
-            keycard_number: scanKeycard.trim(),
-            librarian_id: profile!.id
-          });
+      // Use loan-service edge function
+      const { data, error } = await supabase.functions.invoke('loan-service', {
+        body: {
+          action: 'loan_book',
+          bookId: book.id,
+          userId: selectedUser.id,
+          keycardNumber: scanKeycard.trim(),
+          librarianId: profile!.id,
+          actorUserId: profile!.id,
+          actorUsername: profile!.username || profile!.name
+        }
+      });
 
-        if (loanError) throw loanError;
+      if (error || (data && !data.success)) {
+        throw new Error(data?.error || error?.message || 'Ausleihe fehlgeschlagen');
+      }
 
-        // Update available copies
-        const { error: updateError } = await supabase
-          .from('books')
-          .update({ available_copies: book.available_copies - 1 })
-          .eq('id', book.id);
-
-        if (updateError) throw updateError;
+      toast({
+        title: "Erfolg",
+        description: "Buch wurde ausgeliehen."
       });
 
       toast({
         title: "Erfolg",
-        description: `Buch an ${userData.name} ausgeliehen.`
+        description: "Buch wurde ausgeliehen."
       });
 
-      setScanKeycard('');
       setShowLoanDialog(false);
       setSelectedBook(null);
+      setScanKeycard('');
       loadData();
+      if (selectedUser) {
+        handleSearchUser();
+      }
     } catch (error) {
       console.error('Error loaning book:', error);
       toast({
         variant: "destructive",
         title: "Fehler",
-        description: "Ausleihe konnte nicht erstellt werden."
+        description: "Buch konnte nicht ausgeliehen werden."
       });
+    }
+  };
+
+  // User suggestion search
+  const searchUserSuggestions = async (query: string) => {
+    if (query.length < 2) {
+      setUserSuggestions([]);
+      setShowUserSuggestions(false);
+      return;
+    }
+
+    try {
+      const { data } = await supabase.rpc('search_user_directory', {
+        search_term: query,
+        current_user_id: profile?.id || null
+      });
+
+      if (data) {
+        setUserSuggestions(data);
+        setShowUserSuggestions(true);
+      }
+    } catch (error) {
+      console.error('Error searching users:', error);
+    }
+  };
+
+  // Book suggestion search
+  const searchBookSuggestions = async (query: string) => {
+    if (query.length < 2) {
+      setBookSuggestions([]);
+      setShowBookSuggestions(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('books')
+        .select('id, title, author, isbn')
+        .or(`title.ilike.%${query}%,author.ilike.%${query}%,isbn.ilike.%${query}%`)
+        .limit(10);
+
+      if (!error && data) {
+        setBookSuggestions(data);
+        setShowBookSuggestions(true);
+      }
+    } catch (error) {
+      console.error('Error searching books:', error);
     }
   };
 
@@ -1191,15 +1242,51 @@ const Bibliothek = () => {
                           <ScanLine className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                           <Input
                             value={scanKeycard}
-                            onChange={(e) => setScanKeycard(e.target.value)}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setScanKeycard(value);
+                              searchUserSuggestions(value);
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 handleSearchUser();
+                                setShowUserSuggestions(false);
+                              } else if (e.key === 'Escape') {
+                                setShowUserSuggestions(false);
                               }
+                            }}
+                            onFocus={() => {
+                              if (scanKeycard.length >= 2) {
+                                searchUserSuggestions(scanKeycard);
+                              }
+                            }}
+                            onBlur={() => {
+                              setTimeout(() => setShowUserSuggestions(false), 200);
                             }}
                             placeholder="Keycard scannen..."
                             className="pl-10"
                           />
+                          {/* User suggestions dropdown */}
+                          {showUserSuggestions && userSuggestions.length > 0 && (
+                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                              {userSuggestions.map((user) => (
+                                <div
+                                  key={user.id}
+                                  className="p-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+                                  onClick={() => {
+                                    setScanKeycard(user.keycard_number || user.username);
+                                    setShowUserSuggestions(false);
+                                    handleSearchUser();
+                                  }}
+                                >
+                                  <div className="font-medium">{user.name}</div>
+                                  <div className="text-sm text-gray-500">
+                                    {user.keycard_number ? `Keycard: ${user.keycard_number}` : `Username: ${user.username}`}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                         <Button onClick={handleSearchUser} disabled={!scanKeycard.trim()}>
                           <UserSearch className="h-4 w-4 mr-2" />
@@ -1533,11 +1620,48 @@ const Bibliothek = () => {
                     <Input
                       id="keycard"
                       value={scanKeycard}
-                      onChange={(e) => setScanKeycard(e.target.value)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setScanKeycard(value);
+                        searchUserSuggestions(value);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          setShowUserSuggestions(false);
+                        }
+                      }}
+                      onFocus={() => {
+                        if (scanKeycard.length >= 2) {
+                          searchUserSuggestions(scanKeycard);
+                        }
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => setShowUserSuggestions(false), 200);
+                      }}
                       placeholder="Keycard scannen..."
                       className="pl-10"
                       autoFocus
                     />
+                    {/* User suggestions dropdown in dialog */}
+                    {showUserSuggestions && userSuggestions.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                        {userSuggestions.map((user) => (
+                          <div
+                            key={user.id}
+                            className="p-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+                            onClick={() => {
+                              setScanKeycard(user.keycard_number || user.username);
+                              setShowUserSuggestions(false);
+                            }}
+                          >
+                            <div className="font-medium">{user.name}</div>
+                            <div className="text-sm text-gray-500">
+                              {user.keycard_number ? `Keycard: ${user.keycard_number}` : `Username: ${user.username}`}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

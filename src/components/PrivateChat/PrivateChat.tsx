@@ -106,10 +106,14 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
     };
   }, [conversationId, profile?.id]);
 
-  // Ensure initial scroll to bottom on mount
+  // Ensure initial scroll to bottom on conversation open
   useEffect(() => {
-    setTimeout(scrollToBottom, 120);
-  }, [conversationId]); // Only on conversation change
+    if (conversationId) {
+      // Reset message count and scroll immediately
+      lastMessageCountRef.current = 0;
+      setTimeout(scrollToBottom, 200);
+    }
+  }, [conversationId]);
 
   // Auto-scroll only when message count actually increases
   useEffect(() => {
