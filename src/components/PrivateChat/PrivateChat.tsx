@@ -44,6 +44,7 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const lastMessageCountRef = useRef(0);
 
   useEffect(() => {
     fetchMessages();
@@ -108,18 +109,22 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
   // Ensure initial scroll to bottom on mount
   useEffect(() => {
     setTimeout(scrollToBottom, 120);
-  }, []);
+  }, [conversationId]); // Only on conversation change
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll only when message count actually increases
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    const currentCount = messages.length + optimisticMessages.length;
+    if (currentCount > lastMessageCountRef.current) {
+      scrollToBottom();
+      lastMessageCountRef.current = currentCount;
+    }
+  }, [messages.length, optimisticMessages.length]);
 
-  // Poll as a fallback to ensure new messages appear if realtime is blocked by RLS
+  // Reduced polling interval for better performance
   useEffect(() => {
     const interval = setInterval(() => {
       fetchMessages();
-    }, 2000);
+    }, 5000); // Increased from 2s to 5s
     return () => clearInterval(interval);
   }, [conversationId]);
 
@@ -138,8 +143,6 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
         if (error) throw error;
         const serverMessages = data || [];
         setMessages(serverMessages);
-        // Scroll after syncing
-        setTimeout(scrollToBottom, 50);
         // Remove optimistic messages that now exist on server
         setOptimisticMessages(prev => prev.filter(om =>
           !serverMessages.some(sm => sm.content === om.content && sm.sender_id === om.sender_id)
@@ -206,9 +209,11 @@ export const PrivateChat: React.FC<PrivateChatProps> = ({
         throw new Error((data as any)?.error || error?.message || 'Nachricht konnte nicht gesendet werden');
       }
       
+      // Scroll after sending
+      setTimeout(scrollToBottom, 50);
+      
       // Ensure UI reflects the persisted message even if realtime is blocked
       await fetchMessages();
-      // Do not remove the optimistic message here; fetchMessages will dedupe
     } catch (error) {
       console.error('Error sending message:', error);
       

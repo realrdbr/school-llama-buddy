@@ -37,9 +37,15 @@ export const MessageNotificationWidget: React.FC = () => {
     }
   }, [profile?.id]);
 
-  // Real-time updates for new messages
+  // Optimized real-time updates with debouncing
   useEffect(() => {
     if (!profile?.id) return;
+
+    let debounceTimer: NodeJS.Timeout;
+    const debouncedFetch = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(fetchUnreadMessages, 500);
+    };
 
     const channel = supabase
       .channel('unread-message-notifications')
@@ -53,7 +59,7 @@ export const MessageNotificationWidget: React.FC = () => {
         (payload) => {
           // Only count messages not sent by current user
           if (payload.new.sender_id !== profile.id) {
-            fetchUnreadMessages();
+            debouncedFetch();
           }
         }
       )
@@ -65,12 +71,13 @@ export const MessageNotificationWidget: React.FC = () => {
           table: 'private_messages'
         },
         () => {
-          fetchUnreadMessages();
+          debouncedFetch();
         }
       )
       .subscribe();
 
     return () => {
+      clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, [profile?.id]);
