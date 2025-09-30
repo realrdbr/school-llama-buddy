@@ -251,7 +251,7 @@ const Bibliothek = () => {
         b_genre: newBook.genre || null,
         b_total_copies: newBook.total_copies,
         b_description: newBook.description || null,
-        v_session_id: sessionId || ''
+        v_session_id: sessionId || localStorage.getItem('school_session_id') || ''
       });
 
       if (error || (data && (data as any).success === false)) {
@@ -306,7 +306,7 @@ const Bibliothek = () => {
         b_genre: editingBook.genre || null,
         b_total_copies: editingBook.total_copies,
         b_description: editingBook.description || null,
-        v_session_id: sessionId || ''
+        v_session_id: sessionId || localStorage.getItem('school_session_id') || ''
       });
 
       if (error || (data && (data as any).success === false)) {
