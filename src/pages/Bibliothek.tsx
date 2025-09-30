@@ -123,6 +123,7 @@ const Bibliothek = () => {
   const canManageBooks = hasPermission('library_manage_books');
   const canManageLoans = hasPermission('library_manage_loans');
   const canViewAllUsers = hasPermission('library_view_all_users');
+  const isLibrarian = (profile?.permission_lvl ?? 0) >= 6;
 
   console.log('Permissions:', { 
     canManageBooks, 
@@ -513,7 +514,7 @@ const Bibliothek = () => {
       setScannedBooks([]);
       handleSearchUser(); // Refresh user loans
       loadData(); // Refresh books
-      setActiveTab('loans'); // Stay on loans tab after operation
+      setActiveTab('all-loans');
     } catch (error) {
       console.error('Error loaning books:', error);
       toast({
@@ -572,6 +573,21 @@ const Bibliothek = () => {
         const picked = exactUser || usersFound[0];
         pickedUserId = picked.id;
         setSelectedUser({ ...picked, keycard_number: null, keycard_active: true });
+        // Try to fetch keycard info for the picked user
+        try {
+          await withSession(async () => {
+            const { data: permRow } = await supabase
+              .from('permissions')
+              .select('keycard_number, keycard_active')
+              .eq('id', picked.id)
+              .maybeSingle();
+            if (permRow) {
+              setSelectedUser((prev: any) => prev ? { ...prev, keycard_number: permRow.keycard_number, keycard_active: permRow.keycard_active } : { ...picked, keycard_number: permRow.keycard_number, keycard_active: permRow.keycard_active });
+            }
+          });
+        } catch (e) {
+          console.error('Keycard lookup failed:', e);
+        }
         toast({ title: 'Benutzer ausgewählt', description: `${picked.name} (@${picked.username})` });
       }
 
@@ -698,6 +714,7 @@ const Bibliothek = () => {
       setMultipleBarcodes('');
       handleSearchUser(); // Refresh user loans
       loadData(); // Refresh books
+      setActiveTab('all-loans');
     } catch (error) {
       console.error('Error loaning books:', error);
       toast({
@@ -1021,7 +1038,7 @@ const Bibliothek = () => {
             </div>
           </div>
           
-          {canManageBooks && (
+          {(canManageBooks || isLibrarian) && (
             <Button onClick={() => setShowAddBookDialog(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Neues Buch
@@ -1104,7 +1121,7 @@ const Bibliothek = () => {
                       </p>
                     )}
 
-                    {canManageBooks ? (
+                    {(canManageBooks || isLibrarian) ? (
                       <div className="flex gap-2">
                         <Button
                           size="sm"
