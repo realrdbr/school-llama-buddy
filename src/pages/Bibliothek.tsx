@@ -852,14 +852,10 @@ const Bibliothek = () => {
         description: "Buch wurde ausgeliehen."
       });
 
-      toast({
-        title: "Erfolg",
-        description: "Buch wurde ausgeliehen."
-      });
-
       setShowLoanDialog(false);
       setSelectedBook(null);
       setScanKeycard('');
+      setActiveTab('all-loans');
       loadData();
       if (selectedUser) {
         handleSearchUser();
@@ -1317,15 +1313,51 @@ const Bibliothek = () => {
                           <ScanLine className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                           <Input
                             value={scanBookBarcode}
-                            onChange={(e) => setScanBookBarcode(e.target.value)}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setScanBookBarcode(value);
+                              searchBookSuggestions(value);
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 handleAddScannedBook();
+                                setShowBookSuggestions(false);
+                              } else if (e.key === 'Escape') {
+                                setShowBookSuggestions(false);
                               }
+                            }}
+                            onFocus={() => {
+                              if (scanBookBarcode.length >= 2) {
+                                searchBookSuggestions(scanBookBarcode);
+                              }
+                            }}
+                            onBlur={() => {
+                              setTimeout(() => setShowBookSuggestions(false), 200);
                             }}
                             placeholder="Buchtitel oder Barcode eingeben..."
                             className="pl-10"
                           />
+                          {/* Book suggestions dropdown */}
+                          {showBookSuggestions && bookSuggestions.length > 0 && (
+                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                              {bookSuggestions.map((book) => (
+                                <div
+                                  key={book.id}
+                                  className="p-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+                                  onClick={() => {
+                                    setScanBookBarcode(book.title);
+                                    setShowBookSuggestions(false);
+                                    handleAddScannedBook();
+                                  }}
+                                >
+                                  <div className="font-medium">{book.title}</div>
+                                  <div className="text-sm text-gray-500">
+                                    {book.author} {book.isbn && `• ISBN: ${book.isbn}`}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                         <Button onClick={handleAddScannedBook} disabled={!scanBookBarcode.trim()}>
                           <Plus className="h-4 w-4 mr-2" />

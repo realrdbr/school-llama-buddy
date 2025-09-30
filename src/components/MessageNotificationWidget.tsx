@@ -159,8 +159,12 @@ export const MessageNotificationWidget: React.FC = () => {
     return message.length > 40 ? message.substring(0, 40) + '...' : message;
   };
 
-  const handleOpenMessages = () => {
-    navigate('/private-messages');
+  const handleOpenMessages = (conversationId?: string) => {
+    if (conversationId) {
+      navigate(`/private-messages?conversation=${conversationId}`);
+    } else {
+      navigate('/private-messages');
+    }
   };
 
   if (loading) {
@@ -198,7 +202,7 @@ export const MessageNotificationWidget: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={handleOpenMessages}
+            onClick={() => handleOpenMessages()}
             className="h-8 px-2"
           >
             <Users className="h-4 w-4" />
@@ -216,7 +220,7 @@ export const MessageNotificationWidget: React.FC = () => {
               <div
                 key={item.conversation_id}
                 className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                onClick={handleOpenMessages}
+                onClick={() => handleOpenMessages(item.conversation_id)}
               >
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="text-xs">
@@ -244,7 +248,7 @@ export const MessageNotificationWidget: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleOpenMessages}
+                  onClick={() => handleOpenMessages()}
                   className="text-xs h-8"
                 >
                   +{unreadMessages.length - 3} weitere...
@@ -257,7 +261,7 @@ export const MessageNotificationWidget: React.FC = () => {
         {totalUnread > 0 && (
           <div className="mt-3 pt-3 border-t">
             <Button
-              onClick={handleOpenMessages}
+              onClick={() => handleOpenMessages()}
               size="sm"
               className="w-full"
             >
