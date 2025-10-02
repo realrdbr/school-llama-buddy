@@ -1,1 +1,4 @@
 project_id = "afnfyivevmqihuqijusi"
+
+[functions.book-service]
+verify_jwt = false
