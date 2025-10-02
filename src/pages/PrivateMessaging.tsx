@@ -29,6 +29,37 @@ const PrivateMessaging = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Open chat directly when a conversation=... query param is present
+  // MUST come before any conditional returns to avoid hooks order issues
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const convId = params.get('conversation');
+    if (convId && profile?.id && hasPermission('private_messages')) {
+      (async () => {
+        try {
+          const { data: convs, error: convErr } = await supabase.rpc('list_private_conversations_session', {
+            v_session_id: sessionId || localStorage.getItem('school_session_id') || ''
+          });
+          if (convErr) throw convErr;
+          const conv = Array.isArray(convs) ? (convs as any[]).find((c) => c.id === convId) : null;
+          if (!conv) return;
+          const otherUserId = conv.user1_id === profile.id ? conv.user2_id : conv.user1_id;
+          const { data: userData } = await (supabase as any).rpc('get_user_public_info', {
+            user_id_param: otherUserId
+          });
+          const user = Array.isArray(userData) ? userData[0] : userData;
+          setCurrentChat({
+            conversationId: convId,
+            otherUser: { id: user?.id || otherUserId, name: user?.name || user?.username || 'Unbekannt' }
+          });
+          setCurrentView('chat');
+        } catch (e) {
+          console.error('Deep-link chat open failed:', e);
+        }
+      })();
+    }
+  }, [location.search, profile?.id, sessionId, hasPermission]);
+
   // Check if user has private messages permission
   if (!profile || !hasPermission('private_messages')) {
     return (
@@ -94,36 +125,6 @@ const PrivateMessaging = () => {
       console.error('Chat konnte nicht gestartet werden:', errorMessage);
     }
   };
-
-  // Open chat directly when a conversation=... query param is present
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const convId = params.get('conversation');
-    if (convId && profile?.id) {
-      (async () => {
-        try {
-          const { data: convs, error: convErr } = await supabase.rpc('list_private_conversations_session', {
-            v_session_id: sessionId || localStorage.getItem('school_session_id') || ''
-          });
-          if (convErr) throw convErr;
-          const conv = Array.isArray(convs) ? (convs as any[]).find((c) => c.id === convId) : null;
-          if (!conv) return;
-          const otherUserId = conv.user1_id === profile.id ? conv.user2_id : conv.user1_id;
-          const { data: userData } = await (supabase as any).rpc('get_user_public_info', {
-            user_id_param: otherUserId
-          });
-          const user = Array.isArray(userData) ? userData[0] : userData;
-          setCurrentChat({
-            conversationId: convId,
-            otherUser: { id: user?.id || otherUserId, name: user?.name || user?.username || 'Unbekannt' }
-          });
-          setCurrentView('chat');
-        } catch (e) {
-          console.error('Deep-link chat open failed:', e);
-        }
-      })();
-    }
-  }, [location.search, profile?.id, sessionId]);
 
   const handleBack = () => {
     setCurrentView('sidebar');
