@@ -246,6 +246,27 @@ serve(async (req) => {
         );
       }
 
+      case "get_user_by_id": {
+        // Allow librarians (6+) to view keycard info
+        if ((actor.permission_lvl ?? 0) < 6) return deny(403, "Insufficient permissions");
+        const { targetUserId } = payload;
+        if (!targetUserId) return deny(400, "Missing targetUserId");
+        const { data: userRow, error: userErr } = await supabase
+          .from('permissions')
+          .select('id, username, name, keycard_number, keycard_active')
+          .eq('id', targetUserId)
+          .maybeSingle();
+        if (userErr) {
+          console.error('[admin-users] get_user_by_id error', userErr);
+          return deny(500, `Fehler beim Suchen des Benutzers: ${userErr.message}`);
+        }
+        if (!userRow) return deny(404, 'Benutzer nicht gefunden');
+        return new Response(
+          JSON.stringify({ success: true, user: userRow }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       default:
         return deny(400, "Unknown action");
     

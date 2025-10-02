@@ -242,20 +242,26 @@ const Bibliothek = () => {
     }
 
     try {
-      const { data, error } = await supabase.rpc('add_book_session', {
-        b_title: newBook.title,
-        b_author: newBook.author,
-        b_isbn: newBook.isbn || null,
-        b_publisher: newBook.publisher || null,
-        b_publication_year: newBook.publication_year ? parseInt(newBook.publication_year) : null,
-        b_genre: newBook.genre || null,
-        b_total_copies: newBook.total_copies,
-        b_description: newBook.description || null,
-        v_session_id: sessionId || localStorage.getItem('school_session_id') || ''
+      const { data: resp, error: fnErr } = await supabase.functions.invoke('book-service', {
+        body: {
+          action: 'add_book',
+          book: {
+            title: newBook.title,
+            author: newBook.author,
+            isbn: newBook.isbn || null,
+            publisher: newBook.publisher || null,
+            publication_year: newBook.publication_year ? parseInt(newBook.publication_year) : null,
+            genre: newBook.genre || null,
+            total_copies: newBook.total_copies,
+            description: newBook.description || null
+          },
+          actorUserId: profile?.id,
+          actorUsername: profile?.username
+        }
       });
 
-      if (error || (data && (data as any).success === false)) {
-        throw new Error((data as any)?.error || error?.message || 'Hinzufügen fehlgeschlagen');
+      if (fnErr || !resp?.success) {
+        throw new Error(resp?.error || fnErr?.message || 'Hinzufügen fehlgeschlagen');
       }
 
       toast({
@@ -296,21 +302,27 @@ const Bibliothek = () => {
     }
 
     try {
-      const { data, error } = await supabase.rpc('update_book_session', {
-        b_id: editingBook.id,
-        b_title: editingBook.title,
-        b_author: editingBook.author,
-        b_isbn: editingBook.isbn || null,
-        b_publisher: editingBook.publisher || null,
-        b_publication_year: editingBook.publication_year || null,
-        b_genre: editingBook.genre || null,
-        b_total_copies: editingBook.total_copies,
-        b_description: editingBook.description || null,
-        v_session_id: sessionId || localStorage.getItem('school_session_id') || ''
+      const { data: resp, error: fnErr } = await supabase.functions.invoke('book-service', {
+        body: {
+          action: 'update_book',
+          book: {
+            id: editingBook.id,
+            title: editingBook.title,
+            author: editingBook.author,
+            isbn: editingBook.isbn || null,
+            publisher: editingBook.publisher || null,
+            publication_year: editingBook.publication_year || null,
+            genre: editingBook.genre || null,
+            total_copies: editingBook.total_copies,
+            description: editingBook.description || null
+          },
+          actorUserId: profile?.id,
+          actorUsername: profile?.username
+        }
       });
 
-      if (error || (data && (data as any).success === false)) {
-        throw new Error((data as any)?.error || error?.message || 'Aktualisierung fehlgeschlagen');
+      if (fnErr || !resp?.success) {
+        throw new Error(resp?.error || fnErr?.message || 'Aktualisierung fehlgeschlagen');
       }
 
       toast({
@@ -337,15 +349,18 @@ const Bibliothek = () => {
     }
 
     try {
-      const { data, error } = await supabase.rpc('delete_book_session', {
-        b_id: book.id,
-        v_session_id: sessionId || ''
+      const { data: resp, error: fnErr } = await supabase.functions.invoke('book-service', {
+        body: {
+          action: 'delete_book',
+          bookId: book.id,
+          actorUserId: profile?.id,
+          actorUsername: profile?.username
+        }
       });
 
-      if (error || (data && (data as any).success === false)) {
-        throw new Error((data as any)?.error || error?.message || 'Löschen fehlgeschlagen');
+      if (fnErr || !resp?.success) {
+        throw new Error(resp?.error || fnErr?.message || 'Löschen fehlgeschlagen');
       }
-
 
       toast({
         title: "Erfolg",
@@ -573,18 +588,19 @@ const Bibliothek = () => {
         const picked = exactUser || usersFound[0];
         pickedUserId = picked.id;
         setSelectedUser({ ...picked, keycard_number: null, keycard_active: true });
-        // Try to fetch keycard info for the picked user
+        // Fetch keycard info via edge function to avoid RLS/session context issues
         try {
-          await withSession(async () => {
-            const { data: permRow } = await supabase
-              .from('permissions')
-              .select('keycard_number, keycard_active')
-              .eq('id', picked.id)
-              .maybeSingle();
-            if (permRow) {
-              setSelectedUser((prev: any) => prev ? { ...prev, keycard_number: permRow.keycard_number, keycard_active: permRow.keycard_active } : { ...picked, keycard_number: permRow.keycard_number, keycard_active: permRow.keycard_active });
+          const { data: info, error: infoErr } = await supabase.functions.invoke('admin-users', {
+            body: {
+              action: 'get_user_by_id',
+              targetUserId: picked.id,
+              actorUserId: profile?.id,
+              actorUsername: profile?.username
             }
           });
+          if (!infoErr && info?.success && info?.user) {
+            setSelectedUser((prev: any) => prev ? { ...prev, keycard_number: info.user.keycard_number, keycard_active: info.user.keycard_active } : { ...picked, keycard_number: info.user.keycard_number, keycard_active: info.user.keycard_active });
+          }
         } catch (e) {
           console.error('Keycard lookup failed:', e);
         }
