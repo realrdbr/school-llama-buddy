@@ -24,10 +24,8 @@ export const useSessionRequest = () => {
     try {
       return await operation();
     } finally {
-      // Clean up session context
-      await supabase.rpc('set_session_context', {
-        session_id_param: ''
-      });
+      // Do not clear the session context here to avoid breaking subsequent RLS-guarded operations.
+      // The context is per-connection; we rely on setting it before sensitive operations.
     }
   };
 

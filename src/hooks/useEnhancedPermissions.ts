@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { useSessionRequest } from '@/hooks/useSessionRequest';
 
 export interface Permission {
   id: string;
@@ -47,6 +48,7 @@ const permissions: Permission[] = [
 
 export const useEnhancedPermissions = () => {
   const { profile } = useAuth();
+  const { withSession } = useSessionRequest();
   const [userPermissions, setUserPermissions] = useState<UserPermissions>({});
   const [levelPermissions, setLevelPermissions] = useState<LevelPermissions>({});
   const [isLoaded, setIsLoaded] = useState(false);
@@ -142,20 +144,21 @@ export const useEnhancedPermissions = () => {
     if (!canManagePermissions()) return false;
 
     try {
-      // Use native PostgreSQL UPSERT with ON CONFLICT
-      const { error } = await supabase
-        .from('user_permissions')
-        .upsert(
-          { user_id: userId, permission_id: permissionId, allowed, updated_at: new Date().toISOString() },
-          { onConflict: 'user_id,permission_id' }
-        );
+      const result = await withSession(async () => {
+        const { error } = await supabase
+          .from('user_permissions')
+          .upsert(
+            { user_id: userId, permission_id: permissionId, allowed, updated_at: new Date().toISOString() },
+            { onConflict: 'user_id,permission_id' }
+          );
+        return { error };
+      });
 
-      if (error) {
-        console.error('Error upserting user permission:', error);
+      if (result.error) {
+        console.error('Error upserting user permission:', result.error);
         return false;
       }
 
-      // Update local state
       setUserPermissions(prev => ({
         ...prev,
         [userId]: {
@@ -168,27 +171,28 @@ export const useEnhancedPermissions = () => {
       console.error('Error setting user permission:', error);
       return false;
     }
-  }, [canManagePermissions]);
+  }, [canManagePermissions, withSession]);
 
   // Save level permission to database
   const setLevelPermission = useCallback(async (level: number, permissionId: string, allowed: boolean) => {
     if (!canManagePermissions()) return false;
 
     try {
-      // Use native PostgreSQL UPSERT with ON CONFLICT
-      const { error } = await supabase
-        .from('level_permissions')
-        .upsert(
-          { level, permission_id: permissionId, allowed, updated_at: new Date().toISOString() },
-          { onConflict: 'level,permission_id' }
-        );
+      const result = await withSession(async () => {
+        const { error } = await supabase
+          .from('level_permissions')
+          .upsert(
+            { level, permission_id: permissionId, allowed, updated_at: new Date().toISOString() },
+            { onConflict: 'level,permission_id' }
+          );
+        return { error };
+      });
 
-      if (error) {
-        console.error('Error upserting level permission:', error);
+      if (result.error) {
+        console.error('Error upserting level permission:', result.error);
         return false;
       }
 
-      // Update local state
       setLevelPermissions(prev => ({
         ...prev,
         [level]: {
@@ -201,7 +205,7 @@ export const useEnhancedPermissions = () => {
       console.error('Error setting level permission:', error);
       return false;
     }
-  }, [canManagePermissions]);
+  }, [canManagePermissions, withSession]);
 
   return {
     permissions,
