@@ -2,3 +2,6 @@ project_id = "afnfyivevmqihuqijusi"
 
 [functions.book-service]
 verify_jwt = false
+
+[functions.permission-manager]
+verify_jwt = false

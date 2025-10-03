@@ -142,20 +142,27 @@ export const useEnhancedPermissions = () => {
   // Save user permission to database
   const setUserPermission = useCallback(async (userId: number, permissionId: string, allowed: boolean) => {
     if (!canManagePermissions()) return false;
+    if (!profile?.id) return false;
 
     try {
-      const result = await withSession(async () => {
-        const { error } = await supabase
-          .from('user_permissions')
-          .upsert(
-            { user_id: userId, permission_id: permissionId, allowed, updated_at: new Date().toISOString() },
-            { onConflict: 'user_id,permission_id' }
-          );
-        return { error };
+      const sessionId = localStorage.getItem('sessionId');
+      if (!sessionId) {
+        console.error('No session ID found');
+        return false;
+      }
+
+      const { data, error } = await supabase.functions.invoke('permission-manager', {
+        body: {
+          action: 'set_user_permission',
+          sessionId,
+          userId,
+          permissionId,
+          allowed
+        }
       });
 
-      if (result.error) {
-        console.error('Error upserting user permission:', result.error);
+      if (error || !data?.success) {
+        console.error('Error setting user permission:', error || data?.error);
         return false;
       }
 
@@ -171,25 +178,32 @@ export const useEnhancedPermissions = () => {
       console.error('Error setting user permission:', error);
       return false;
     }
-  }, [canManagePermissions, withSession]);
+  }, [canManagePermissions, profile]);
 
   // Save level permission to database
   const setLevelPermission = useCallback(async (level: number, permissionId: string, allowed: boolean) => {
     if (!canManagePermissions()) return false;
+    if (!profile?.id) return false;
 
     try {
-      const result = await withSession(async () => {
-        const { error } = await supabase
-          .from('level_permissions')
-          .upsert(
-            { level, permission_id: permissionId, allowed, updated_at: new Date().toISOString() },
-            { onConflict: 'level,permission_id' }
-          );
-        return { error };
+      const sessionId = localStorage.getItem('sessionId');
+      if (!sessionId) {
+        console.error('No session ID found');
+        return false;
+      }
+
+      const { data, error } = await supabase.functions.invoke('permission-manager', {
+        body: {
+          action: 'set_level_permission',
+          sessionId,
+          level,
+          permissionId,
+          allowed
+        }
       });
 
-      if (result.error) {
-        console.error('Error upserting level permission:', result.error);
+      if (error || !data?.success) {
+        console.error('Error setting level permission:', error || data?.error);
         return false;
       }
 
@@ -205,7 +219,7 @@ export const useEnhancedPermissions = () => {
       console.error('Error setting level permission:', error);
       return false;
     }
-  }, [canManagePermissions, withSession]);
+  }, [canManagePermissions, profile]);
 
   return {
     permissions,
