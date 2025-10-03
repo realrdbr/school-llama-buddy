@@ -123,7 +123,7 @@ const Bibliothek = () => {
   const canManageBooks = hasPermission('library_manage_books');
   const canManageLoans = hasPermission('library_manage_loans');
   const canViewAllUsers = hasPermission('library_view_all_users');
-  const isLibrarian = (profile?.permission_lvl ?? 0) >= 6;
+  const isLibrarian = canManageBooks || canManageLoans;
 
   console.log('Permissions:', { 
     canManageBooks, 
