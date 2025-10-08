@@ -24,15 +24,33 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Set session context
-    await supabase.rpc('set_session_context', { session_id_param: sessionId });
-
-    // Verify user has permission level 10
-    const { data: hasPermission } = await supabase.rpc('current_user_has_permission_level', {
-      required_level: 10
+    // Resolve actor from session directly to avoid GUC/session pooling issues
+    const { data: actorId, error: actorErr } = await supabase.rpc('resolve_current_user_from_session', {
+      v_session_id: sessionId
     });
 
-    if (!hasPermission) {
+    if (actorErr || !actorId) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid or expired session' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+      );
+    }
+
+    // Fetch actor permission level
+    const { data: actor, error: fetchErr } = await supabase
+      .from('permissions')
+      .select('permission_lvl')
+      .eq('id', actorId)
+      .maybeSingle();
+
+    if (fetchErr || !actor) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Actor not found' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+      );
+    }
+
+    if ((actor.permission_lvl ?? 0) < 10) {
       return new Response(
         JSON.stringify({ success: false, error: 'Insufficient permissions' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
