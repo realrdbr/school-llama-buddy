@@ -21,6 +21,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const navigate = useNavigate();
   const { profile, loading } = useAuth();
   const { hasPermission, isLoaded } = useEnhancedPermissions();
+  const allowed = hasPermission(requiredPermission) || (requiredPermission === 'library_view' && (profile?.permission_lvl ?? 0) >= 10);
 
   useEffect(() => {
     if (!profile && !loading) {
@@ -28,11 +29,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       return;
     }
 
-    if (isLoaded && !hasPermission(requiredPermission)) {
+    if (isLoaded && !allowed) {
       if (showToast) {
         // Enhanced error message for level 10 users trying to access library
         const isLibraryAccess = requiredPermission === 'library_view' && profile?.permission_lvl >= 10;
-        
         toast({
           variant: "destructive",
           title: "Zugriff verweigert",
@@ -55,7 +55,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Show nothing if access denied (navigation will handle redirect)
-  if (!hasPermission(requiredPermission)) {
+  if (!allowed) {
     return null;
   }
 
