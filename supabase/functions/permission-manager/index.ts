@@ -111,6 +111,30 @@ Deno.serve(async (req) => {
       );
     }
 
+    if (action === 'get_permissions') {
+      // Return both user and level permissions for UI consumption
+      const { data: userPerms, error: userPermsErr } = await supabase
+        .from('user_permissions')
+        .select('*');
+      const { data: levelPerms, error: levelPermsErr } = await supabase
+        .from('level_permissions')
+        .select('*');
+
+      if (userPermsErr || levelPermsErr) {
+        const err = userPermsErr || levelPermsErr;
+        console.error('Error fetching permissions:', err);
+        return new Response(
+          JSON.stringify({ success: false, error: err.message }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, user_permissions: userPerms ?? [], level_permissions: levelPerms ?? [] }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     return new Response(
       JSON.stringify({ success: false, error: 'Unknown action' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }

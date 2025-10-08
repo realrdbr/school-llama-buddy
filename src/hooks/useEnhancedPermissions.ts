@@ -61,18 +61,22 @@ export const useEnhancedPermissions = () => {
     }
 
     try {
-      // Load user-specific permissions
-      const { data: userPerms, error: userError } = await supabase
-        .from('user_permissions')
-        .select('*');
+      // Load permissions via Edge Function to avoid REST + RLS session issues
+      const effectiveSessionId = sessionId || localStorage.getItem('school_session_id');
+      const { data: permData, error: permError } = await supabase.functions.invoke('permission-manager', {
+        body: {
+          action: 'get_permissions',
+          sessionId: effectiveSessionId
+        }
+      });
 
-      // Load level-based permissions
-      const { data: levelPerms, error: levelError } = await supabase
-        .from('level_permissions')
-        .select('*');
+      if (permError || !permData?.success) {
+        console.error('Error loading permissions via function:', permError || permData?.error);
+      }
 
-      if (userError) console.error('Error loading user permissions:', userError);
-      if (levelError) console.error('Error loading level permissions:', levelError);
+      const userPerms = permData?.user_permissions as any[] | null;
+      const levelPerms = permData?.level_permissions as any[] | null;
+
 
       // Process user permissions
       const processedUserPerms: UserPermissions = {};

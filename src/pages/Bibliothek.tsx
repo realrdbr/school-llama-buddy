@@ -141,7 +141,7 @@ const Bibliothek = () => {
 
     if (!isLoaded) return; // wait for permissions to load
 
-    if (profile && !hasPermission('library_view')) {
+    if (profile && !(hasPermission('library_view') || (profile.permission_lvl ?? 0) >= 10)) {
       navigate('/');
       return;
     }
