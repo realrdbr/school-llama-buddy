@@ -47,7 +47,7 @@ const permissions: Permission[] = [
 ];
 
 export const useEnhancedPermissions = () => {
-  const { profile } = useAuth();
+  const { profile, sessionId } = useAuth();
   const { withSession } = useSessionRequest();
   const [userPermissions, setUserPermissions] = useState<UserPermissions>({});
   const [levelPermissions, setLevelPermissions] = useState<LevelPermissions>({});
@@ -145,8 +145,8 @@ export const useEnhancedPermissions = () => {
     if (!profile?.id) return false;
 
     try {
-      const sessionId = localStorage.getItem('sessionId');
-      if (!sessionId) {
+      const effectiveSessionId = sessionId || localStorage.getItem('school_session_id');
+      if (!effectiveSessionId) {
         console.error('No session ID found');
         return false;
       }
@@ -154,7 +154,7 @@ export const useEnhancedPermissions = () => {
       const { data, error } = await supabase.functions.invoke('permission-manager', {
         body: {
           action: 'set_user_permission',
-          sessionId,
+          sessionId: effectiveSessionId,
           userId,
           permissionId,
           allowed
@@ -186,8 +186,8 @@ export const useEnhancedPermissions = () => {
     if (!profile?.id) return false;
 
     try {
-      const sessionId = localStorage.getItem('sessionId');
-      if (!sessionId) {
+      const effectiveSessionId = sessionId || localStorage.getItem('school_session_id');
+      if (!effectiveSessionId) {
         console.error('No session ID found');
         return false;
       }
@@ -195,7 +195,7 @@ export const useEnhancedPermissions = () => {
       const { data, error } = await supabase.functions.invoke('permission-manager', {
         body: {
           action: 'set_level_permission',
-          sessionId,
+          sessionId: effectiveSessionId,
           level,
           permissionId,
           allowed
