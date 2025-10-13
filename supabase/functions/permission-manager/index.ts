@@ -5,6 +5,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Input validation constants
+const VALID_ACTIONS = ['set_user_permission', 'set_level_permission', 'get_permissions'];
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -15,16 +19,79 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { action, sessionId, userId, permissionId, level, allowed } = await req.json();
-
-    if (!sessionId) {
+    // Parse and validate input
+    let payload;
+    try {
+      payload = await req.json();
+    } catch {
       return new Response(
-        JSON.stringify({ success: false, error: 'Session ID required' }),
+        JSON.stringify({ success: false, error: 'Invalid JSON payload' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
 
-    // Resolve actor from session directly to avoid GUC/session pooling issues
+    const { action, sessionId, userId, permissionId, level, allowed } = payload;
+
+    // Validate action
+    if (!action || !VALID_ACTIONS.includes(action)) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid or missing action parameter' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
+    // Validate sessionId format
+    if (!sessionId || typeof sessionId !== 'string' || !UUID_REGEX.test(sessionId)) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid or missing sessionId (must be UUID)' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
+    // Action-specific validation
+    if (action === 'set_user_permission') {
+      if (typeof userId !== 'number' || userId <= 0) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Invalid userId (must be positive integer)' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
+      if (!permissionId || typeof permissionId !== 'string' || permissionId.length > 100) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Invalid permissionId' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
+      if (typeof allowed !== 'boolean') {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Invalid allowed value (must be boolean)' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
+    }
+
+    if (action === 'set_level_permission') {
+      if (typeof level !== 'number' || level < 1 || level > 10) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Invalid level (must be 1-10)' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
+      if (!permissionId || typeof permissionId !== 'string' || permissionId.length > 100) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Invalid permissionId' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
+      if (typeof allowed !== 'boolean') {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Invalid allowed value (must be boolean)' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
+    }
+
+    // Resolve actor from session (validation already done above)
     const { data: actorId, error: actorErr } = await supabase.rpc('resolve_current_user_from_session', {
       v_session_id: sessionId
     });
