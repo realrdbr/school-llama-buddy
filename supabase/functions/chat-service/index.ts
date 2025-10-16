@@ -13,18 +13,35 @@ serve(async (req) => {
 
   try {
     const body = await req.json()
-    const { action } = body
+    const { action, profileId } = body
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
-
-    if (!action) {
-      return new Response(JSON.stringify({ success: false, error: 'Missing action' }), {
+    // Input validation
+    if (!action || typeof action !== 'string') {
+      return new Response(JSON.stringify({ success: false, error: 'Missing or invalid action' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       })
     }
+
+    if (!profileId || typeof profileId !== 'string') {
+      return new Response(JSON.stringify({ success: false, error: 'Missing or invalid profileId' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
+    }
+
+    // Validate UUID format for profileId
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(profileId)) {
+      return new Response(JSON.stringify({ success: false, error: 'Invalid profileId format' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Helper: verify conversation belongs to user
     const ensureOwnership = async (conversationId: string, profileId: string) => {
@@ -41,9 +58,6 @@ serve(async (req) => {
 
     switch (action) {
       case 'list_conversations': {
-        const { profileId } = body
-        if (!profileId) throw new Error('Missing profileId')
-
         const { data, error } = await supabase
           .from('chat_conversations')
           .select('id, title, created_at, updated_at')
@@ -54,8 +68,13 @@ serve(async (req) => {
       }
 
       case 'list_messages': {
-        const { profileId, conversationId } = body
-        if (!profileId || !conversationId) throw new Error('Missing profileId or conversationId')
+        const { conversationId } = body
+        if (!conversationId || typeof conversationId !== 'string') {
+          throw new Error('Missing or invalid conversationId')
+        }
+        if (!uuidRegex.test(conversationId)) {
+          throw new Error('Invalid conversationId format')
+        }
         await ensureOwnership(conversationId, profileId)
 
         const { data, error } = await supabase
@@ -68,8 +87,10 @@ serve(async (req) => {
       }
 
       case 'create_conversation': {
-        const { profileId, title } = body
-        if (!profileId || !title) throw new Error('Missing profileId or title')
+        const { title } = body
+        if (!title || typeof title !== 'string' || title.length > 255) {
+          throw new Error('Missing or invalid title')
+        }
         const { data, error } = await supabase
           .from('chat_conversations')
           .insert({ user_id: profileId, title })
@@ -80,8 +101,22 @@ serve(async (req) => {
       }
 
       case 'add_message': {
-        const { profileId, conversationId, role, content } = body
-        if (!profileId || !conversationId || !role || !content) throw new Error('Missing fields')
+        const { conversationId, role, content } = body
+        
+        // Input validation
+        if (!conversationId || typeof conversationId !== 'string') {
+          throw new Error('Missing or invalid conversationId')
+        }
+        if (!uuidRegex.test(conversationId)) {
+          throw new Error('Invalid conversationId format')
+        }
+        if (!role || typeof role !== 'string' || !['user', 'assistant', 'system'].includes(role)) {
+          throw new Error('Invalid role')
+        }
+        if (!content || typeof content !== 'string' || content.length > 10000) {
+          throw new Error('Missing or invalid content')
+        }
+        
         await ensureOwnership(conversationId, profileId)
 
         const { error: msgErr } = await supabase
@@ -99,8 +134,13 @@ serve(async (req) => {
       }
 
       case 'delete_conversation': {
-        const { profileId, conversationId } = body
-        if (!profileId || !conversationId) throw new Error('Missing profileId or conversationId')
+        const { conversationId } = body
+        if (!conversationId || typeof conversationId !== 'string') {
+          throw new Error('Missing or invalid conversationId')
+        }
+        if (!uuidRegex.test(conversationId)) {
+          throw new Error('Invalid conversationId format')
+        }
         await ensureOwnership(conversationId, profileId)
 
         // Delete messages first (FK might not cascade)
@@ -110,9 +150,6 @@ serve(async (req) => {
       }
 
       case 'delete_all_conversations': {
-        const { profileId } = body
-        if (!profileId) throw new Error('Missing profileId')
-
         // Get all conv ids
         const { data: convs, error: convErr } = await supabase
           .from('chat_conversations')
@@ -129,8 +166,13 @@ serve(async (req) => {
       }
 
       case 'touch_conversation': {
-        const { profileId, conversationId } = body
-        if (!profileId || !conversationId) throw new Error('Missing profileId or conversationId')
+        const { conversationId } = body
+        if (!conversationId || typeof conversationId !== 'string') {
+          throw new Error('Missing or invalid conversationId')
+        }
+        if (!uuidRegex.test(conversationId)) {
+          throw new Error('Invalid conversationId format')
+        }
         await ensureOwnership(conversationId, profileId)
         await supabase.from('chat_conversations').update({ updated_at: new Date().toISOString() }).eq('id', conversationId)
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })

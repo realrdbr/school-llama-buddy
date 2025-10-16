@@ -30,7 +30,7 @@ const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [availableClasses, setAvailableClasses] = useState<string[]>([]);
-  const { profile } = useAuth();
+  const { profile, sessionId } = useAuth();
 
   // Load available classes from database
   useEffect(() => {
@@ -88,23 +88,14 @@ const EditUserModal = ({ isOpen, onClose, user }: EditUserModalProps) => {
 
     setLoading(true);
     try {
-      // Build actor info from context or localStorage fallback
-      const storedProfile = typeof window !== 'undefined' ? localStorage.getItem('school_profile') : null;
-      let actorUserId = profile?.id as number | undefined;
-      let actorUsername = (profile as any)?.username as string | undefined;
-      if ((!actorUserId || !actorUsername) && storedProfile) {
-        try {
-          const parsed = JSON.parse(storedProfile);
-          actorUserId = actorUserId ?? parsed?.id;
-          actorUsername = actorUsername ?? parsed?.username;
-        } catch {}
+      if (!sessionId) {
+        throw new Error('Keine aktive Sitzung');
       }
 
       const { data, error } = await supabase.functions.invoke('admin-users', {
         body: {
           action: 'update_user',
-          actorUserId,
-          actorUsername,
+          sessionId,
           targetUserId: user.id,
           targetUsername: user.username,
           updates: {
