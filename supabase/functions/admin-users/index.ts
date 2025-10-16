@@ -14,7 +14,7 @@ serve(async (req) => {
 
   try {
     const payload = await req.json();
-    const { action, sessionId } = payload;
+    const { action } = payload;
     console.log('[admin-users] input', { action });
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -29,48 +29,52 @@ serve(async (req) => {
 
     if (!action) return deny(400, "Missing action");
 
-    // Input validation for sessionId
-    if (!sessionId || typeof sessionId !== 'string') {
-      return deny(400, "Missing or invalid sessionId");
+    // Get actor info from request payload (internal auth system)
+    const { actorUserId, actorUsername } = payload;
+    
+    if (!actorUserId && !actorUsername) {
+      return deny(400, "Missing actor information");
     }
 
-    // Validate UUID format
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(sessionId)) {
-      return deny(400, "Invalid sessionId format");
+    // Get actor permission info using internal user ID or username
+    let actor;
+    let actorErr;
+    
+    if (actorUserId) {
+      const result = await supabase
+        .from('permissions')
+        .select('id, permission_lvl, username, name, user_class, keycard_number, keycard_active')
+        .eq('id', actorUserId)
+        .maybeSingle();
+      actor = result.data;
+      actorErr = result.error;
+    } else if (actorUsername) {
+      const result = await supabase
+        .from('permissions')
+        .select('id, permission_lvl, username, name, user_class, keycard_number, keycard_active')
+        .eq('username', actorUsername)
+        .maybeSingle();
+      actor = result.data;
+      actorErr = result.error;
     }
 
-    // Server-side permission verification for level 10 operations
-    const { data: permCheck, error: permError } = await supabase.rpc('verify_permission_server_side', {
-      session_id_param: sessionId,
-      required_level: 10
-    }).single();
+    console.log('[admin-users] actor', { actor, actorErr });
 
-    if (permError || !permCheck?.is_valid) {
-      console.error('[admin-users] Permission check failed:', permError, permCheck);
-      return deny(403, permCheck?.error_message || "Unauthorized - Invalid session or insufficient permissions");
-    }
-
-    const actorUserId = permCheck.user_id;
-
-    // Get full actor info
-    const { data: actor, error: actorErr } = await supabase
-      .from('permissions')
-      .select('id, permission_lvl, username, name, user_class, keycard_number, keycard_active')
-      .eq('id', actorUserId)
-      .maybeSingle();
-
-    if (actorErr || !actor) {
-      console.error('[admin-users] Actor lookup failed:', actorErr);
+    if (actorErr) {
+      console.error("admin-users actor lookup error:", actorErr);
       return deny(500, "Actor lookup failed");
+    }
+
+    if (!actor) {
+      return deny(403, "Missing or invalid actor");
     }
 
     switch (action) {
       case "list_users": {
-        // Use safe public view instead of direct permissions table access
+        if ((actor.permission_lvl ?? 0) < 10) return deny(403, "Insufficient permissions");
         const { data, error } = await supabase
-          .from("user_public_info")
-          .select("id, username, name, permission_lvl, user_class, created_at")
+          .from("permissions")
+          .select("id, username, name, permission_lvl, created_at, user_class, keycard_number, keycard_active")
           .order("permission_lvl", { ascending: false })
           .order("name", { ascending: true });
         
@@ -84,23 +88,11 @@ serve(async (req) => {
       }
 
       case "update_user": {
+        if ((actor.permission_lvl ?? 0) < 10) return deny(403, "Insufficient permissions");
         const { targetUserId, targetUsername, updates } = payload;
         console.log('[admin-users] update_user input', { targetUserId, targetUsername, updates });
 
-        // Input validation
         if (!targetUserId && !targetUsername) return deny(400, "Missing target identifier");
-        
-        if (targetUserId && (typeof targetUserId !== 'number' || targetUserId <= 0)) {
-          return deny(400, "Invalid targetUserId");
-        }
-
-        if (targetUsername && (typeof targetUsername !== 'string' || targetUsername.length > 255)) {
-          return deny(400, "Invalid targetUsername");
-        }
-
-        if (!updates || typeof updates !== 'object') {
-          return deny(400, "Invalid updates object");
-        }
 
         // Resolve target user by id or username
         let targetUserIdResolved = targetUserId;
@@ -166,13 +158,14 @@ serve(async (req) => {
             return deny(500, result?.error || 'Fehler beim Ändern des Passworts');
           }
           
-          // Log admin operation
-          await supabase.from('admin_operation_log').insert({
-            user_id: actor.id,
-            operation: 'password_change',
-            target_user_id: targetUserIdResolved,
-            operation_details: { targetUser: targetUser.username, actor: actor.username }
-          }).catch(err => console.error('Failed to log admin operation:', err));
+          // Log security event
+          await supabase.rpc('log_security_event', {
+            user_id_param: actor.id,
+            action_param: 'admin_password_change',
+            resource_param: `user:${targetUserIdResolved}`,
+            success_param: true,
+            details_param: { targetUser: targetUser.username, actor: actor.username }
+          }).catch(err => console.error('Failed to log security event:', err));
         }
 
         if (Object.keys(updatePayload).length === 0) {
@@ -209,19 +202,10 @@ serve(async (req) => {
       }
 
       case "delete_user": {
+        if ((actor.permission_lvl ?? 0) < 10) return deny(403, "Insufficient permissions");
         const { targetUserId, targetUsername } = payload;
         console.log('[admin-users] delete_user input', { targetUserId, targetUsername });
-        
-        // Input validation
         if (!targetUserId && !targetUsername) return deny(400, "Missing target identifier");
-        
-        if (targetUserId && (typeof targetUserId !== 'number' || targetUserId <= 0)) {
-          return deny(400, "Invalid targetUserId");
-        }
-
-        if (targetUsername && (typeof targetUsername !== 'string' || targetUsername.length > 255)) {
-          return deny(400, "Invalid targetUsername");
-        }
 
         // Resolve target id if only username provided
         let targetIdResolved = targetUserId;
@@ -249,14 +233,6 @@ serve(async (req) => {
           return deny(500, `Fehler beim Löschen: ${error.message}`);
         }
 
-        // Log admin operation
-        await supabase.from('admin_operation_log').insert({
-          user_id: actor.id,
-          operation: 'user_deletion',
-          target_user_id: targetIdResolved,
-          operation_details: { targetUserId: targetIdResolved }
-        }).catch(err => console.error('Failed to log admin operation:', err));
-
         return new Response(
           JSON.stringify({ success: true }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -271,16 +247,10 @@ serve(async (req) => {
       }
 
       case "get_user_by_id": {
-        const { targetUserId } = payload;
-        
-        // Input validation
-        if (!targetUserId) return deny(400, "Missing targetUserId");
-        if (typeof targetUserId !== 'number' || targetUserId <= 0) {
-          return deny(400, "Invalid targetUserId");
-        }
-
-        // Re-check permission level for librarians (need level 6+)
+        // Allow librarians (6+) to view keycard info
         if ((actor.permission_lvl ?? 0) < 6) return deny(403, "Insufficient permissions");
+        const { targetUserId } = payload;
+        if (!targetUserId) return deny(400, "Missing targetUserId");
         const { data: userRow, error: userErr } = await supabase
           .from('permissions')
           .select('id, username, name, keycard_number, keycard_active')
@@ -301,18 +271,13 @@ serve(async (req) => {
         return deny(400, "Unknown action");
     
     case 'search_by_keycard':
-      // Re-check permission for librarians
-      if ((actor.permission_lvl ?? 0) < 6) {
+      // Allow librarians and above to search by keycard (Level 6+)
+      if (!actor || (actor.permission_lvl ?? 0) < 6) {
         return deny(403, "Bibliotheks-Berechtigung erforderlich");
       }
       
-      // Input validation
       if (!payload.keycard_number) {
         return deny(400, 'Keycard-Nummer fehlt');
-      }
-
-      if (typeof payload.keycard_number !== 'string' || payload.keycard_number.length > 100) {
-        return deny(400, 'Invalid keycard_number');
       }
       
       const searchResult = await supabase

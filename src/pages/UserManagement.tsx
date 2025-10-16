@@ -28,7 +28,7 @@ interface User {
 
 const UserManagement = () => {
   const navigate = useNavigate();
-  const { user, profile, sessionId } = useAuth();
+  const { user, profile } = useAuth();
   const { hasPermission, isLoaded } = useEnhancedPermissions();
   
   const [users, setUsers] = useState<User[]>([]);
@@ -70,12 +70,13 @@ const UserManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      if (!profile || !sessionId) throw new Error('Keine aktive Sitzung');
+      if (!profile) throw new Error('Kein Profil gefunden');
 
       const { data, error } = await supabase.functions.invoke('admin-users', {
         body: {
           action: 'list_users',
-          sessionId,
+          actorUserId: profile.id,
+          actorUsername: profile.username,
         },
       });
       
@@ -125,12 +126,13 @@ const handleDeleteUser = async () => {
   if (!selectedUser) return;
   setDeleting(true);
     try {
-      if (!profile || !sessionId) throw new Error('Keine aktive Sitzung');
+      if (!profile) throw new Error('Kein Profil gefunden');
 
       const { data, error } = await supabase.functions.invoke('admin-users', {
         body: {
           action: 'delete_user',
-          sessionId,
+          actorUserId: profile.id,
+          actorUsername: profile.username,
           targetUserId: selectedUser.id,
           targetUsername: selectedUser.username
         }

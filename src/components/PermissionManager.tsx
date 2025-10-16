@@ -23,7 +23,7 @@ interface User {
 }
 
 const PermissionManager = () => {
-  const { profile, sessionId } = useAuth();
+  const { profile } = useAuth();
   const { 
     permissions, 
     userPermissions, 
@@ -50,12 +50,12 @@ const PermissionManager = () => {
 
   const fetchUsers = async () => {
     try {
-      if (!profile || !sessionId) throw new Error('Keine aktive Sitzung');
+      if (!profile) throw new Error('Kein Profil gefunden');
 
       const { data, error } = await supabase.functions.invoke('admin-users', {
         body: {
           action: 'list_users',
-          sessionId,
+          actorUserId: profile.id,
         },
       });
       
