@@ -158,14 +158,14 @@ serve(async (req) => {
             return deny(500, result?.error || 'Fehler beim Ändern des Passworts');
           }
           
-          // Log security event
-          await supabase.rpc('log_security_event', {
+          // Log security event (fire and forget)
+          supabase.rpc('log_security_event', {
             user_id_param: actor.id,
             action_param: 'admin_password_change',
             resource_param: `user:${targetUserIdResolved}`,
             success_param: true,
             details_param: { targetUser: targetUser.username, actor: actor.username }
-          }).catch(err => console.error('Failed to log security event:', err));
+          }).then(() => {}).catch(err => console.error('Failed to log security event:', err));
         }
 
         if (Object.keys(updatePayload).length === 0) {
